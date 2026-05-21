@@ -1,0 +1,46 @@
+{
+  "source": "misli_public",
+  "page_url": "manual-task45-fixture",
+  "scraped_at": "2026-05-20T12:00:00+04:00",
+  "title": "Task 45 deterministic live dry-run snapshot",
+  "event_count": 1,
+  "events": [
+    {
+      "source": "misli_public",
+      "sport": "football",
+      "event_id": "task45-001",
+      "source_match_id": "task45-001",
+      "detail_url": null,
+      "home_team": "Northbridge FC",
+      "away_team": "Harbor Rovers",
+      "kickoff_date_label": "20.06.2026",
+      "kickoff_date": "20.06.2026",
+      "kickoff_time": "20:00",
+      "league": "Task 45 Dry Run",
+      "odds": [
+        {
+          "market": "1X2",
+          "selection": "HOME",
+          "odds_decimal": 2.1,
+          "label": "1",
+          "raw_text": "1 2.10"
+        },
+        {
+          "market": "1X2",
+          "selection": "DRAW",
+          "odds_decimal": 3.2,
+          "label": "X",
+          "raw_text": "X 3.20"
+        },
+        {
+          "market": "1X2",
+          "selection": "AWAY",
+          "odds_decimal": 3.4,
+          "label": "2",
+          "raw_text": "2 3.40"
+        }
+      ],
+      "raw_text": "Northbridge FC - Harbor Rovers 20.06.2026 20:00 1 2.10 X 3.20 2 3.40"
+    }
+  ]
+}

@@ -1,0 +1,306 @@
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select, text
+
+from app.config import load_settings
+from app.db.engine import create_engine_from_url, session_scope
+from app.db.models import AIAnalysisRun
+from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
+from app.services.live_status_service import LiveStatusService
+
+
+def create_api(
+    reports_dir: Path = Path("reports"),
+    database_url: str | None = None,
+) -> FastAPI:
+    api = FastAPI(title="Paper Odds Lab API")
+    live_database_url = database_url or load_settings().database_url
+    live_status = LiveStatusService(live_database_url)
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
+        allow_credentials=True,
+        allow_methods=["GET"],
+        allow_headers=["*"],
+    )
+
+    @api.get("/api/health")
+    def get_health() -> dict[str, Any]:
+        return _health_payload(live_database_url)
+
+    @api.get("/api/reports/comparisons")
+    def list_comparisons(include_test_reports: bool = False) -> list[dict[str, Any]]:
+        return [
+            _comparison_summary(path)
+            for path in sorted(reports_dir.glob("*_comparison.json"))
+            if include_test_reports or not _is_test_report(path)
+        ]
+
+    @api.get("/api/reports/comparisons/{name}")
+    def get_comparison(name: str) -> dict[str, Any]:
+        report_path = _comparison_report_path(reports_dir, name)
+        report = _load_comparison_report(report_path, name)
+        analysis = _optional_analysis_payload(report_path, name)
+        if isinstance(analysis, dict):
+            report["analysis"] = analysis
+        else:
+            report["analysis_error"] = analysis
+        return report
+
+    @api.get("/api/reports/comparisons/{name}/analysis")
+    def get_comparison_analysis(name: str) -> dict[str, Any]:
+        report_path = _comparison_report_path(reports_dir, name)
+        return _analysis_payload(report_path, name)
+
+    @api.get("/api/live/status")
+    def get_live_status() -> dict[str, Any]:
+        return live_status.status()
+
+    @api.get("/api/live/runs")
+    def list_live_runs(limit: int = 20) -> list[dict[str, Any]]:
+        return live_status.recent_runs(limit=limit)
+
+    @api.get("/api/live/runs/{run_id:path}")
+    def get_live_run(run_id: str) -> dict[str, Any]:
+        live_run = live_status.run(run_id)
+        if live_run is None:
+            raise HTTPException(status_code=404, detail=f"live run not found: {run_id}")
+        return live_run
+
+    @api.get("/api/ai/analysis/latest")
+    def get_latest_ai_analysis() -> dict[str, Any]:
+        analysis = _latest_ai_analysis_payload(live_database_url)
+        if analysis is None:
+            raise HTTPException(status_code=404, detail="AI analysis run not found")
+        return analysis
+
+    @api.get("/api/ai/analysis/runs")
+    def list_ai_analysis_runs(limit: int = 20) -> list[dict[str, Any]]:
+        return _ai_analysis_run_payloads(live_database_url, limit=limit)
+
+    @api.get("/api/ai/analysis/runs/{analysis_id}")
+    def get_ai_analysis_run(analysis_id: int) -> dict[str, Any]:
+        analysis = _ai_analysis_run_payload(live_database_url, analysis_id)
+        if analysis is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"AI analysis run not found: {analysis_id}",
+            )
+        return analysis
+
+    return api
+
+
+api = create_api()
+
+
+def _comparison_summary(path: Path) -> dict[str, Any]:
+    report = _read_json(path)
+    metadata = report.get("metadata", {})
+    runs = report.get("runs", [])
+    rankings = report.get("rankings", {})
+    sample_size = _sample_size(runs)
+    return {
+        "name": _comparison_name_from_path(path),
+        "filename": path.name,
+        "league": metadata.get("league"),
+        "season": metadata.get("season"),
+        "models": metadata.get("models", []),
+        "bookmakers": metadata.get("bookmakers", []),
+        "runs": len(runs),
+        "modified_at": _report_timestamp(path, metadata),
+        "total_settled_bets": _sum_run_metric(runs, "settled_bets"),
+        "best_roi": _ranking_value(rankings, "best_roi", runs, "roi", higher_is_better=True),
+        "best_brier_score": _ranking_value(
+            rankings,
+            "best_brier_score",
+            runs,
+            "brier_score",
+            higher_is_better=False,
+        ),
+        "best_log_loss": _ranking_value(
+            rankings,
+            "best_log_loss",
+            runs,
+            "log_loss",
+            higher_is_better=False,
+        ),
+        "sample_size_smallest": sample_size[0],
+        "sample_size_largest": sample_size[1],
+    }
+
+
+def _health_payload(database_url: str) -> dict[str, Any]:
+    engine = create_engine_from_url(database_url)
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "ok"}
+    finally:
+        engine.dispose()
+
+
+def _comparison_report_path(reports_dir: Path, name: str) -> Path:
+    return reports_dir / f"{name}_comparison.json"
+
+
+def _comparison_name_from_path(path: Path) -> str:
+    return path.name.removesuffix("_comparison.json")
+
+
+def _is_test_report(path: Path) -> bool:
+    return _comparison_name_from_path(path).startswith("pytest_")
+
+
+def _report_timestamp(path: Path, metadata: Any) -> str:
+    if isinstance(metadata, dict) and isinstance(metadata.get("generated_at"), str):
+        generated_at = metadata["generated_at"]
+        try:
+            datetime.fromisoformat(generated_at)
+        except ValueError:
+            pass
+        else:
+            return generated_at
+
+    return datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat()
+
+
+def _load_comparison_report(path: Path, name: str) -> dict[str, Any]:
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"comparison report not found: {name}")
+    return _read_json(path)
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    return loaded
+
+
+def _analysis_payload(path: Path, name: str) -> dict[str, Any]:
+    try:
+        return ComparisonAnalysisService().analyze_comparison_data(path)
+    except ComparisonAnalysisError as exc:
+        if not path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"comparison report not found: {name}",
+            ) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _optional_analysis_payload(path: Path, name: str) -> dict[str, Any] | str:
+    try:
+        return _analysis_payload(path, name)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            raise
+        return str(exc.detail)
+
+
+def _sum_run_metric(runs: Any, metric: str) -> int:
+    if not isinstance(runs, list):
+        return 0
+    return sum(int(run.get(metric, 0)) for run in runs if isinstance(run, dict))
+
+
+def _sample_size(runs: Any) -> tuple[int | None, int | None]:
+    if not isinstance(runs, list):
+        return None, None
+    settled_counts = [
+        int(run["settled_bets"])
+        for run in runs
+        if isinstance(run, dict) and isinstance(run.get("settled_bets"), int | float)
+    ]
+    if not settled_counts:
+        return None, None
+    return min(settled_counts), max(settled_counts)
+
+
+def _ranking_value(
+    rankings: Any,
+    ranking_key: str,
+    runs: Any,
+    metric: str,
+    *,
+    higher_is_better: bool,
+) -> float | None:
+    if isinstance(rankings, dict):
+        ranking = rankings.get(ranking_key)
+        if isinstance(ranking, dict) and isinstance(ranking.get("value"), int | float):
+            return float(ranking["value"])
+
+    if not isinstance(runs, list):
+        return None
+    values = [
+        float(run[metric])
+        for run in runs
+        if isinstance(run, dict) and isinstance(run.get(metric), int | float)
+    ]
+    if not values:
+        return None
+    return max(values) if higher_is_better else min(values)
+
+
+def _latest_ai_analysis_payload(database_url: str) -> dict[str, Any] | None:
+    engine = create_engine_from_url(database_url)
+    try:
+        with session_scope(engine) as session:
+            analysis = session.scalar(
+                select(AIAnalysisRun)
+                .order_by(AIAnalysisRun.created_at.desc(), AIAnalysisRun.id.desc())
+                .limit(1)
+            )
+            return _ai_analysis_payload(analysis)
+    finally:
+        engine.dispose()
+
+
+def _ai_analysis_run_payloads(database_url: str, *, limit: int) -> list[dict[str, Any]]:
+    engine = create_engine_from_url(database_url)
+    try:
+        with session_scope(engine) as session:
+            analyses = session.scalars(
+                select(AIAnalysisRun)
+                .order_by(AIAnalysisRun.created_at.desc(), AIAnalysisRun.id.desc())
+                .limit(max(1, min(limit, 100)))
+            ).all()
+            return [payload for analysis in analyses if (payload := _ai_analysis_payload(analysis))]
+    finally:
+        engine.dispose()
+
+
+def _ai_analysis_run_payload(database_url: str, analysis_id: int) -> dict[str, Any] | None:
+    engine = create_engine_from_url(database_url)
+    try:
+        with session_scope(engine) as session:
+            return _ai_analysis_payload(session.get(AIAnalysisRun, analysis_id))
+    finally:
+        engine.dispose()
+
+
+def _ai_analysis_payload(analysis: AIAnalysisRun | None) -> dict[str, Any] | None:
+    if analysis is None:
+        return None
+    return {
+        "id": analysis.id,
+        "analysis_type": analysis.analysis_type,
+        "source_type": analysis.source_type,
+        "source_id": analysis.source_id,
+        "input": json.loads(analysis.input_json),
+        "output": json.loads(analysis.output_json),
+        "model_name": analysis.model_name,
+        "prompt_version": analysis.prompt_version,
+        "status": analysis.status,
+        "error_summary": analysis.error_summary,
+        "created_at": analysis.created_at,
+    }
