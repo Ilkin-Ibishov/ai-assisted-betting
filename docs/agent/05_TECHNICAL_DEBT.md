@@ -88,6 +88,8 @@ Task 34 added Brier and log-loss calibration lines to the cross-report trend cha
 
 Task 35 added trend metric visibility controls and did not introduce new documented technical debt.
 
+Task 50 added the one-shot scheduled paper worker and did not introduce new documented technical debt. Worker cadence is intentionally externalized to Railway or another scheduler and remains an open deployment decision, not implementation debt.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

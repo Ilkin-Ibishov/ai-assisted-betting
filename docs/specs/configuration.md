@@ -57,6 +57,7 @@ FOOTBALL_API_KEY=
 - CLI `--model` options may override `MODEL_NAME` for a single command run.
 - Keep `AI_ANALYSIS_MODE=deterministic` unless an LLM provider is explicitly implemented and verified.
 - Do not require AI provider credentials for the core paper-betting loop.
+- `run-scheduled-paper-worker` must use `LIVE_COLLECTION_ENABLED=true`; keep it `false` for local/API services that should not collect live data.
 
 ## Environments
 
@@ -78,6 +79,20 @@ API:
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 LIVE_COLLECTION_ENABLED=false
 AI_ANALYSIS_MODE=deterministic
+```
+
+Scheduled worker:
+
+```env
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+LIVE_COLLECTION_ENABLED=true
+AI_ANALYSIS_MODE=deterministic
+```
+
+Run command:
+
+```powershell
+python -m app.cli run-scheduled-paper-worker --provider misli-public --snapshot <snapshot.json> --model baseline_heuristic
 ```
 
 Dashboard:

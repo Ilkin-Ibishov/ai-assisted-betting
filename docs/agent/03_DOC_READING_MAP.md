@@ -342,6 +342,10 @@ Only after the offline sample pipeline works:
 - `docs/tasks/task-46-live-cycle-run-scoping.md`
 - `docs/specs/live-paper-loop.md`
 - `docs/specs/safety-and-compliance.md`
+- `docs/specs/configuration.md`
+- `app/services/scheduled_worker_service.py`
+- `app/services/live_cycle_service.py`
+- `app/cli.py`
 
 ## Task 51 - Railway Deployment Runbook And Production Smoke
 

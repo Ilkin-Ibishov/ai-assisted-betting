@@ -40,10 +40,11 @@ deterministic end-to-end live paper dry run
 Not yet available:
 
 ```text
-scheduled collection loop
 provider-native result discovery
 complete resolution for bare time-only Misli rows
 ```
+
+Task 50 added a one-shot scheduled paper worker command. It does not run an infinite local loop; Railway or another scheduler owns cadence.
 
 ## Phase Goal
 
@@ -231,6 +232,7 @@ python -m app.cli run-live-paper-cycle
 python -m app.cli collect-results
 python -m app.cli settle-results
 python -m app.cli evaluate
+python -m app.cli run-scheduled-paper-worker
 ```
 
 Task 40 implemented the manual Misli public snapshot forms:
@@ -271,6 +273,14 @@ python -m app.cli settle-results
 ```
 
 `collect-results` updates matches by `source + source_match_id` and records a `live_runs` entry. `settle-results` remains the existing explicit settlement command.
+
+Task 50 implemented the one-shot scheduled paper worker:
+
+```powershell
+python -m app.cli run-scheduled-paper-worker --provider misli-public --snapshot <snapshot.json> --model baseline_heuristic
+```
+
+The worker records `live_runs.run_type='scheduled_paper_worker'`, refuses to run unless `LIVE_COLLECTION_ENABLED=true`, skips when another worker run is already `running`, and delegates the paper cycle to `run-live-paper-cycle` behavior. It intentionally does not perform settlement.
 
 ## Error Handling
 
@@ -325,6 +335,10 @@ Build in this order:
 8. Task 45 - End-To-End Live Paper Dry Run
 9. Task 46 - Live Cycle Run Scoping
 10. Task 47 - Misli Kickoff Date Extraction
+11. Task 48 - AI-Assisted Analyst Layer
+12. Task 52 - Provider Health AI Analysis
+13. Task 49 - Railway And Postgres Readiness
+14. Task 50 - Scheduled Paper Worker
 
 Do not skip Tasks 38 and 39. The provider contract and run registry are the foundation for reliable implementation and future agent handoffs.
 
@@ -353,6 +367,8 @@ full tests/lint/smoke pass
 Real Misli public import is partially complete. Task 47 imports rows with full dates or high-confidence relative date labels and rejects bare time-only rows with live-run errors.
 
 Task 46 resolved the P3 run-scoping debt: `run-live-paper-cycle` now processes only the intended snapshot match ids instead of all scheduled matches in the active database.
+
+Task 50 added `run-scheduled-paper-worker` as the first scheduler-safe one-shot entrypoint. It is ready for external cadence configuration but still depends on Task 53 scraper hardening before real Misli public data should be trusted continuously.
 
 ## Non-Goals
 

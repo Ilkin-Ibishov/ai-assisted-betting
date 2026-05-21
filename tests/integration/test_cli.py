@@ -402,6 +402,58 @@ def test_run_live_paper_cycle_command_is_idempotent(tmp_path) -> None:
     assert paper_bets_count > 0
 
 
+def test_run_scheduled_paper_worker_command_records_worker_run(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "scheduled-worker.sqlite"
+    snapshot = _valid_misli_snapshot()
+    snapshot["events"][0]["home_team"] = "Forest City"
+    snapshot["events"][0]["away_team"] = "Eastport Athletic"
+    snapshot["events"][0]["league"] = "Sample Premier"
+    snapshot_path = tmp_path / "misli-worker.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    env = {
+        "DATABASE_URL": f"sqlite:///{db_path.as_posix()}",
+        "LIVE_COLLECTION_ENABLED": "true",
+        "MIN_EDGE": "0.01",
+    }
+
+    assert runner.invoke(app, ["init-db"], env=env).exit_code == 0
+    assert runner.invoke(app, ["import-sample-data"], env=env).exit_code == 0
+    result = runner.invoke(
+        app,
+        [
+            "run-scheduled-paper-worker",
+            "--provider",
+            "misli-public",
+            "--snapshot",
+            str(snapshot_path),
+            "--model",
+            "baseline_heuristic",
+        ],
+        env=env,
+    )
+
+    assert result.exit_code == 0
+    assert "run-scheduled-paper-worker: started" in result.output
+    assert "status=completed" in result.output
+    assert "cycle.status=completed" in result.output
+    assert "run-scheduled-paper-worker: finished" in result.output
+
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.connect() as connection:
+        worker_run_count = connection.execute(
+            text("SELECT count(*) FROM live_runs WHERE run_type='scheduled_paper_worker'")
+        ).scalar_one()
+        cycle_run_count = connection.execute(
+            text("SELECT count(*) FROM live_runs WHERE run_type='run_live_paper_cycle'")
+        ).scalar_one()
+        paper_bets_count = connection.execute(text("SELECT count(*) FROM paper_bets")).scalar_one()
+
+    assert worker_run_count == 1
+    assert cycle_run_count == 1
+    assert paper_bets_count > 0
+
+
 def test_collect_results_command_updates_match_and_settles_open_bet(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "live-results.sqlite"

@@ -17,6 +17,10 @@ from app.services.live_cycle_service import LivePaperCycleRequest, LivePaperCycl
 from app.services.live_result_service import LiveResultRequest, LiveResultService
 from app.services.prediction_service import PredictionService
 from app.services.replay_service import ReplayService
+from app.services.scheduled_worker_service import (
+    ScheduledPaperWorkerRequest,
+    ScheduledPaperWorkerService,
+)
 from app.services.settlement_service import SettlementService
 
 app = typer.Typer(help="Paper Odds Lab CLI.")
@@ -324,6 +328,51 @@ def run_live_paper_cycle(
     typer.echo(f"items_skipped={summary.items_skipped}")
     typer.echo(f"errors_count={summary.errors_count}")
     typer.echo("run-live-paper-cycle: finished")
+
+
+@app.command("run-scheduled-paper-worker")
+def run_scheduled_paper_worker(
+    provider: str = LIVE_PROVIDER_OPTION,
+    snapshot: Path = SNAPSHOT_OPTION,
+    model: str | None = MODEL_OPTION,
+    league: str | None = typer.Option(None, help="Live league name or provider sport."),
+    season: str | None = typer.Option(None, help="Season label for imported live rows."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    summary = ScheduledPaperWorkerService(engine, settings).run_once(
+        ScheduledPaperWorkerRequest(
+            provider=provider,
+            snapshot=snapshot,
+            model=model,
+            league=league,
+            season=season,
+        )
+    )
+    typer.echo("run-scheduled-paper-worker: started")
+    typer.echo(f"status={summary.status}")
+    typer.echo(f"run_id={summary.run_id}")
+    if summary.cycle_summary is not None:
+        typer.echo(f"cycle.status={summary.cycle_summary.status}")
+        _print_stage_summary("cycle.collect_matches", summary.cycle_summary.collect_matches)
+        _print_stage_summary("cycle.collect_odds", summary.cycle_summary.collect_odds)
+        _print_stage_summary(
+            "cycle.generate_features",
+            summary.cycle_summary.generate_features,
+        )
+        _print_stage_summary(
+            "cycle.generate_predictions",
+            summary.cycle_summary.generate_predictions,
+        )
+        _print_stage_summary("cycle.write_paper_bets", summary.cycle_summary.write_paper_bets)
+    if summary.error_summary:
+        typer.echo(f"error_summary={summary.error_summary}")
+    typer.echo(f"items_read={summary.items_read}")
+    typer.echo(f"items_created={summary.items_created}")
+    typer.echo(f"items_updated={summary.items_updated}")
+    typer.echo(f"items_skipped={summary.items_skipped}")
+    typer.echo(f"errors_count={summary.errors_count}")
+    typer.echo("run-scheduled-paper-worker: finished")
 
 
 @app.command("collect-results")

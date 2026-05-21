@@ -67,6 +67,7 @@ Build in this order:
 - Task 47 - Misli Kickoff Date Extraction
 - Task 48 - AI-Assisted Analyst Layer, deterministic live and comparison analyst backbone
 - Task 49 - Railway And Postgres Readiness
+- Task 50 - Scheduled Paper Worker
 - Task 52 - Provider Health AI Analysis
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
@@ -75,10 +76,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Task 50 - Scheduled Paper Worker
+Task 53 - Misli Live Scraper Hardening
 ```
 
-Do not add production scheduling beyond the paper-only worker scope.
+Task 50 added the one-shot scheduled paper worker. Do not add real-money execution, account automation, or protected scraping while hardening the next Misli phase.
 
 Required verification commands after implementation:
 
@@ -135,7 +136,7 @@ Build the paper-only live loop in this order:
 11. Task 48 - AI-Assisted Analyst Layer, deterministic live and comparison analyst backbone completed
 12. Task 52 - Provider Health AI Analysis, completed
 13. Task 49 - Railway And Postgres Readiness, completed
-14. Task 50 - Scheduled Paper Worker
+14. Task 50 - Scheduled Paper Worker, completed
 15. Task 53 - Misli Live Scraper Hardening
 16. Task 54 - Live Odds Movement Tracking
 17. Task 55 - Paper Bet Recommendation Engine
