@@ -43,7 +43,7 @@ try {
     ({ pageUrl, sportName }) => {
       const clean = (value) => (value || "").replace(/\s+/g, " ").trim();
       const numericOdd = (value) => {
-        const normalized = clean(value);
+        const normalized = clean(value).replace(",", ".");
         if (normalized === "-") return null;
         const parsed = Number.parseFloat(normalized);
         return Number.isFinite(parsed) ? parsed : null;
@@ -65,6 +65,7 @@ try {
       const selectionFromLabel = (label) => selectionMap.get(label) || label;
 
       const events = [];
+      const skippedRows = [];
       let currentDateLabel = null;
       let currentDate = null;
       let currentLeague = null;
@@ -91,6 +92,10 @@ try {
         const rowLeague = clean(node.querySelector(".bulletinTime")?.getAttribute("data-tooltip"));
 
         if (!eventId || !homeTeam || !awayTeam || !kickoffTime) {
+          skippedRows.push({
+            reason: "missing event id, team, or kickoff time",
+            raw_text: clean(node.textContent),
+          });
           continue;
         }
 
@@ -143,6 +148,12 @@ try {
         scraped_at: new Date().toISOString(),
         title: document.title,
         event_count: events.length,
+        extraction_summary: {
+          row_count: document.querySelectorAll(".bulletinItemRow").length,
+          event_count: events.length,
+          skipped_rows_count: skippedRows.length,
+          skipped_rows: skippedRows.slice(0, 20),
+        },
         events,
       };
     },

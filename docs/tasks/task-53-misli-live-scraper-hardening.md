@@ -15,10 +15,23 @@ Make Misli.az public football collection reliable enough for repeated paper-only
 
 ## Acceptance Criteria
 
-- Misli collection can run repeatedly without producing duplicate active events for the same match/market.
-- Invalid or partial rows are skipped with explicit reasons.
-- Provider-health analysis reports parser drift, stale snapshots, and low extraction confidence.
-- Tests cover Azerbaijani relative time labels, absolute date/time labels, malformed rows, and odds parsing.
+- Completed: Misli collection can run repeatedly without producing duplicate active events for the same match/market.
+- Completed: invalid or partial rows fail closed with explicit reasons, including empty identity fields, incomplete 1X2 odds, empty snapshots, and low extraction confidence.
+- Completed: provider-health analysis reports parser drift, stale snapshots, and low extraction confidence as explicit risk flags.
+- Completed: tests cover Azerbaijani relative time labels, absolute date/time labels, malformed rows, empty snapshots, low extraction confidence, and comma-decimal odds parsing.
+
+## Implementation Notes
+
+- Hardened `app/providers/misli_public.py` to normalize comma decimal odds and reject empty identity/team/league/raw-text fields.
+- Hardened `app/services/live_collection_service.py` to mark empty snapshots as possible parser drift and row-count mismatch as low extraction confidence.
+- Updated `tools/misli-public-snapshot.mjs` to normalize comma decimal odds and include `extraction_summary` with skipped-row metadata.
+- Updated deterministic provider-health analysis to emit:
+
+```text
+provider_parser_drift
+provider_stale_snapshot
+provider_low_extraction_confidence
+```
 
 ## Verification
 
@@ -38,8 +51,8 @@ Task 54 - Live Odds Movement Tracking.
 
 ## Blockers
 
-Requires Task 50 scheduled worker or a manual repeated-run substitute.
+None for the completed parser/provider-health hardening.
 
 ## Technical Debt
 
-If selectors remain brittle, document selector drift risks and the exact fallback behavior in `docs/agent/05_TECHNICAL_DEBT.md`.
+Selector drift remains open technical debt because the snapshot script still depends on rendered Misli DOM classes. The fallback behavior is fail-closed with parser-drift and low-confidence live-run errors.

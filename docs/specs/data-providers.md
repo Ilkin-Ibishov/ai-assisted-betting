@@ -154,7 +154,15 @@ app/providers/base.py
 app/providers/misli_public.py
 ```
 
-Misli snapshot DTO validation fails closed unless full kickoff date/time and complete HOME/DRAW/AWAY 1X2 odds are present.
+Misli snapshot DTO validation fails closed unless full kickoff date/time, non-empty event identity/team/league fields, raw row text, and complete HOME/DRAW/AWAY 1X2 odds are present. Task 53 also normalizes comma decimal odds such as `2,16`.
+
+Task 53 snapshot hardening:
+
+```text
+empty snapshots -> live-run error: possible Misli parser drift
+row-count mismatch / all rows skipped -> live-run error: low extraction confidence
+provider-health analysis -> explicit parser drift, stale snapshot, and low-confidence risk flags
+```
 
 ### 5. ReplayProvider
 

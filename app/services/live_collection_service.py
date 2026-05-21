@@ -42,6 +42,7 @@ class LiveCollectionService:
         items_skipped = 0
         errors: list[str] = []
 
+        _record_empty_snapshot_error(payload, errors)
         with session_scope(self.engine) as session:
             live_runs = LiveRunRepository(session)
             matches = MatchRepository(session)
@@ -108,6 +109,7 @@ class LiveCollectionService:
         errors: list[str] = []
         snapshot_time = str(payload.get("scraped_at") or "")
 
+        _record_empty_snapshot_error(payload, errors)
         with session_scope(self.engine) as session:
             live_runs = LiveRunRepository(session)
             matches = MatchRepository(session)
@@ -192,6 +194,38 @@ def _ensure_misli_provider(provider: str) -> None:
 
 def _read_snapshot(snapshot: Path) -> dict:
     return json.loads(snapshot.read_text(encoding="utf-8"))
+
+
+def _record_empty_snapshot_error(payload: dict, errors: list[str]) -> None:
+    events = payload.get("events")
+    if isinstance(events, list) and not events:
+        errors.append("Misli snapshot contains no events; possible Misli parser drift")
+    extraction_summary = payload.get("extraction_summary")
+    if not isinstance(extraction_summary, dict):
+        return
+    row_count = _int_or_none(extraction_summary.get("row_count"))
+    event_count = _int_or_none(extraction_summary.get("event_count"))
+    skipped_rows_count = _int_or_none(extraction_summary.get("skipped_rows_count"))
+    if row_count is None or event_count is None:
+        return
+    if row_count > 0 and event_count == 0:
+        errors.append(
+            "Misli extraction confidence is low: "
+            f"{row_count} public rows produced {event_count} validated events"
+        )
+        return
+    if skipped_rows_count is not None and skipped_rows_count > event_count:
+        errors.append(
+            "Misli extraction confidence is low: "
+            f"{skipped_rows_count} skipped rows exceeded {event_count} extracted events"
+        )
+
+
+def _int_or_none(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _validate_event(

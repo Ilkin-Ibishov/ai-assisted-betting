@@ -145,6 +145,41 @@ def test_ai_analysis_service_records_provider_health_advisory(tmp_path) -> None:
     engine.dispose()
 
 
+def test_provider_health_flags_parser_drift_stale_snapshot_and_low_confidence(
+    tmp_path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'provider-health-drift.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        repository = LiveRunRepository(session)
+        repository.start(
+            run_id="drift-run",
+            run_type="collect_matches",
+            provider="misli_public",
+        )
+        repository.fail(
+            run_id="drift-run",
+            errors_count=3,
+            error_summary=(
+                "Misli snapshot contains no events; possible Misli parser drift\n"
+                "Misli snapshot is stale\n"
+                "Misli extraction confidence is low"
+            ),
+            items_read=0,
+            items_skipped=0,
+        )
+
+    analysis = AIAnalysisService(engine).analyze_provider_health("misli_public")
+
+    output = json.loads(analysis.output_json)
+    assert "provider_parser_drift" in output["risk_flags"]
+    assert "provider_stale_snapshot" in output["risk_flags"]
+    assert "provider_low_extraction_confidence" in output["risk_flags"]
+    assert "Review Misli public selectors" in output["recommended_next_actions"][0]
+    engine.dispose()
+
+
 def _seed_failed_misli_run(engine) -> None:
     with session_scope(engine) as session:
         repository = LiveRunRepository(session)

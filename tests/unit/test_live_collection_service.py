@@ -115,6 +115,60 @@ def test_live_collection_refuses_incomplete_misli_1x2_odds(tmp_path) -> None:
     assert "complete 1X2" in (live_run.error_summary or "")
 
 
+def test_live_collection_records_empty_misli_snapshot_as_parser_drift(tmp_path) -> None:
+    snapshot = _valid_snapshot()
+    snapshot["event_count"] = 0
+    snapshot["events"] = []
+    snapshot_path = tmp_path / "misli-empty.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'test.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+
+    summary = LiveCollectionService(engine).collect_matches(
+        LiveCollectionRequest(provider="misli-public", snapshot=snapshot_path)
+    )
+
+    assert summary.items_read == 0
+    assert summary.items_created == 0
+    assert summary.items_skipped == 0
+    assert summary.errors_count == 1
+
+    with session_scope(engine) as session:
+        live_run = session.scalar(select(LiveRun))
+
+    assert live_run is not None
+    assert live_run.status == "failed"
+    assert "possible Misli parser drift" in (live_run.error_summary or "")
+
+
+def test_live_collection_records_misli_low_extraction_confidence(tmp_path) -> None:
+    snapshot = _valid_snapshot()
+    snapshot["event_count"] = 1
+    snapshot["events"] = []
+    snapshot["extraction_summary"] = {
+        "row_count": 4,
+        "event_count": 0,
+        "skipped_rows_count": 4,
+    }
+    snapshot_path = tmp_path / "misli-low-confidence.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'test.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+
+    summary = LiveCollectionService(engine).collect_matches(
+        LiveCollectionRequest(provider="misli-public", snapshot=snapshot_path)
+    )
+
+    assert summary.errors_count == 2
+
+    with session_scope(engine) as session:
+        live_run = session.scalar(select(LiveRun))
+
+    assert live_run is not None
+    assert "possible Misli parser drift" in (live_run.error_summary or "")
+    assert "extraction confidence is low" in (live_run.error_summary or "")
+
+
 def _valid_snapshot() -> dict:
     return {
         "source": "misli_public",

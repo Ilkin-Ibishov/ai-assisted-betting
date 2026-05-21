@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.providers.base import ProviderCapability
 
@@ -30,6 +30,16 @@ class MisliPublicOdd(BaseModel):
     previous_odds_decimal: float | None = None
     final_odds_decimal: float | None = None
     raw_text: str | None = None
+
+    @field_validator("odds_decimal", "previous_odds_decimal", "final_odds_decimal", mode="before")
+    @classmethod
+    def normalize_decimal(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            normalized = value.strip().replace(",", ".")
+            if normalized == "":
+                return None
+            return normalized
+        return value
 
 
 class MisliPublicEvent(BaseModel):
@@ -66,6 +76,17 @@ class MisliPublicEvent(BaseModel):
     def validate_public_event(self) -> "MisliPublicEvent":
         if self.source != "misli_public":
             raise ValueError("Misli event source must be misli_public")
+        for field_name in (
+            "sport",
+            "event_id",
+            "source_match_id",
+            "home_team",
+            "away_team",
+            "league",
+            "raw_text",
+        ):
+            if not str(getattr(self, field_name) or "").strip():
+                raise ValueError(f"Misli event requires non-empty {field_name}")
         if not self.has_full_kickoff_datetime:
             raise ValueError("Misli event requires a full kickoff date and time")
         if not self.has_complete_1x2:

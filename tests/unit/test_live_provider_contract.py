@@ -219,3 +219,68 @@ def test_misli_public_snapshot_fails_closed_for_incomplete_1x2_odds() -> None:
                 ],
             }
         )
+
+
+def test_misli_public_snapshot_normalizes_comma_decimal_odds() -> None:
+    snapshot = MisliPublicSnapshot.model_validate(
+        {
+            "source": "misli_public",
+            "page_url": "https://www.misli.az/idman-novleri/futbol",
+            "scraped_at": "2026-05-19T13:43:22.194Z",
+            "event_count": 1,
+            "events": [
+                {
+                    "source": "misli_public",
+                    "sport": "football",
+                    "event_id": "2816300",
+                    "source_match_id": "misli:football:2816300",
+                    "home_team": "Rid",
+                    "away_team": "Volfsberq",
+                    "kickoff_date": "19.05.2026",
+                    "kickoff_time": "20:30",
+                    "league": "Bundesliqa, Avropa Liqasi Pley-Off",
+                    "odds": [
+                        {"market": "1X2", "selection": "HOME", "odds_decimal": "2,16"},
+                        {"market": "1X2", "selection": "DRAW", "odds_decimal": "3,18"},
+                        {"market": "1X2", "selection": "AWAY", "odds_decimal": "2,94"},
+                    ],
+                    "raw_text": "20:30 1 Rid - Volfsberq 1 2,16 X 3,18 2 2,94",
+                }
+            ],
+        }
+    )
+
+    assert snapshot.events[0].odds[0].odds_decimal == 2.16
+    assert snapshot.events[0].odds[1].odds_decimal == 3.18
+    assert snapshot.events[0].odds[2].odds_decimal == 2.94
+
+
+def test_misli_public_snapshot_fails_closed_for_empty_identity_fields() -> None:
+    with pytest.raises(ValidationError, match="non-empty home_team"):
+        MisliPublicSnapshot.model_validate(
+            {
+                "source": "misli_public",
+                "page_url": "https://www.misli.az/idman-novleri/futbol",
+                "scraped_at": "2026-05-19T13:43:22.194Z",
+                "event_count": 1,
+                "events": [
+                    {
+                        "source": "misli_public",
+                        "sport": "football",
+                        "event_id": "2816300",
+                        "source_match_id": "misli:football:2816300",
+                        "home_team": "",
+                        "away_team": "Volfsberq",
+                        "kickoff_date": "19.05.2026",
+                        "kickoff_time": "20:30",
+                        "league": "Bundesliqa, Avropa Liqasi Pley-Off",
+                        "odds": [
+                            {"market": "1X2", "selection": "HOME", "odds_decimal": 2.16},
+                            {"market": "1X2", "selection": "DRAW", "odds_decimal": 3.18},
+                            {"market": "1X2", "selection": "AWAY", "odds_decimal": 2.94},
+                        ],
+                        "raw_text": "20:30 1 Rid - Volfsberq",
+                    }
+                ],
+            }
+        )

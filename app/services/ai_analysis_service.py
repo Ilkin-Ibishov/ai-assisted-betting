@@ -337,14 +337,31 @@ def _provider_health_output(input_payload: dict[str, Any]) -> dict[str, Any]:
     root_cause = "No recent provider failures were found."
     if latest_failure is not None:
         failure_summary = str(latest_failure.get("error_summary") or "")
+        failure_summary_lower = failure_summary.lower()
         root_cause = failure_summary or "Recent provider collection failed."
-        if "kickoff date" in failure_summary.lower():
+        if "parser drift" in failure_summary_lower:
+            risk_flags.append("provider_parser_drift")
+            recommended_actions.insert(
+                0,
+                "Review Misli public selectors and raw snapshot text before scheduling.",
+            )
+        if "stale" in failure_summary_lower:
+            risk_flags.append("provider_stale_snapshot")
+            recommended_actions.append(
+                "Collect a fresh public snapshot before trusting recommendation inputs.",
+            )
+        if "low" in failure_summary_lower and "confidence" in failure_summary_lower:
+            risk_flags.append("provider_low_extraction_confidence")
+            recommended_actions.append(
+                "Compare extracted rows with the visible public Misli page before accepting data.",
+            )
+        if "kickoff date" in failure_summary_lower:
             risk_flags.append("provider_datetime_missing")
             recommended_actions.insert(
                 0,
                 "Continue resolving only high-confidence Misli date labels and reject bare times.",
             )
-        else:
+        if not risk_flags:
             risk_flags.append("provider_validation_failure")
             recommended_actions.insert(0, "Review recent provider validation errors.")
     if input_payload["failed_runs_count"] > 0:

@@ -42,7 +42,7 @@ Impact:
 Misli frontend class or column-order changes can break collection or mislabel odds.
 
 Next:
-Task 38 added typed snapshot validation and fail-closed complete 1X2 validation. During Task 40, keep raw row text in stored payloads for audit and continue to treat the DOM-order mapping as provider risk.
+Task 38 added typed snapshot validation and fail-closed complete 1X2 validation. Task 53 added comma-odds normalization, non-empty identity validation, skipped-row extraction metadata, parser-drift errors for empty snapshots, and low-confidence errors when public rows do not become usable events. Continue to treat DOM-order mapping as provider risk until Task 54+ can validate odds movement against repeated snapshots.
 
 ### P2 - Misli Bare Time-Only Kickoff Rows Remain Ambiguous
 
@@ -89,6 +89,8 @@ Task 34 added Brier and log-loss calibration lines to the cross-report trend cha
 Task 35 added trend metric visibility controls and did not introduce new documented technical debt.
 
 Task 50 added the one-shot scheduled paper worker and did not introduce new documented technical debt. Worker cadence is intentionally externalized to Railway or another scheduler and remains an open deployment decision, not implementation debt.
+
+Task 53 hardened Misli parsing and provider-health drift reporting. It did not resolve the rendered-DOM selector dependency, which remains open above.
 
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
