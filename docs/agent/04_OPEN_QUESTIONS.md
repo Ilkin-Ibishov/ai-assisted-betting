@@ -2,6 +2,12 @@
 
 Resolve these before or during the relevant implementation task.
 
+## Live Recommendation Operations
+
+Open: choose the deployed scheduling topology for the paper worker. Options include a separate Railway worker service, Railway cron, or an API-triggered job runner. Decide during Tasks 50 and 60.
+
+Open: choose an external alert destination, if any, after dashboard/API guardrail status is stable. Keep notification bots out of scope until Task 61.
+
 ## Documentation Maintenance
 
 Resolved: after each implementation task, agents must update agent-context docs and relevant project docs before claiming completion. The canonical rule lives in:

@@ -68,6 +68,7 @@ Build in this order:
 - Task 48 - AI-Assisted Analyst Layer, deterministic live and comparison analyst backbone
 - Task 49 - Railway And Postgres Readiness
 - Task 52 - Provider Health AI Analysis
+- Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
 
@@ -135,7 +136,17 @@ Build the paper-only live loop in this order:
 12. Task 52 - Provider Health AI Analysis, completed
 13. Task 49 - Railway And Postgres Readiness, completed
 14. Task 50 - Scheduled Paper Worker
-15. Task 51 - Railway Deployment Runbook And Production Smoke
+15. Task 53 - Misli Live Scraper Hardening
+16. Task 54 - Live Odds Movement Tracking
+17. Task 55 - Paper Bet Recommendation Engine
+18. Task 56 - Paper Bet Combination Engine
+19. Task 57 - AI Recommendation Review Layer
+20. Task 58 - Recommendation Dashboard
+21. Task 59 - Historical Recommendation Backtesting
+22. Task 51 - Railway Deployment Runbook And Production Smoke
+23. Task 60 - Railway Worker Deployment And Monitoring
+24. Task 61 - Operational Guardrails And Alerting
+25. Task 62 - Final Production Readiness Review
 
 ## AI-Assisted Product Phase Order
 
@@ -151,9 +162,10 @@ Build AI assistance in this order:
 2. Implemented: Task 48 prompt/version registry, provider boundary, AI analysis config defaults, and fail-closed eval gates.
 3. Implemented: Task 48 comparison-report analyst mode through `analyze-comparison-ai`.
 4. Implemented: Task 52 provider-health analyst mode through `analyze-provider-health`.
-5. Later: optional LLM-backed analysis provider using official OpenAI docs and secure credential handling.
-6. Later: richer AI-assisted experiment design over historical replay/comparison results.
-7. Later: deployment readiness analyst mode.
+5. Next: Task 57 recommendation and combination AI review mode.
+6. Later: optional LLM-backed analysis provider using official OpenAI docs and secure credential handling.
+7. Later: richer AI-assisted experiment design over historical replay/comparison results.
+8. Later: deployment readiness analyst mode.
 
 AI assistance must remain advisory and paper-only. It must not place bets, automate accounts, or override safety rules.
 
@@ -164,7 +176,22 @@ Build Railway readiness in this order:
 1. Task 49 - Railway And Postgres Readiness
 2. Task 50 - Scheduled Paper Worker
 3. Task 51 - Railway Deployment Runbook And Production Smoke
+4. Task 60 - Railway Worker Deployment And Monitoring
+5. Task 61 - Operational Guardrails And Alerting
+6. Task 62 - Final Production Readiness Review
+
+## Recommendation Phase Order
+
+Build live recommendation work in this order:
+
+1. Task 53 - Misli Live Scraper Hardening
+2. Task 54 - Live Odds Movement Tracking
+3. Task 55 - Paper Bet Recommendation Engine
+4. Task 56 - Paper Bet Combination Engine
+5. Task 57 - AI Recommendation Review Layer
+6. Task 58 - Recommendation Dashboard
+7. Task 59 - Historical Recommendation Backtesting
 
 ## Do Not Jump Ahead
 
-Do not implement real-money betting, bookmaker account automation, protected scraping, scheduling, notification bots, or advanced ML before the paper-only live loop is manually repeatable and audited.
+Do not implement real-money betting, bookmaker account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.

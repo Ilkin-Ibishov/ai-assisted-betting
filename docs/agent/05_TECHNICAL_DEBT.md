@@ -20,6 +20,16 @@ P3 - useful cleanup or polish
 
 ## Open
 
+### Planning Note - Live Misli Recommendation Roadmap
+
+Status: accepted  
+Introduced: Task roadmap generation for Tasks 53-62  
+Area: planning
+
+Tasks 53 through 62 have been added to prevent recommendation work from skipping ingestion reliability, odds movement, deterministic scoring, AI safety evals, dashboard visibility, deployment monitoring, and final readiness review.
+
+No new implementation debt was introduced by this planning update. Expected future debt areas to watch are Misli selector drift, correlation heuristics for paper bet combinations before historical validation, Railway worker cadence and cold-start limits, and AI review eval coverage if an LLM-backed provider is enabled.
+
 ### P2 - Misli Public Snapshot Depends On Rendered DOM Shape
 
 Status: open  

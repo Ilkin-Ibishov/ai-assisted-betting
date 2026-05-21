@@ -43,6 +43,8 @@ Task 52 is now complete: provider-health AI analysis can explain recent `live_ru
 
 Task 49 is now complete: Railway/Postgres readiness is documented in `docs/deployment/railway-readiness.md`, `/api/health` is available for API health checks, and the dashboard can target deployed APIs through `VITE_API_BASE_URL`.
 
+The next full roadmap for real-time Misli paper recommendations is documented in `docs/superpowers/plans/2026-05-22-live-misli-recommendations.md`. Task 50 remains the immediate next implementation task, followed by Tasks 53 through 62 for Misli scraper hardening, odds movement, recommendations, combinations, AI review, dashboard recommendation views, backtesting, Railway monitoring, guardrails, and final readiness review.
+
 ## First Milestone
 
 The first milestone is complete only when this sequence works:

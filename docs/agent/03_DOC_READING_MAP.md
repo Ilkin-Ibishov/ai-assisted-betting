@@ -351,6 +351,95 @@ Only after the offline sample pipeline works:
 - `docs/specs/configuration.md`
 - `docs/specs/testing-strategy.md`
 
+## Live Misli Recommendation Plan
+
+- `docs/superpowers/plans/2026-05-22-live-misli-recommendations.md`
+- `docs/specs/live-paper-loop.md`
+- `docs/specs/ai-assisted-backbone.md`
+- `docs/specs/dashboard.md`
+- `docs/specs/safety-and-compliance.md`
+
+## Task 53 - Misli Live Scraper Hardening
+
+- `docs/tasks/task-53-misli-live-scraper-hardening.md`
+- `docs/research/misli-public-discovery.md`
+- `docs/specs/data-providers.md`
+- `docs/specs/live-paper-loop.md`
+- `docs/specs/safety-and-compliance.md`
+- `tools/misli-public-snapshot.mjs`
+- `app/providers/misli_public.py`
+
+## Task 54 - Live Odds Movement Tracking
+
+- `docs/tasks/task-54-live-odds-movement-tracking.md`
+- `docs/specs/database-schema.md`
+- `docs/specs/live-paper-loop.md`
+- `docs/specs/logging-and-evaluation.md`
+- `app/services/live_collection_service.py`
+- `app/db/models.py`
+- `app/db/repositories.py`
+
+## Task 55 - Paper Bet Recommendation Engine
+
+- `docs/tasks/task-55-paper-bet-recommendation-engine.md`
+- `docs/specs/value-detection-and-paper-bets.md`
+- `docs/specs/prediction-engine.md`
+- `docs/specs/ai-assisted-backbone.md`
+- `app/services/prediction_service.py`
+- `app/core/value_detector.py`
+
+## Task 56 - Paper Bet Combination Engine
+
+- `docs/tasks/task-56-paper-bet-combination-engine.md`
+- `docs/specs/value-detection-and-paper-bets.md`
+- `docs/specs/safety-and-compliance.md`
+- `docs/agent/05_TECHNICAL_DEBT.md`
+
+## Task 57 - AI Recommendation Review Layer
+
+- `docs/tasks/task-57-ai-recommendation-review-layer.md`
+- `docs/specs/ai-assisted-backbone.md`
+- `docs/specs/safety-and-compliance.md`
+- `app/services/ai_analysis_service.py`
+- `app/services/ai_prompt_registry.py`
+- `app/services/ai_analysis_evals.py`
+
+## Task 58 - Recommendation Dashboard
+
+- `docs/tasks/task-58-recommendation-dashboard.md`
+- `docs/specs/dashboard.md`
+- `docs/decisions/ADR-0003-dashboard-stack.md`
+- `dashboard/src/App.tsx`
+- `dashboard/src/lib/api.ts`
+
+## Task 59 - Historical Recommendation Backtesting
+
+- `docs/tasks/task-59-historical-recommendation-backtesting.md`
+- `docs/specs/logging-and-evaluation.md`
+- `docs/specs/pipeline-flow.md`
+- `docs/specs/ai-assisted-backbone.md`
+
+## Task 60 - Railway Worker Deployment And Monitoring
+
+- `docs/tasks/task-60-railway-worker-deployment-monitoring.md`
+- `docs/deployment/railway-readiness.md`
+- `.env.example`
+- `docs/specs/configuration.md`
+
+## Task 61 - Operational Guardrails And Alerting
+
+- `docs/tasks/task-61-operational-guardrails-alerting.md`
+- `docs/specs/live-paper-loop.md`
+- `docs/specs/dashboard.md`
+- `docs/agent/04_OPEN_QUESTIONS.md`
+
+## Task 62 - Final Production Readiness Review
+
+- `docs/tasks/task-62-final-production-readiness-review.md`
+- `docs/agent/05_TECHNICAL_DEBT.md`
+- `docs/agent/04_OPEN_QUESTIONS.md`
+- `docs/deployment/railway-readiness.md`
+
 ## Task 22 - Dashboard Data API
 
 - `docs/tasks/task-22-dashboard-data-api.md`
