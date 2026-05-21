@@ -12,6 +12,7 @@ from app.db.engine import create_engine_from_url, session_scope
 from app.db.models import AIAnalysisRun
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.live_status_service import LiveStatusService
+from app.services.odds_movement_service import OddsMovementService
 
 
 def create_api(
@@ -74,6 +75,20 @@ def create_api(
         if live_run is None:
             raise HTTPException(status_code=404, detail=f"live run not found: {run_id}")
         return live_run
+
+    @api.get("/api/live/odds-movement")
+    def get_live_odds_movement(
+        stale_after_minutes: int = 60,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        engine = create_engine_from_url(live_database_url)
+        try:
+            return OddsMovementService(engine).summaries(
+                stale_after_minutes=stale_after_minutes,
+                limit=limit,
+            )
+        finally:
+            engine.dispose()
 
     @api.get("/api/ai/analysis/latest")
     def get_latest_ai_analysis() -> dict[str, Any]:

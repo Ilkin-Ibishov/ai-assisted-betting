@@ -9,6 +9,7 @@ from app.db.models import Base
 from app.db.repositories import (
     LiveRunRepository,
     MatchRepository,
+    OddsSnapshotRepository,
     PaperBetRepository,
     PredictionRepository,
 )
@@ -330,6 +331,22 @@ def test_unknown_live_run_returns_404(tmp_path: Path) -> None:
     assert response.json()["detail"] == "live run not found: missing-run"
 
 
+def test_live_odds_movement_endpoint_returns_recent_movement(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_odds_movement_database(database_url)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/odds-movement?stale_after_minutes=100000")
+
+    assert response.status_code == 200
+    payload = response.json()
+    by_selection = {item["selection"]: item for item in payload}
+    assert by_selection["HOME"]["movement_direction"] == "up"
+    assert by_selection["HOME"]["current_odds"] == 2.3
+    assert by_selection["DRAW"]["movement_direction"] == "stable"
+    assert by_selection["AWAY"]["movement_direction"] == "down"
+
+
 def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_live_status_database(database_url)
@@ -469,4 +486,41 @@ def _seed_live_status_database(database_url: str) -> None:
             expected_value=0.2,
             status="won",
         )
+    engine.dispose()
+
+
+def _seed_odds_movement_database(database_url: str) -> None:
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        match = MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:2816300",
+            league="Sample Premier",
+            home_team="Forest City",
+            away_team="Eastport Athletic",
+            kickoff_time="2026-05-19T20:30:00+04:00",
+        )
+        odds = OddsSnapshotRepository(session)
+        for selection, value in (("HOME", 2.1), ("DRAW", 3.1), ("AWAY", 3.0)):
+            odds.add(
+                match_id=match.id,
+                source="misli_public",
+                bookmaker="Misli.az",
+                market="1X2",
+                selection=selection,
+                odds_decimal=value,
+                implied_probability=1 / value,
+                snapshot_time="2026-05-19T11:00:00+00:00",
+            )
+        for selection, value in (("HOME", 2.3), ("DRAW", 3.1), ("AWAY", 2.8)):
+            odds.add(
+                match_id=match.id,
+                source="misli_public",
+                bookmaker="Misli.az",
+                market="1X2",
+                selection=selection,
+                odds_decimal=value,
+                implied_probability=1 / value,
+                snapshot_time="2026-05-19T12:00:00+00:00",
+            )
     engine.dispose()

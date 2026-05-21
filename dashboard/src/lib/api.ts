@@ -82,6 +82,28 @@ export type LiveStatus = {
   errors_count: number
 }
 
+export type OddsMovementSummary = {
+  match_id: number
+  source: string
+  source_match_id: string
+  league: string
+  home_team: string
+  away_team: string
+  kickoff_time: string
+  bookmaker: string
+  market: string
+  selection: string
+  opening_odds: number
+  previous_odds: number | null
+  current_odds: number | null
+  latest_snapshot_time: string
+  market_latest_snapshot_time: string
+  movement_direction: 'new' | 'up' | 'down' | 'stable' | 'missing' | 'stale'
+  status: 'active' | 'missing' | 'stale'
+  is_stale: boolean
+  snapshots_count: number
+}
+
 export type AIAnalysisOutput = {
   label: string
   short_summary: string
@@ -116,6 +138,10 @@ export async function fetchComparisonDetail(name: string): Promise<ComparisonRep
 
 export async function fetchLiveStatus(): Promise<LiveStatus> {
   return getJson('/api/live/status')
+}
+
+export async function fetchOddsMovement(): Promise<OddsMovementSummary[]> {
+  return getJson('/api/live/odds-movement')
 }
 
 export async function fetchLatestAIAnalysis(): Promise<AIAnalysisRun | null> {

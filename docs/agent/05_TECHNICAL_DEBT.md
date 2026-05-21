@@ -20,6 +20,20 @@ P3 - useful cleanup or polish
 
 ## Open
 
+### P3 - Odds Movement Uses Computed Summaries Instead Of A Dedicated Table
+
+Status: accepted  
+Introduced: Task 54 - Live Odds Movement Tracking  
+Area: live odds movement
+
+Task 54 computes odds movement directly from `odds_snapshots` instead of storing a dedicated movement table.
+
+Impact:
+This keeps MVP state simple and auditable, but movement queries may become slower after high-frequency deployed collection.
+
+Next:
+Keep computed summaries while data volume is small. If deployed collection makes `/api/live/odds-movement` slow, add a materialized summary table or cached view during monitoring/backtesting work.
+
 ### Planning Note - Live Misli Recommendation Roadmap
 
 Status: accepted  
@@ -91,6 +105,8 @@ Task 35 added trend metric visibility controls and did not introduce new documen
 Task 50 added the one-shot scheduled paper worker and did not introduce new documented technical debt. Worker cadence is intentionally externalized to Railway or another scheduler and remains an open deployment decision, not implementation debt.
 
 Task 53 hardened Misli parsing and provider-health drift reporting. It did not resolve the rendered-DOM selector dependency, which remains open above.
+
+Task 54 added computed odds movement summaries from existing `odds_snapshots`; see the accepted P3 movement-summary tradeoff above.
 
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 

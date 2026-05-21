@@ -69,6 +69,7 @@ Build in this order:
 - Task 49 - Railway And Postgres Readiness
 - Task 50 - Scheduled Paper Worker
 - Task 53 - Misli Live Scraper Hardening
+- Task 54 - Live Odds Movement Tracking
 - Task 52 - Provider Health AI Analysis
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
@@ -77,10 +78,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Task 54 - Live Odds Movement Tracking
+Task 55 - Paper Bet Recommendation Engine
 ```
 
-Task 53 hardened Misli public snapshot parsing and provider-health drift reporting. Do not add real-money execution, account automation, or protected scraping while building odds movement tracking.
+Task 54 added read-only odds movement summaries over existing odds snapshots. Do not add real-money execution, account automation, or protected scraping while building paper recommendations.
 
 Required verification commands after implementation:
 
@@ -139,7 +140,7 @@ Build the paper-only live loop in this order:
 13. Task 49 - Railway And Postgres Readiness, completed
 14. Task 50 - Scheduled Paper Worker, completed
 15. Task 53 - Misli Live Scraper Hardening, completed
-16. Task 54 - Live Odds Movement Tracking
+16. Task 54 - Live Odds Movement Tracking, completed
 17. Task 55 - Paper Bet Recommendation Engine
 18. Task 56 - Paper Bet Combination Engine
 19. Task 57 - AI Recommendation Review Layer

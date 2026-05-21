@@ -14,10 +14,29 @@ Track how Misli odds change over time so recommendations can use movement, fresh
 
 ## Acceptance Criteria
 
-- Repeated snapshots for the same event produce an auditable odds timeline.
-- The system can answer whether an outcome moved up, moved down, stayed stable, disappeared, or became stale.
-- Dashboard/API consumers can show current odds plus recent movement.
-- Tests cover duplicate snapshot ingestion, missing outcomes, and stale movement windows.
+- Completed: repeated snapshots for the same event produce an auditable odds timeline through existing `odds_snapshots` rows.
+- Completed: the system can answer whether an outcome moved up, moved down, stayed stable, disappeared, or became stale.
+- Completed: dashboard/API consumers can show current odds plus recent movement through `GET /api/live/odds-movement` and `fetchOddsMovement()`.
+- Completed: tests cover repeated snapshots, missing outcomes, stale movement windows, and API/frontend data-layer access.
+
+## Implementation Notes
+
+- Added `app/services/odds_movement_service.py`.
+- Added read-only endpoint:
+
+```text
+GET /api/live/odds-movement
+```
+
+- Added dashboard API data type/helper:
+
+```text
+dashboard/src/lib/api.ts -> fetchOddsMovement()
+```
+
+- Movement is computed from `odds_snapshots`, grouped by match, bookmaker, market, and selection.
+- Status values: `active`, `missing`, `stale`.
+- Movement values: `new`, `up`, `down`, `stable`, `missing`, `stale`.
 
 ## Verification
 
@@ -37,8 +56,8 @@ Task 55 - Paper Bet Recommendation Engine.
 
 ## Blockers
 
-Requires Task 53 hardened normalized Misli collection.
+None for the completed movement summary layer.
 
 ## Technical Debt
 
-If odds history is initially stored in existing tables instead of a dedicated table, record the schema tradeoff and migration path.
+Accepted tradeoff: odds movement is computed from existing `odds_snapshots` instead of a dedicated movement table. This avoids duplicated state for MVP. If queries become slow after deployed collection, add a materialized summary table or cached view during monitoring/backtesting work.

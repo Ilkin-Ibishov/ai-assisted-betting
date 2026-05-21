@@ -107,6 +107,14 @@ CREATE TABLE odds_snapshots (
 );
 ```
 
+Task 54 uses `odds_snapshots` as the odds movement audit trail. Movement summaries are computed by grouping snapshots by:
+
+```text
+match_id, bookmaker, market, selection
+```
+
+The first observed odds become opening odds, the previous observed odds become previous odds, and the latest observed odds become current odds unless the outcome is missing from the latest market snapshot. No dedicated movement table exists yet.
+
 ### market values
 
 MVP:

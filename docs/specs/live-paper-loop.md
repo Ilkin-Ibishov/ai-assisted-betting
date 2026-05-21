@@ -372,6 +372,8 @@ Task 50 added `run-scheduled-paper-worker` as the first scheduler-safe one-shot 
 
 Task 53 hardened Misli public snapshot parsing and health reporting. Misli imports now fail closed for empty identity fields, incomplete odds, empty snapshots, and low extraction confidence. Provider-health AI analysis distinguishes parser drift, stale snapshots, and low extraction confidence from generic validation errors.
 
+Task 54 added read-only odds movement summaries computed from existing `odds_snapshots`. The API can report opening odds, previous odds, current odds, movement direction, missing outcomes, and stale outcomes without inferring bet placement or bookmaker account state.
+
 ## Non-Goals
 
 - Real-money betting.

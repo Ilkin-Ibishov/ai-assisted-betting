@@ -379,7 +379,11 @@ Only after the offline sample pipeline works:
 - `docs/specs/database-schema.md`
 - `docs/specs/live-paper-loop.md`
 - `docs/specs/logging-and-evaluation.md`
+- `docs/specs/dashboard.md`
+- `app/services/odds_movement_service.py`
 - `app/services/live_collection_service.py`
+- `app/api.py`
+- `dashboard/src/lib/api.ts`
 - `app/db/models.py`
 - `app/db/repositories.py`
 
