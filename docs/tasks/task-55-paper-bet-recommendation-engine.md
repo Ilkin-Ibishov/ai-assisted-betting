@@ -15,10 +15,29 @@ Generate ranked paper-only bet recommendations from live Misli events using dete
 
 ## Acceptance Criteria
 
-- A live cycle can produce zero or more ranked recommendations from collected events.
-- Every recommendation includes probability, implied probability, edge, confidence, risk flags, and plain-language deterministic rationale.
-- Low-quality candidates are rejected rather than silently omitted.
-- Tests cover positive-edge, negative-edge, stale-data, unhealthy-provider, and low-confidence scenarios.
+- Completed: a live database can produce zero or more ranked recommendations from collected odds and predictions.
+- Completed: every persisted recommendation includes probability, implied probability, edge, confidence, current odds, expected value, risk flags, and deterministic rationale.
+- Completed: low-quality candidates are rejected rather than silently omitted.
+- Completed: tests cover positive-edge, negative-edge, stale-data, unhealthy-provider, and low-confidence scenarios.
+
+## Implementation Notes
+
+- Added `paper_recommendations` persistence through SQLAlchemy model and SQLite migration `005_create_paper_recommendations`.
+- Added `app/services/recommendation_service.py`.
+- Added CLI command:
+
+```powershell
+python -m app.cli generate-recommendations --stale-after-minutes 60
+```
+
+- Added read-only API endpoint:
+
+```text
+GET /api/live/recommendations
+```
+
+- Grades: `recommended`, `lean`, `watch`, `reject`.
+- Recommendation scoring is deterministic and paper-only. It does not create `paper_bets`, place bets, or automate bookmaker interactions.
 
 ## Verification
 
@@ -38,8 +57,8 @@ Task 56 - Paper Bet Combination Engine.
 
 ## Blockers
 
-Requires Task 54 odds movement tracking and stable live recommendation inputs.
+None for the completed deterministic recommendation engine.
 
 ## Technical Debt
 
-Document any simplified bankroll or staking assumptions until a richer risk model exists.
+Accepted technical debt: recommendation expected value uses fixed unit-stake arithmetic and does not yet include bankroll sizing, exposure caps, correlation, or drawdown controls. Task 56 should add combination/exposure rules, and later backtesting should validate thresholds.

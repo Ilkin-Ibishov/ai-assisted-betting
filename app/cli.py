@@ -16,6 +16,7 @@ from app.services.live_collection_service import LiveCollectionRequest, LiveColl
 from app.services.live_cycle_service import LivePaperCycleRequest, LivePaperCycleService
 from app.services.live_result_service import LiveResultRequest, LiveResultService
 from app.services.prediction_service import PredictionService
+from app.services.recommendation_service import RecommendationService
 from app.services.replay_service import ReplayService
 from app.services.scheduled_worker_service import (
     ScheduledPaperWorkerRequest,
@@ -393,6 +394,21 @@ def collect_results(
         )
     )
     _print_summary("collect-results", summary)
+
+
+@app.command("generate-recommendations")
+def generate_recommendations(
+    stale_after_minutes: int = typer.Option(
+        60,
+        help="Minutes after which latest odds are considered stale.",
+    ),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    summary = RecommendationService(engine, settings).generate(
+        stale_after_minutes=stale_after_minutes
+    )
+    _print_summary("generate-recommendations", summary)
 
 
 @app.command("generate-features")

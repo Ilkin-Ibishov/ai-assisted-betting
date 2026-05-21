@@ -9,7 +9,7 @@ from sqlalchemy import select, text
 
 from app.config import load_settings
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import AIAnalysisRun
+from app.db.models import AIAnalysisRun, PaperRecommendation
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.live_status_service import LiveStatusService
 from app.services.odds_movement_service import OddsMovementService
@@ -89,6 +89,10 @@ def create_api(
             )
         finally:
             engine.dispose()
+
+    @api.get("/api/live/recommendations")
+    def list_live_recommendations(limit: int = 100) -> list[dict[str, Any]]:
+        return _paper_recommendation_payloads(live_database_url, limit=limit)
 
     @api.get("/api/ai/analysis/latest")
     def get_latest_ai_analysis() -> dict[str, Any]:
@@ -318,4 +322,45 @@ def _ai_analysis_payload(analysis: AIAnalysisRun | None) -> dict[str, Any] | Non
         "status": analysis.status,
         "error_summary": analysis.error_summary,
         "created_at": analysis.created_at,
+    }
+
+
+def _paper_recommendation_payloads(database_url: str, *, limit: int) -> list[dict[str, Any]]:
+    engine = create_engine_from_url(database_url)
+    try:
+        with session_scope(engine) as session:
+            recommendations = session.scalars(
+                select(PaperRecommendation)
+                .order_by(PaperRecommendation.created_at.desc(), PaperRecommendation.id.desc())
+                .limit(max(1, min(limit, 500)))
+            ).all()
+            return [_paper_recommendation_payload(item) for item in recommendations]
+    finally:
+        engine.dispose()
+
+
+def _paper_recommendation_payload(recommendation: PaperRecommendation) -> dict[str, Any]:
+    return {
+        "id": recommendation.id,
+        "match_id": recommendation.match_id,
+        "prediction_id": recommendation.prediction_id,
+        "source_run_id": recommendation.source_run_id,
+        "source_match_id": recommendation.source_match_id,
+        "bookmaker": recommendation.bookmaker,
+        "market": recommendation.market,
+        "selection": recommendation.selection,
+        "latest_snapshot_time": recommendation.latest_snapshot_time,
+        "model_name": recommendation.model_name,
+        "model_version": recommendation.model_version,
+        "grade": recommendation.grade,
+        "status": recommendation.status,
+        "model_probability": recommendation.model_probability,
+        "implied_probability": recommendation.implied_probability,
+        "edge": recommendation.edge,
+        "confidence_score": recommendation.confidence_score,
+        "current_odds": recommendation.current_odds,
+        "expected_value": recommendation.expected_value,
+        "risk_flags": json.loads(recommendation.risk_flags_json),
+        "rationale": recommendation.rationale,
+        "created_at": recommendation.created_at,
     }

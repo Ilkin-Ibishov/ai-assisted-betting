@@ -393,6 +393,13 @@ Only after the offline sample pipeline works:
 - `docs/specs/value-detection-and-paper-bets.md`
 - `docs/specs/prediction-engine.md`
 - `docs/specs/ai-assisted-backbone.md`
+- `docs/specs/database-schema.md`
+- `app/services/recommendation_service.py`
+- `app/services/odds_movement_service.py`
+- `app/db/models.py`
+- `app/db/migrations.py`
+- `app/api.py`
+- `app/cli.py`
 - `app/services/prediction_service.py`
 - `app/core/value_detector.py`
 

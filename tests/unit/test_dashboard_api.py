@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.api import create_api
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import Base
+from app.db.models import Base, PaperRecommendation
 from app.db.repositories import (
     LiveRunRepository,
     MatchRepository,
@@ -347,6 +347,20 @@ def test_live_odds_movement_endpoint_returns_recent_movement(tmp_path: Path) -> 
     assert by_selection["AWAY"]["movement_direction"] == "down"
 
 
+def test_live_recommendations_endpoint_lists_persisted_recommendations(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_recommendation_database(database_url)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/recommendations")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload[0]["grade"] == "recommended"
+    assert payload[0]["risk_flags"] == ["no_current_risk_flags"]
+    assert payload[0]["source_match_id"] == "misli:football:2816300"
+
+
 def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_live_status_database(database_url)
@@ -523,4 +537,40 @@ def _seed_odds_movement_database(database_url: str) -> None:
                 implied_probability=1 / value,
                 snapshot_time="2026-05-19T12:00:00+00:00",
             )
+    engine.dispose()
+
+
+def _seed_recommendation_database(database_url: str) -> None:
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        match = MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:2816300",
+            league="Sample Premier",
+            home_team="Forest City",
+            away_team="Eastport Athletic",
+            kickoff_time="2026-05-19T20:30:00+04:00",
+        )
+        session.add(
+            PaperRecommendation(
+                match_id=match.id,
+                source_match_id=match.source_match_id,
+                bookmaker="Misli.az",
+                market="1X2",
+                selection="HOME",
+                latest_snapshot_time="2026-05-19T12:00:00+00:00",
+                model_name="baseline_heuristic",
+                model_version="v0",
+                grade="recommended",
+                status="active",
+                model_probability=0.62,
+                implied_probability=0.5,
+                edge=0.12,
+                confidence_score=0.72,
+                current_odds=2.0,
+                expected_value=0.24,
+                risk_flags_json='["no_current_risk_flags"]',
+                rationale="Positive edge is above recommendation threshold.",
+            )
+        )
     engine.dispose()

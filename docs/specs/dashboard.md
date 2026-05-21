@@ -103,6 +103,7 @@ GET /api/live/status
 GET /api/live/runs
 GET /api/live/runs/{run_id}
 GET /api/live/odds-movement
+GET /api/live/recommendations
 ```
 
 Response data should come from existing comparison JSON and analysis service output. The first version does not need database write operations.
@@ -183,6 +184,8 @@ errors_count
 `GET /api/live/runs` returns recent live runs newest-first. `GET /api/live/runs/{run_id}` returns one run or 404.
 
 `GET /api/live/odds-movement` returns read-only current/opening/previous odds movement summaries grouped by match, bookmaker, market, and selection. Outcomes can be `active`, `missing`, or `stale`, with movement directions `new`, `up`, `down`, `stable`, `missing`, or `stale`.
+
+`GET /api/live/recommendations` returns persisted deterministic paper recommendations newest-first. Records include grade, model probability, implied probability, edge, confidence, current odds, expected value, risk flags, and rationale.
 
 Each live run payload includes:
 

@@ -146,6 +146,46 @@ class PaperBet(Base):
     created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
 
 
+class PaperRecommendation(Base):
+    __tablename__ = "paper_recommendations"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_match_id",
+            "market",
+            "selection",
+            "model_name",
+            "model_version",
+            "latest_snapshot_time",
+            name="uq_paper_recommendation_identity",
+        ),
+        Index("idx_paper_recommendations_grade", "grade"),
+        Index("idx_paper_recommendations_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), nullable=False)
+    prediction_id: Mapped[int | None] = mapped_column(ForeignKey("predictions.id"))
+    source_run_id: Mapped[str | None] = mapped_column(String)
+    source_match_id: Mapped[str] = mapped_column(String, nullable=False)
+    bookmaker: Mapped[str] = mapped_column(String, nullable=False)
+    market: Mapped[str] = mapped_column(String, nullable=False)
+    selection: Mapped[str] = mapped_column(String, nullable=False)
+    latest_snapshot_time: Mapped[str] = mapped_column(String, nullable=False)
+    model_name: Mapped[str] = mapped_column(String, nullable=False)
+    model_version: Mapped[str] = mapped_column(String, nullable=False)
+    grade: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    model_probability: Mapped[float | None]
+    implied_probability: Mapped[float | None]
+    edge: Mapped[float | None]
+    confidence_score: Mapped[float | None]
+    current_odds: Mapped[float | None]
+    expected_value: Mapped[float | None]
+    risk_flags_json: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
+
+
 class DecisionLog(Base):
     __tablename__ = "decision_logs"
     __table_args__ = (Index("idx_decision_logs_match_stage", "match_id", "stage"),)

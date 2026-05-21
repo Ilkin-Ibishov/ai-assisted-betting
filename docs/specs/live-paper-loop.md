@@ -374,6 +374,8 @@ Task 53 hardened Misli public snapshot parsing and health reporting. Misli impor
 
 Task 54 added read-only odds movement summaries computed from existing `odds_snapshots`. The API can report opening odds, previous odds, current odds, movement direction, missing outcomes, and stale outcomes without inferring bet placement or bookmaker account state.
 
+Task 55 added deterministic paper recommendations. `generate-recommendations` reads odds movement and model predictions, persists graded advisory records, rejects unsafe/weak candidates with explicit risk flags, and exposes them through `GET /api/live/recommendations`. It does not create `paper_bets`; actual paper bet logging remains a separate controlled stage.
+
 ## Non-Goals
 
 - Real-money betting.

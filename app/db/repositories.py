@@ -9,6 +9,7 @@ from app.db.models import (
     Match,
     OddsSnapshot,
     PaperBet,
+    PaperRecommendation,
     Prediction,
 )
 
@@ -217,6 +218,39 @@ class PaperBetRepository:
         return self.session.scalar(
             select(PaperBet).where(PaperBet.prediction_id == prediction_id)
         )
+
+
+class PaperRecommendationRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, **values: object) -> PaperRecommendation:
+        recommendation = PaperRecommendation(**values)
+        self.session.add(recommendation)
+        self.session.flush()
+        return recommendation
+
+    def exists(
+        self,
+        *,
+        source_match_id: str,
+        market: str,
+        selection: str,
+        model_name: str,
+        model_version: str,
+        latest_snapshot_time: str,
+    ) -> bool:
+        recommendation_id = self.session.scalar(
+            select(PaperRecommendation.id).where(
+                PaperRecommendation.source_match_id == source_match_id,
+                PaperRecommendation.market == market,
+                PaperRecommendation.selection == selection,
+                PaperRecommendation.model_name == model_name,
+                PaperRecommendation.model_version == model_version,
+                PaperRecommendation.latest_snapshot_time == latest_snapshot_time,
+            )
+        )
+        return recommendation_id is not None
 
 
 class EvaluationRunRepository:

@@ -6,6 +6,7 @@ MIGRATION_NAMES = [
     "002_add_identity_unique_indexes",
     "003_create_live_runs",
     "004_create_ai_analysis_runs",
+    "005_create_paper_recommendations",
 ]
 
 
@@ -43,6 +44,11 @@ def run_migrations(engine) -> None:
             connection,
             "004_create_ai_analysis_runs",
             _create_ai_analysis_runs,
+        )
+        _run_migration(
+            connection,
+            "005_create_paper_recommendations",
+            _create_paper_recommendations,
         )
 
 
@@ -235,5 +241,63 @@ def _create_ai_analysis_runs(connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_ai_analysis_status
         ON ai_analysis_runs (status)
+        """
+    )
+
+
+def _create_paper_recommendations(connection) -> None:
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE IF NOT EXISTS paper_recommendations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_id INTEGER NOT NULL,
+            prediction_id INTEGER,
+            source_run_id TEXT,
+            source_match_id TEXT NOT NULL,
+            bookmaker TEXT NOT NULL,
+            market TEXT NOT NULL,
+            selection TEXT NOT NULL,
+            latest_snapshot_time TEXT NOT NULL,
+            model_name TEXT NOT NULL,
+            model_version TEXT NOT NULL,
+            grade TEXT NOT NULL,
+            status TEXT NOT NULL,
+            model_probability REAL,
+            implied_probability REAL,
+            edge REAL,
+            confidence_score REAL,
+            current_odds REAL,
+            expected_value REAL,
+            risk_flags_json TEXT NOT NULL,
+            rationale TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(match_id) REFERENCES matches(id),
+            FOREIGN KEY(prediction_id) REFERENCES predictions(id)
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_paper_recommendation_identity
+        ON paper_recommendations (
+            source_match_id,
+            market,
+            selection,
+            model_name,
+            model_version,
+            latest_snapshot_time
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS idx_paper_recommendations_grade
+        ON paper_recommendations (grade)
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS idx_paper_recommendations_created
+        ON paper_recommendations (created_at)
         """
     )

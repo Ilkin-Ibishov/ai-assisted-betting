@@ -550,6 +550,88 @@ def test_collect_results_command_updates_match_and_settles_open_bet(tmp_path) ->
     assert result_run_count == 1
 
 
+def test_generate_recommendations_command_persists_recommendations(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "recommendations.sqlite"
+    env = {
+        "DATABASE_URL": f"sqlite:///{db_path.as_posix()}",
+        "MIN_EDGE": "0.07",
+    }
+
+    assert runner.invoke(app, ["init-db"], env=env).exit_code == 0
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO matches (
+                    source, source_match_id, league, home_team, away_team,
+                    kickoff_time, status, created_at, updated_at
+                )
+                VALUES (
+                    'misli_public', 'misli:football:2816300', 'Sample Premier',
+                    'Forest City', 'Eastport Athletic',
+                    '2026-05-19T20:30:00+04:00', 'scheduled',
+                    '2026-05-19T11:00:00+00:00', '2026-05-19T11:00:00+00:00'
+                )
+                """
+            )
+        )
+        match_id = connection.execute(text("SELECT id FROM matches")).scalar_one()
+        connection.execute(
+            text(
+                """
+                INSERT INTO odds_snapshots (
+                    match_id, source, bookmaker, market, selection, odds_decimal,
+                    implied_probability, snapshot_time, is_closing, created_at
+                )
+                VALUES (
+                    :match_id, 'misli_public', 'Misli.az', '1X2', 'HOME', 2.0,
+                    0.5, '2026-05-19T12:00:00+00:00', 0,
+                    '2026-05-19T12:00:00+00:00'
+                )
+                """
+            ),
+            {"match_id": match_id},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO predictions (
+                    match_id, market, selection, model_name, model_version,
+                    model_probability, bookmaker_probability, edge,
+                    confidence_score, decision, reason, created_at
+                )
+                VALUES (
+                    :match_id, '1X2', 'HOME', 'baseline_heuristic', 'v0',
+                    0.62, 0.5, 0.12, 0.72, 'PENDING',
+                    'seed prediction', '2026-05-19T12:00:00+00:00'
+                )
+                """
+            ),
+            {"match_id": match_id},
+        )
+
+    result = runner.invoke(
+        app,
+        ["generate-recommendations", "--stale-after-minutes", "100000"],
+        env=env,
+    )
+
+    assert result.exit_code == 0
+    assert "generate-recommendations: started" in result.output
+    assert "items_created=1" in result.output
+
+    with engine.connect() as connection:
+        recommendation_count = connection.execute(
+            text("SELECT count(*) FROM paper_recommendations")
+        ).scalar_one()
+        grade = connection.execute(text("SELECT grade FROM paper_recommendations")).scalar_one()
+
+    assert recommendation_count == 1
+    assert grade == "recommended"
+
+
 def test_replay_football_data_runs_historical_pipeline(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "replay.sqlite"

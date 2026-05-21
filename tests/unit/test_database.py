@@ -41,6 +41,7 @@ def test_init_db_creates_expected_tables(tmp_path) -> None:
         "matches",
         "live_runs",
         "odds_snapshots",
+        "paper_recommendations",
         "paper_bets",
         "predictions",
         "schema_migrations",
@@ -61,7 +62,7 @@ def test_postgres_model_managed_migrations_are_recorded_as_noops() -> None:
 
     _record_noop_migrations_for_model_managed_database(connection)
 
-    assert len(connection.statements) == 4
+    assert len(connection.statements) == 5
     assert all("ON CONFLICT" in statement for statement, _params in connection.statements)
     assert connection.statements[0][1] == {"migration_name": "001_add_feature_elo_columns"}
 
@@ -111,6 +112,7 @@ def test_init_db_upgrades_old_database_with_missing_elo_feature_columns(tmp_path
         ("002_add_identity_unique_indexes",),
         ("003_create_live_runs",),
         ("004_create_ai_analysis_runs",),
+        ("005_create_paper_recommendations",),
     ]
 
 
@@ -196,6 +198,7 @@ def test_init_db_upgrades_old_database_with_identity_uniqueness_indexes(tmp_path
         ("002_add_identity_unique_indexes",),
         ("003_create_live_runs",),
         ("004_create_ai_analysis_runs",),
+        ("005_create_paper_recommendations",),
     ]
 
 
@@ -257,6 +260,7 @@ def test_init_db_upgrades_old_database_with_live_run_registry(tmp_path) -> None:
         ("002_add_identity_unique_indexes",),
         ("003_create_live_runs",),
         ("004_create_ai_analysis_runs",),
+        ("005_create_paper_recommendations",),
     ]
 
 
@@ -315,6 +319,7 @@ def test_init_db_upgrades_old_database_with_ai_analysis_runs(tmp_path) -> None:
         ("002_add_identity_unique_indexes",),
         ("003_create_live_runs",),
         ("004_create_ai_analysis_runs",),
+        ("005_create_paper_recommendations",),
     ]
 
 

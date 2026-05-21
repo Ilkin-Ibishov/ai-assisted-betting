@@ -34,6 +34,20 @@ This keeps MVP state simple and auditable, but movement queries may become slowe
 Next:
 Keep computed summaries while data volume is small. If deployed collection makes `/api/live/odds-movement` slow, add a materialized summary table or cached view during monitoring/backtesting work.
 
+### P2 - Recommendation Risk Model Uses Simplified Unit-Stake EV
+
+Status: accepted  
+Introduced: Task 55 - Paper Bet Recommendation Engine  
+Area: recommendation risk model
+
+Task 55 computes expected value from model probability and current odds with fixed unit-stake arithmetic. It does not yet include bankroll sizing, exposure caps, market correlation, drawdown controls, or portfolio-level risk.
+
+Impact:
+Single recommendation grades are useful for paper analysis, but they are not enough for disciplined combination construction or bankroll-aware strategy.
+
+Next:
+Task 56 must add combination and exposure rules. Task 59 should backtest recommendation thresholds and risk assumptions.
+
 ### Planning Note - Live Misli Recommendation Roadmap
 
 Status: accepted  
@@ -107,6 +121,8 @@ Task 50 added the one-shot scheduled paper worker and did not introduce new docu
 Task 53 hardened Misli parsing and provider-health drift reporting. It did not resolve the rendered-DOM selector dependency, which remains open above.
 
 Task 54 added computed odds movement summaries from existing `odds_snapshots`; see the accepted P3 movement-summary tradeoff above.
+
+Task 55 added deterministic paper recommendations; see the accepted P2 simplified unit-stake EV tradeoff above.
 
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 

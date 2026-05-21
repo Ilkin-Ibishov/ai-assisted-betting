@@ -394,3 +394,47 @@ ON paper_bets(prediction_id);
 CREATE UNIQUE INDEX uq_live_runs_run_id
 ON live_runs(run_id);
 ```
+
+---
+
+## 10. paper_recommendations
+
+Stores deterministic paper-only recommendation records created from predictions and live odds movement summaries.
+
+```sql
+CREATE TABLE paper_recommendations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL,
+    prediction_id INTEGER,
+    source_run_id TEXT,
+    source_match_id TEXT NOT NULL,
+    bookmaker TEXT NOT NULL,
+    market TEXT NOT NULL,
+    selection TEXT NOT NULL,
+    latest_snapshot_time TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    model_version TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    status TEXT NOT NULL,
+    model_probability REAL,
+    implied_probability REAL,
+    edge REAL,
+    confidence_score REAL,
+    current_odds REAL,
+    expected_value REAL,
+    risk_flags_json TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+```
+
+Recommendation grades:
+
+```text
+recommended
+lean
+watch
+reject
+```
+
+Recommendations are advisory and paper-only. They do not create real bets or automate bookmaker interactions.
