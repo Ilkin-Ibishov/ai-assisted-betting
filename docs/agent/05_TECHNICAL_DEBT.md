@@ -146,6 +146,8 @@ Task 58 added a direct-rendered recommendation dashboard panel. It did not intro
 
 Task 59 added historical recommendation backtesting, dashboard-compatible companion exports, and deterministic AI backtest summaries. It did not introduce new technical debt. Existing recommendation and combination risk-model limitations remain tracked above until larger backtests justify stronger thresholds or richer exposure modeling.
 
+Task 51 added a Railway deployment runbook and `production-smoke` command. It did not introduce new implementation debt. First deployed smoke evidence still requires real Railway staging URLs and credentials, which is an operational prerequisite rather than code debt.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

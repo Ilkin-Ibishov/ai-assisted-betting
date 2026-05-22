@@ -19,6 +19,16 @@ Document and verify the Railway deployment process end to end.
 - Deployment does not require local-only files except documented fixtures.
 - Known limitations are documented.
 
+## Implementation Notes
+
+Implemented in Task 51:
+
+- Added `ProductionSmokeService` with stdlib HTTP checks for deployed API and dashboard URLs.
+- Added `production-smoke` CLI command.
+- Smoke checks cover `/api/health`, `/api/live/status`, `/api/live/runs?limit=5`, `/api/reports/comparisons`, and optional dashboard HTML root.
+- Expanded `docs/deployment/railway-readiness.md` into an operator runbook with API, dashboard, Postgres, worker boundary, staging smoke, rollback, and recovery notes.
+- Kept scheduled live collection disabled by default until Task 60 monitoring exists.
+
 ## Verification
 
 ```powershell
@@ -28,24 +38,17 @@ cd dashboard
 npm run test
 npm run lint
 npm run build
+npm run smoke
 ```
 
 ## Next
 
-Post-deployment hardening:
-
-```text
-provider reliability
-AI-assisted analysis refinement
-model quality improvements
-additional markets
-operations alerts
-```
+Task 60 - Railway Worker Deployment And Monitoring.
 
 ## Blockers
 
-Requires Railway project access and deployment credentials.
+No code blocker remains. Running smoke against real Railway staging requires deployed Railway service URLs and credentials.
 
 ## Technical Debt
 
-Record any manual deployment steps that remain after the first successful staging deploy.
+No new implementation debt. Manual Railway project creation and first deployed smoke evidence remain operational steps until Railway credentials are available.

@@ -17,6 +17,11 @@ from app.services.live_collection_service import LiveCollectionRequest, LiveColl
 from app.services.live_cycle_service import LivePaperCycleRequest, LivePaperCycleService
 from app.services.live_result_service import LiveResultRequest, LiveResultService
 from app.services.prediction_service import PredictionService
+from app.services.production_smoke_service import (
+    ProductionSmokeError,
+    ProductionSmokeRequest,
+    ProductionSmokeService,
+)
 from app.services.recommendation_backtest_service import (
     RecommendationBacktestRequest,
     RecommendationBacktestService,
@@ -53,6 +58,14 @@ RECOMMENDATION_BACKTEST_REPORT_OPTION = typer.Option(
     help="Recommendation backtest JSON report path.",
 )
 REPORTS_DIR_OPTION = typer.Option(Path("reports"), help="Directory for report exports.")
+PRODUCTION_API_URL_OPTION = typer.Option(
+    "",
+    help="Deployed API base URL, for example https://api.up.railway.app.",
+)
+PRODUCTION_DASHBOARD_URL_OPTION = typer.Option(
+    "",
+    help="Optional deployed dashboard URL.",
+)
 
 
 def _not_implemented(command_name: str) -> None:
@@ -329,6 +342,27 @@ def analyze_recommendation_backtest(
     typer.echo(f"label={output.get('label')}")
     typer.echo(f"short_summary={output.get('short_summary')}")
     typer.echo("analyze-recommendation-backtest: finished")
+
+
+@app.command("production-smoke")
+def production_smoke(
+    api_base_url: str = PRODUCTION_API_URL_OPTION,
+    dashboard_url: str = PRODUCTION_DASHBOARD_URL_OPTION,
+) -> None:
+    typer.echo("production-smoke: started")
+    try:
+        report = ProductionSmokeService().run(
+            ProductionSmokeRequest(
+                api_base_url=api_base_url,
+                dashboard_url=dashboard_url or None,
+            )
+        )
+    except ProductionSmokeError as exc:
+        typer.echo("production-smoke: failed")
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(report, indent=2, sort_keys=True))
+    typer.echo("production-smoke: finished")
 
 
 def _split_csv_option(value: str) -> list[str]:

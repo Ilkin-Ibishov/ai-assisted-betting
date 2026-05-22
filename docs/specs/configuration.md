@@ -101,6 +101,12 @@ Dashboard:
 VITE_API_BASE_URL=https://<api-service>.up.railway.app
 ```
 
+Production smoke:
+
+```powershell
+python -m app.cli production-smoke --api-base-url https://<api-service>.up.railway.app --dashboard-url https://<dashboard-service>.up.railway.app
+```
+
 ### replay
 
 Historical CSV/replay provider.

@@ -357,6 +357,10 @@ Only after the offline sample pipeline works:
 - `docs/tasks/task-50-scheduled-paper-worker.md`
 - `docs/specs/configuration.md`
 - `docs/specs/testing-strategy.md`
+- `docs/deployment/railway-readiness.md`
+- `app/services/production_smoke_service.py`
+- `app/cli.py`
+- `tests/unit/test_production_smoke_service.py`
 
 ## Live Misli Recommendation Plan
 

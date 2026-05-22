@@ -836,6 +836,16 @@ def test_backtest_recommendations_command_exports_report(tmp_path) -> None:
     assert (tmp_path / "reports" / "pytest_cli_rec_backtest_recommendation_backtest.json").exists()
 
 
+def test_production_smoke_command_reports_missing_api_url() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["production-smoke"])
+
+    assert result.exit_code == 1
+    assert "production-smoke: failed" in result.output
+    assert "api_base_url_required" in result.output
+
+
 def test_analyze_recommendation_backtest_command_persists_ai_summary(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "backtest-ai-cli.sqlite"
