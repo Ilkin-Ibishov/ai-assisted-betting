@@ -186,6 +186,36 @@ class PaperRecommendation(Base):
     created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
 
 
+class PaperCombination(Base):
+    __tablename__ = "paper_combinations"
+    __table_args__ = (
+        UniqueConstraint(
+            "leg_recommendation_ids_json",
+            "model_name",
+            "model_version",
+            name="uq_paper_combination_identity",
+        ),
+        Index("idx_paper_combinations_grade", "grade"),
+        Index("idx_paper_combinations_rank", "rank"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    leg_recommendation_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    leg_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    model_name: Mapped[str] = mapped_column(String, nullable=False)
+    model_version: Mapped[str] = mapped_column(String, nullable=False)
+    grade: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    combined_odds: Mapped[float] = mapped_column(nullable=False)
+    estimated_probability: Mapped[float] = mapped_column(nullable=False)
+    combined_expected_value: Mapped[float] = mapped_column(nullable=False)
+    confidence_score: Mapped[float | None]
+    risk_flags_json: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
+
+
 class DecisionLog(Base):
     __tablename__ = "decision_logs"
     __table_args__ = (Index("idx_decision_logs_match_stage", "match_id", "stage"),)

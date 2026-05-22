@@ -438,3 +438,41 @@ reject
 ```
 
 Recommendations are advisory and paper-only. They do not create real bets or automate bookmaker interactions.
+
+---
+
+## 11. paper_combinations
+
+Stores ranked paper-only bet-combination suggestions generated from deterministic paper recommendations.
+
+```sql
+CREATE TABLE paper_combinations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    leg_recommendation_ids_json TEXT NOT NULL,
+    leg_count INTEGER NOT NULL,
+    model_name TEXT NOT NULL,
+    model_version TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    status TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    combined_odds REAL NOT NULL,
+    estimated_probability REAL NOT NULL,
+    combined_expected_value REAL NOT NULL,
+    confidence_score REAL,
+    risk_flags_json TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(leg_recommendation_ids_json, model_name, model_version)
+);
+```
+
+Combination grades:
+
+```text
+single
+recommended
+lean
+reject
+```
+
+Combinations are advisory and paper-only. They reject duplicate event exposure and unsafe/stale legs, but deeper correlation and portfolio-risk validation remain a Task 59 backtesting concern.

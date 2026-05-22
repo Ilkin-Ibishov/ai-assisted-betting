@@ -104,6 +104,7 @@ GET /api/live/runs
 GET /api/live/runs/{run_id}
 GET /api/live/odds-movement
 GET /api/live/recommendations
+GET /api/live/combinations
 ```
 
 Response data should come from existing comparison JSON and analysis service output. The first version does not need database write operations.
@@ -186,6 +187,8 @@ errors_count
 `GET /api/live/odds-movement` returns read-only current/opening/previous odds movement summaries grouped by match, bookmaker, market, and selection. Outcomes can be `active`, `missing`, or `stale`, with movement directions `new`, `up`, `down`, `stable`, `missing`, or `stale`.
 
 `GET /api/live/recommendations` returns persisted deterministic paper recommendations newest-first. Records include grade, model probability, implied probability, edge, confidence, current odds, expected value, risk flags, and rationale.
+
+`GET /api/live/combinations` returns ranked persisted paper-only combinations. Records include leg recommendation ids, leg count, model identity, grade, status, rank, combined odds, estimated probability, combined expected value, confidence score, risk flags, rationale, and creation time.
 
 Each live run payload includes:
 

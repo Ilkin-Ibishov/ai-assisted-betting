@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.api import create_api
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import Base, PaperRecommendation
+from app.db.models import Base, PaperCombination, PaperRecommendation
 from app.db.repositories import (
     LiveRunRepository,
     MatchRepository,
@@ -361,6 +361,22 @@ def test_live_recommendations_endpoint_lists_persisted_recommendations(tmp_path:
     assert payload[0]["source_match_id"] == "misli:football:2816300"
 
 
+def test_live_combinations_endpoint_lists_ranked_paper_combinations(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_combination_database(database_url)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/combinations")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload[0]["rank"] == 1
+    assert payload[0]["grade"] == "recommended"
+    assert payload[0]["leg_recommendation_ids"] == [1, 2]
+    assert payload[0]["risk_flags"] == ["no_current_risk_flags"]
+    assert payload[0]["combined_expected_value"] == 0.19
+
+
 def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_live_status_database(database_url)
@@ -571,6 +587,62 @@ def _seed_recommendation_database(database_url: str) -> None:
                 expected_value=0.24,
                 risk_flags_json='["no_current_risk_flags"]',
                 rationale="Positive edge is above recommendation threshold.",
+            )
+        )
+    engine.dispose()
+
+
+def _seed_combination_database(database_url: str) -> None:
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        match = MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:2816300",
+            league="Sample Premier",
+            home_team="Forest City",
+            away_team="Eastport Athletic",
+            kickoff_time="2026-05-19T20:30:00+04:00",
+        )
+        recommendations = []
+        for selection in ("HOME", "AWAY"):
+            recommendation = PaperRecommendation(
+                match_id=match.id,
+                source_match_id=f"misli:football:2816300:{selection}",
+                bookmaker="Misli.az",
+                market="1X2",
+                selection=selection,
+                latest_snapshot_time="2026-05-19T12:00:00+00:00",
+                model_name="baseline_heuristic",
+                model_version="v0",
+                grade="recommended",
+                status="active",
+                model_probability=0.6,
+                implied_probability=0.5,
+                edge=0.1,
+                confidence_score=0.7,
+                current_odds=2.0,
+                expected_value=0.2,
+                risk_flags_json='["no_current_risk_flags"]',
+                rationale="Seed recommendation",
+            )
+            session.add(recommendation)
+            session.flush()
+            recommendations.append(recommendation)
+        session.add(
+            PaperCombination(
+                leg_recommendation_ids_json=json.dumps([item.id for item in recommendations]),
+                leg_count=2,
+                model_name="baseline_heuristic",
+                model_version="v0",
+                grade="recommended",
+                status="active",
+                rank=1,
+                combined_odds=3.8,
+                estimated_probability=0.313,
+                combined_expected_value=0.19,
+                confidence_score=0.7,
+                risk_flags_json='["no_current_risk_flags"]',
+                rationale="Seed combination",
             )
         )
     engine.dispose()

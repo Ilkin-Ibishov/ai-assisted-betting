@@ -9,6 +9,7 @@ from app.db.migrations import init_db as run_init_db
 from app.services.ai_analysis_service import AIAnalysisService
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.collection_service import CollectionService
+from app.services.combination_service import CombinationService
 from app.services.comparison_service import ReplayComparisonRequest, ReplayComparisonService
 from app.services.evaluation_service import EvaluationService, format_evaluation_report
 from app.services.football_data_service import FootballDataImportRequest, FootballDataImportService
@@ -409,6 +410,30 @@ def generate_recommendations(
         stale_after_minutes=stale_after_minutes
     )
     _print_summary("generate-recommendations", summary)
+
+
+@app.command("generate-combinations")
+def generate_combinations(
+    max_legs: int = typer.Option(3, help="Maximum number of paper combination legs."),
+    min_leg_confidence: float = typer.Option(
+        0.6,
+        help="Minimum confidence score required for each leg.",
+    ),
+    max_risk_flags: int = typer.Option(
+        1,
+        help="Maximum non-neutral risk flags allowed on a persisted combination.",
+    ),
+    max_combinations: int = typer.Option(100, help="Maximum combinations to persist."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    summary = CombinationService(engine).generate(
+        max_legs=max_legs,
+        min_leg_confidence=min_leg_confidence,
+        max_risk_flags=max_risk_flags,
+        max_combinations=max_combinations,
+    )
+    _print_summary("generate-combinations", summary)
 
 
 @app.command("generate-features")

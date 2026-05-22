@@ -407,8 +407,16 @@ Only after the offline sample pipeline works:
 
 - `docs/tasks/task-56-paper-bet-combination-engine.md`
 - `docs/specs/value-detection-and-paper-bets.md`
+- `docs/specs/database-schema.md`
+- `docs/specs/dashboard.md`
 - `docs/specs/safety-and-compliance.md`
 - `docs/agent/05_TECHNICAL_DEBT.md`
+- `app/services/combination_service.py`
+- `app/db/models.py`
+- `app/db/migrations.py`
+- `app/api.py`
+- `app/cli.py`
+- `dashboard/src/lib/api.ts`
 
 ## Task 57 - AI Recommendation Review Layer
 

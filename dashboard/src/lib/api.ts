@@ -128,6 +128,24 @@ export type AIAnalysisRun = {
   created_at: string
 }
 
+export type PaperCombination = {
+  id: number
+  leg_recommendation_ids: number[]
+  leg_count: number
+  model_name: string
+  model_version: string
+  grade: string
+  status: string
+  rank: number
+  combined_odds: number
+  estimated_probability: number
+  combined_expected_value: number
+  confidence_score: number | null
+  risk_flags: string[]
+  rationale: string
+  created_at: string
+}
+
 export async function fetchComparisons(): Promise<ComparisonSummary[]> {
   return getJson('/api/reports/comparisons')
 }
@@ -142,6 +160,10 @@ export async function fetchLiveStatus(): Promise<LiveStatus> {
 
 export async function fetchOddsMovement(): Promise<OddsMovementSummary[]> {
   return getJson('/api/live/odds-movement')
+}
+
+export async function fetchPaperCombinations(): Promise<PaperCombination[]> {
+  return getJson('/api/live/combinations')
 }
 
 export async function fetchLatestAIAnalysis(): Promise<AIAnalysisRun | null> {

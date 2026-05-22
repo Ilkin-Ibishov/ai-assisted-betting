@@ -48,6 +48,20 @@ Single recommendation grades are useful for paper analysis, but they are not eno
 Next:
 Task 56 must add combination and exposure rules. Task 59 should backtest recommendation thresholds and risk assumptions.
 
+### P2 - Combination Correlation Rules Are Heuristic
+
+Status: accepted  
+Introduced: Task 56 - Paper Bet Combination Engine  
+Area: paper combination risk model
+
+Task 56 rejects duplicate event exposure and filters unsafe legs, but it does not yet model deeper market correlation, league/team exposure concentration, bankroll sizing, drawdown risk, or historical parlay calibration.
+
+Impact:
+Ranked combinations are useful for paper-only analysis and dashboard review, but the risk model is still too simple for strategy confidence.
+
+Next:
+Task 57 should have AI review call out correlation and confidence limitations. Task 59 should backtest singles versus combinations and calibrate or replace the heuristic rules.
+
 ### Planning Note - Live Misli Recommendation Roadmap
 
 Status: accepted  
@@ -123,6 +137,8 @@ Task 53 hardened Misli parsing and provider-health drift reporting. It did not r
 Task 54 added computed odds movement summaries from existing `odds_snapshots`; see the accepted P3 movement-summary tradeoff above.
 
 Task 55 added deterministic paper recommendations; see the accepted P2 simplified unit-stake EV tradeoff above.
+
+Task 56 added paper bet combinations; see the accepted P2 combination-correlation tradeoff above.
 
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 

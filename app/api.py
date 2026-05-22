@@ -9,7 +9,7 @@ from sqlalchemy import select, text
 
 from app.config import load_settings
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import AIAnalysisRun, PaperRecommendation
+from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.live_status_service import LiveStatusService
 from app.services.odds_movement_service import OddsMovementService
@@ -93,6 +93,10 @@ def create_api(
     @api.get("/api/live/recommendations")
     def list_live_recommendations(limit: int = 100) -> list[dict[str, Any]]:
         return _paper_recommendation_payloads(live_database_url, limit=limit)
+
+    @api.get("/api/live/combinations")
+    def list_live_combinations(limit: int = 100) -> list[dict[str, Any]]:
+        return _paper_combination_payloads(live_database_url, limit=limit)
 
     @api.get("/api/ai/analysis/latest")
     def get_latest_ai_analysis() -> dict[str, Any]:
@@ -363,4 +367,38 @@ def _paper_recommendation_payload(recommendation: PaperRecommendation) -> dict[s
         "risk_flags": json.loads(recommendation.risk_flags_json),
         "rationale": recommendation.rationale,
         "created_at": recommendation.created_at,
+    }
+
+
+def _paper_combination_payloads(database_url: str, *, limit: int) -> list[dict[str, Any]]:
+    engine = create_engine_from_url(database_url)
+    try:
+        with session_scope(engine) as session:
+            combinations = session.scalars(
+                select(PaperCombination)
+                .order_by(PaperCombination.rank.asc(), PaperCombination.id.asc())
+                .limit(max(1, min(limit, 500)))
+            ).all()
+            return [_paper_combination_payload(item) for item in combinations]
+    finally:
+        engine.dispose()
+
+
+def _paper_combination_payload(combination: PaperCombination) -> dict[str, Any]:
+    return {
+        "id": combination.id,
+        "leg_recommendation_ids": json.loads(combination.leg_recommendation_ids_json),
+        "leg_count": combination.leg_count,
+        "model_name": combination.model_name,
+        "model_version": combination.model_version,
+        "grade": combination.grade,
+        "status": combination.status,
+        "rank": combination.rank,
+        "combined_odds": combination.combined_odds,
+        "estimated_probability": combination.estimated_probability,
+        "combined_expected_value": combination.combined_expected_value,
+        "confidence_score": combination.confidence_score,
+        "risk_flags": json.loads(combination.risk_flags_json),
+        "rationale": combination.rationale,
+        "created_at": combination.created_at,
     }

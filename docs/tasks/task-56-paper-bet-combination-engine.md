@@ -19,6 +19,17 @@ Build paper-only bet-combination suggestions that avoid naive high-odds parlays 
 - Tests cover duplicate-event rejection, correlated-market rejection, stale-leg rejection, and maximum-leg enforcement.
 - Dashboard can consume combination data without additional backend transformation.
 
+## Implementation Notes
+
+Completed in Task 56:
+
+- Added `paper_combinations` storage with migration `006_create_paper_combinations`.
+- Added `CombinationService` to generate ranked single-leg and multi-leg paper combinations from active deterministic recommendations.
+- Added duplicate event exposure rejection, stale/provider-risk leg filtering, maximum-leg enforcement, `max_risk_flags` enforcement, EV/probability/confidence scoring, and risk flags.
+- Added `generate-combinations` CLI command with `--max-legs`, `--min-leg-confidence`, `--max-risk-flags`, and `--max-combinations`.
+- Added `GET /api/live/combinations` and typed dashboard API helper `fetchPaperCombinations`.
+- Added unit/API/CLI coverage for service behavior, migration records, API payloads, and CLI persistence.
+
 ## Verification
 
 ```powershell
@@ -41,4 +52,4 @@ Requires Task 55 recommendation engine.
 
 ## Technical Debt
 
-Document correlation rules that are heuristic and need historical validation.
+Combination correlation and exposure rules are heuristic and need historical validation in Task 59 before they should influence any serious paper strategy decisions.

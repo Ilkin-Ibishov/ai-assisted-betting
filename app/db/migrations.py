@@ -7,6 +7,7 @@ MIGRATION_NAMES = [
     "003_create_live_runs",
     "004_create_ai_analysis_runs",
     "005_create_paper_recommendations",
+    "006_create_paper_combinations",
 ]
 
 
@@ -49,6 +50,11 @@ def run_migrations(engine) -> None:
             connection,
             "005_create_paper_recommendations",
             _create_paper_recommendations,
+        )
+        _run_migration(
+            connection,
+            "006_create_paper_combinations",
+            _create_paper_combinations,
         )
 
 
@@ -299,5 +305,51 @@ def _create_paper_recommendations(connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_paper_recommendations_created
         ON paper_recommendations (created_at)
+        """
+    )
+
+
+def _create_paper_combinations(connection) -> None:
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE IF NOT EXISTS paper_combinations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            leg_recommendation_ids_json TEXT NOT NULL,
+            leg_count INTEGER NOT NULL,
+            model_name TEXT NOT NULL,
+            model_version TEXT NOT NULL,
+            grade TEXT NOT NULL,
+            status TEXT NOT NULL,
+            rank INTEGER NOT NULL,
+            combined_odds REAL NOT NULL,
+            estimated_probability REAL NOT NULL,
+            combined_expected_value REAL NOT NULL,
+            confidence_score REAL,
+            risk_flags_json TEXT NOT NULL,
+            rationale TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_paper_combination_identity
+        ON paper_combinations (
+            leg_recommendation_ids_json,
+            model_name,
+            model_version
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS idx_paper_combinations_grade
+        ON paper_combinations (grade)
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS idx_paper_combinations_rank
+        ON paper_combinations (rank)
         """
     )
