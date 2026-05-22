@@ -81,22 +81,34 @@ Older comparison reports can still be opened if structured analysis cannot be de
 
 By default, the report catalog excludes `pytest_*` comparison artifacts. Use `GET /api/reports/comparisons?include_test_reports=true` when debugging test-generated reports.
 
-## Next Phase
+## Current Readiness
 
-The next major phase is a paper-only live loop. The roadmap starts at:
+The current system is conditionally ready for monitored paper-only Railway staging.
+
+Read the final readiness gate before starting new advanced work:
+
+```text
+docs/deployment/production-readiness-review.md
+```
+
+Railway setup, smoke checks, rollback, and guardrail triage are documented in:
+
+```text
+docs/deployment/railway-readiness.md
+```
+
+The system remains paper-only and advisory. Deployed Railway smoke evidence is still required before calling it fully production-proven.
+
+## Live Paper Phase
+
+The paper-only live loop roadmap starts at:
 
 ```text
 docs/specs/live-paper-loop.md
 docs/tasks/task-39-live-run-registry.md
 ```
 
-Task 38 has added the live provider contract and Misli public snapshot DTO validation. Task 39 has added the SQLite-backed live run registry. Task 40 has added manual live collection commands. Task 41 has added the live paper cycle command. Task 42 has added manual result collection and settlement reuse. The remaining implementation order is Tasks 43-45:
-
-```text
-process status API
-dashboard process monitor
-end-to-end dry run
-```
+Tasks 38 through 62 implemented the public Misli snapshot contract, live run registry, manual collection, scoped live paper cycle, result collection, process API, dashboard monitor, Railway readiness, scheduled worker, recommendations, combinations, AI review, backtesting, worker monitoring, operational guardrails, and final readiness review.
 
 Misli.az is the first localized provider candidate for discovery, scoped to public unauthenticated data only. If its usable odds require protected or disallowed paths, the live phase should proceed with a deterministic fake/manual provider first.
 

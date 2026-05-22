@@ -320,3 +320,19 @@ Recovery notes:
 - API failures are usually missing `DATABASE_URL`, dependency install failure, or Postgres connectivity.
 
 Keep all live workflows paper-only. Scheduled collection is allowed only through the separate monitored worker service.
+
+## Readiness Report
+
+The final Task 62 readiness decision is documented in:
+
+```text
+docs/deployment/production-readiness-review.md
+```
+
+Current decision:
+
+```text
+conditionally ready for continuous paper-only Railway staging
+```
+
+Full production proof is pending until deployed Railway smoke passes against real service URLs.

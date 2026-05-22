@@ -484,6 +484,7 @@ Only after the offline sample pipeline works:
 ## Task 62 - Final Production Readiness Review
 
 - `docs/tasks/task-62-final-production-readiness-review.md`
+- `docs/deployment/production-readiness-review.md`
 - `docs/agent/05_TECHNICAL_DEBT.md`
 - `docs/agent/04_OPEN_QUESTIONS.md`
 - `docs/deployment/railway-readiness.md`

@@ -25,6 +25,7 @@ P3 - useful cleanup or polish
 Status: accepted  
 Introduced: Task 54 - Live Odds Movement Tracking  
 Area: live odds movement
+Owner: future monitoring/data-volume task
 
 Task 54 computes odds movement directly from `odds_snapshots` instead of storing a dedicated movement table.
 
@@ -39,6 +40,7 @@ Keep computed summaries while data volume is small. If deployed collection makes
 Status: accepted  
 Introduced: Task 55 - Paper Bet Recommendation Engine  
 Area: recommendation risk model
+Owner: future recommendation-risk/backtesting task
 
 Task 55 computes expected value from model probability and current odds with fixed unit-stake arithmetic. It does not yet include bankroll sizing, exposure caps, market correlation, drawdown controls, or portfolio-level risk.
 
@@ -53,6 +55,7 @@ Task 56 must add combination and exposure rules. Task 59 should backtest recomme
 Status: accepted  
 Introduced: Task 56 - Paper Bet Combination Engine  
 Area: paper combination risk model
+Owner: future combination-risk/backtesting task
 
 Task 56 rejects duplicate event exposure and filters unsafe legs, but it does not yet model deeper market correlation, league/team exposure concentration, bankroll sizing, drawdown risk, or historical parlay calibration.
 
@@ -67,6 +70,7 @@ Task 57 should have AI review call out correlation and confidence limitations. T
 Status: accepted  
 Introduced: Task roadmap generation for Tasks 53-62  
 Area: planning
+Owner: future roadmap review task
 
 Tasks 53 through 62 have been added to prevent recommendation work from skipping ingestion reliability, odds movement, deterministic scoring, AI safety evals, dashboard visibility, deployment monitoring, and final readiness review.
 
@@ -77,6 +81,7 @@ No new implementation debt was introduced by this planning update. Expected futu
 Status: open  
 Introduced: Misli.az public Playwright snapshot prototype  
 Area: live provider discovery
+Owner: future Misli provider reliability task
 
 `tools/misli-public-snapshot.mjs` reads Misli.az public football rows from rendered DOM classes and maps the first three odds columns to HOME, DRAW, and AWAY when headless rendering hides explicit labels.
 
@@ -91,6 +96,7 @@ Task 38 added typed snapshot validation and fail-closed complete 1X2 validation.
 Status: open  
 Introduced: Misli.az public Playwright snapshot prototype  
 Area: live provider discovery
+Owner: future Misli provider reliability task
 
 Task 47 resolves high-confidence relative public labels such as `Bu Gün HH:MM` and `Sabah HH:MM` against snapshot `scraped_at` in the `Asia/Baku` timezone. Some public rows still expose only bare `HH:MM` labels with no full date context.
 
@@ -151,6 +157,8 @@ Task 51 added a Railway deployment runbook and `production-smoke` command. It di
 Task 60 added worker freshness monitoring, `/api/live/worker-status`, and production-smoke checks for worker freshness and recommendation endpoint health. It did not introduce new code debt. Railway cron cadence, cold starts, and service-to-service networking remain operational considerations documented in `docs/deployment/railway-readiness.md`.
 
 Task 61 added operational guardrails, `operational-status`, `/api/operations/guardrails`, and a dashboard guardrails panel. It did not introduce new code debt. External alert destinations remain an open product/operations decision in `docs/agent/04_OPEN_QUESTIONS.md`; notification bots are intentionally out of scope until staging use proves the guardrail states.
+
+Task 62 added the final production readiness review. It did not introduce new code debt. The system is conditionally ready for monitored paper-only Railway staging, with deployed Railway smoke evidence still pending.
 
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
