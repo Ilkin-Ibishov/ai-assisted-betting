@@ -84,6 +84,17 @@ Misli datetime validation risk flags
 provider failure source run ids
 ```
 
+Implemented by Task 57 recommendation review slice:
+
+```text
+recommendation-review prompt/version registry
+recommendation_review AI analysis persistence
+analyze-recommendations CLI command
+latest recommendation review API endpoint
+approval_state, concerns, rejected assumptions, and next checks
+fail-closed evals for hype, unsafe betting instructions, and missing inputs
+```
+
 ## Recommended Architecture
 
 ### 1. Deterministic Data And Policy Core
@@ -222,6 +233,7 @@ Possible `analysis_type` values:
 live_run_root_cause
 model_comparison_summary
 provider_health_summary
+recommendation_review
 next_experiment_plan
 deployment_readiness_review
 ```
@@ -232,6 +244,7 @@ Read endpoints:
 
 ```text
 GET /api/ai/analysis/latest
+GET /api/ai/recommendation-review/latest
 GET /api/ai/analysis/runs
 GET /api/ai/analysis/runs/{id}
 ```
@@ -243,6 +256,7 @@ python -m app.cli analyze-live-status
 python -m app.cli analyze-comparison --report <path>
 python -m app.cli analyze-comparison-ai --report <path>
 python -m app.cli analyze-provider-health --provider misli_public
+python -m app.cli analyze-recommendations
 python -m app.cli plan-next-experiment
 ```
 
@@ -267,6 +281,7 @@ Implemented: uses source ids from input records, except valid no_live_runs empty
 Implemented: keeps next actions within paper-only safety boundaries
 Implemented: flags ROI/calibration disagreement in comparison reports
 Implemented: identifies missing kickoff dates as provider blocker in provider-health mode
+Implemented: rejects recommendation-review hype, real-money/account instructions, unsupported certainty, bad review shape, and missing deterministic inputs
 Next: add stricter no-invented-facts fixtures across comparison report variants
 ```
 
@@ -279,9 +294,10 @@ Next: add stricter no-invented-facts fixtures across comparison report variants
 5. Implemented: add stricter live-status eval fixtures and regression tests.
 6. Implemented: add model-comparison analyst mode over replay comparison JSON.
 7. Implemented: add provider-health analyst mode over live provider runs.
-8. Next: add optional LLM provider integration behind configuration.
-9. Next: add richer AI-assisted next-experiment planner.
-10. Next: add deployment-readiness analyst mode.
+8. Implemented: add recommendation and combination review analyst mode.
+9. Next: add optional LLM provider integration behind configuration.
+10. Next: add richer AI-assisted next-experiment planner.
+11. Next: add deployment-readiness analyst mode.
 
 ## Non-Goals
 

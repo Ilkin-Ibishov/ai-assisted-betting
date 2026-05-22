@@ -140,6 +140,8 @@ Task 55 added deterministic paper recommendations; see the accepted P2 simplifie
 
 Task 56 added paper bet combinations; see the accepted P2 combination-correlation tradeoff above.
 
+Task 57 added deterministic AI review over recommendations and combinations. It did not introduce new implementation debt, but optional LLM-backed recommendation review remains future work and must add provider-specific eval fixtures before enablement.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

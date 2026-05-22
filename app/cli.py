@@ -254,6 +254,25 @@ def analyze_provider_health(
     typer.echo("analyze-provider-health: finished")
 
 
+@app.command("analyze-recommendations")
+def analyze_recommendations(
+    limit: int = typer.Option(50, help="Maximum recommendations and combinations to review."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    analysis = AIAnalysisService(engine).analyze_recommendation_review(limit=limit)
+    output = json.loads(analysis.output_json)
+    typer.echo("analyze-recommendations: started")
+    typer.echo(f"analysis_id={analysis.id}")
+    typer.echo(f"analysis_type={analysis.analysis_type}")
+    typer.echo(f"model_name={analysis.model_name}")
+    typer.echo(f"prompt_version={analysis.prompt_version}")
+    typer.echo(f"status={analysis.status}")
+    typer.echo(f"approval_state={output.get('approval_state')}")
+    typer.echo(f"short_summary={output.get('short_summary')}")
+    typer.echo("analyze-recommendations: finished")
+
+
 def _split_csv_option(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 

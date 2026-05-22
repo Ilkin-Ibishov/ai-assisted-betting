@@ -112,6 +112,11 @@ export type AIAnalysisOutput = {
   recommended_next_actions: string[]
   confidence: string
   source_record_ids: string[]
+  approval_state?: 'approve' | 'caution' | 'reject'
+  concerns?: string[]
+  confidence_explanation?: string
+  rejected_assumptions?: string[]
+  next_checks?: string[]
 }
 
 export type AIAnalysisRun = {
@@ -168,6 +173,20 @@ export async function fetchPaperCombinations(): Promise<PaperCombination[]> {
 
 export async function fetchLatestAIAnalysis(): Promise<AIAnalysisRun | null> {
   const response = await fetch(buildApiUrl('/api/ai/analysis/latest'))
+
+  if (response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json() as Promise<AIAnalysisRun>
+}
+
+export async function fetchLatestRecommendationReview(): Promise<AIAnalysisRun | null> {
+  const response = await fetch(buildApiUrl('/api/ai/recommendation-review/latest'))
 
   if (response.status === 404) {
     return null

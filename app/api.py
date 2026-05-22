@@ -105,6 +105,16 @@ def create_api(
             raise HTTPException(status_code=404, detail="AI analysis run not found")
         return analysis
 
+    @api.get("/api/ai/recommendation-review/latest")
+    def get_latest_ai_recommendation_review() -> dict[str, Any]:
+        analysis = _latest_ai_analysis_payload(
+            live_database_url,
+            analysis_type="recommendation_review",
+        )
+        if analysis is None:
+            raise HTTPException(status_code=404, detail="AI recommendation review not found")
+        return analysis
+
     @api.get("/api/ai/analysis/runs")
     def list_ai_analysis_runs(limit: int = 20) -> list[dict[str, Any]]:
         return _ai_analysis_run_payloads(live_database_url, limit=limit)
@@ -274,12 +284,19 @@ def _ranking_value(
     return max(values) if higher_is_better else min(values)
 
 
-def _latest_ai_analysis_payload(database_url: str) -> dict[str, Any] | None:
+def _latest_ai_analysis_payload(
+    database_url: str,
+    *,
+    analysis_type: str | None = None,
+) -> dict[str, Any] | None:
     engine = create_engine_from_url(database_url)
     try:
         with session_scope(engine) as session:
+            query = select(AIAnalysisRun)
+            if analysis_type is not None:
+                query = query.where(AIAnalysisRun.analysis_type == analysis_type)
             analysis = session.scalar(
-                select(AIAnalysisRun)
+                query
                 .order_by(AIAnalysisRun.created_at.desc(), AIAnalysisRun.id.desc())
                 .limit(1)
             )

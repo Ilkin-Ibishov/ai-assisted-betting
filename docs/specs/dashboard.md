@@ -105,6 +105,7 @@ GET /api/live/runs/{run_id}
 GET /api/live/odds-movement
 GET /api/live/recommendations
 GET /api/live/combinations
+GET /api/ai/recommendation-review/latest
 ```
 
 Response data should come from existing comparison JSON and analysis service output. The first version does not need database write operations.
@@ -189,6 +190,8 @@ errors_count
 `GET /api/live/recommendations` returns persisted deterministic paper recommendations newest-first. Records include grade, model probability, implied probability, edge, confidence, current odds, expected value, risk flags, and rationale.
 
 `GET /api/live/combinations` returns ranked persisted paper-only combinations. Records include leg recommendation ids, leg count, model identity, grade, status, rank, combined odds, estimated probability, combined expected value, confidence score, risk flags, rationale, and creation time.
+
+`GET /api/ai/recommendation-review/latest` returns the latest persisted AI-assisted advisory review for paper recommendations and combinations. The output includes approval state, concerns, confidence explanation, rejected assumptions, next checks, risk flags, and source record ids.
 
 Each live run payload includes:
 

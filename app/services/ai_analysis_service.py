@@ -5,18 +5,28 @@ from typing import Any, Protocol
 from sqlalchemy import Engine, func, select
 
 from app.db.engine import session_scope
-from app.db.models import AIAnalysisRun, LiveRun, PaperBet
+from app.db.models import (
+    AIAnalysisRun,
+    EvaluationRun,
+    LiveRun,
+    PaperBet,
+    PaperCombination,
+    PaperRecommendation,
+)
 from app.services.ai_analysis_evals import evaluate_ai_analysis_output
 from app.services.ai_prompt_registry import (
     COMPARISON_REPORT_PROMPT_VERSION,
     LIVE_STATUS_PROMPT_VERSION,
     PROVIDER_HEALTH_PROMPT_VERSION,
+    RECOMMENDATION_REVIEW_PROMPT_VERSION,
     ComparisonReportPrompt,
     LiveStatusPrompt,
     ProviderHealthPrompt,
+    RecommendationReviewPrompt,
     build_comparison_report_prompt,
     build_live_status_prompt,
     build_provider_health_prompt,
+    build_recommendation_review_prompt,
 )
 from app.services.analysis_service import ComparisonAnalysisService
 
@@ -33,6 +43,9 @@ class AIAnalysisProvider(Protocol):
         pass
 
     def analyze_provider_health(self, prompt: ProviderHealthPrompt) -> dict[str, Any]:
+        pass
+
+    def analyze_recommendation_review(self, prompt: RecommendationReviewPrompt) -> dict[str, Any]:
         pass
 
 
@@ -55,6 +68,12 @@ class DeterministicAIAnalysisProvider:
         return {
             "prompt_version": prompt.version,
             "output": _provider_health_output(prompt.input_payload),
+        }
+
+    def analyze_recommendation_review(self, prompt: RecommendationReviewPrompt) -> dict[str, Any]:
+        return {
+            "prompt_version": prompt.version,
+            "output": _recommendation_review_output(prompt.input_payload),
         }
 
 
@@ -167,6 +186,58 @@ class AIAnalysisService:
                     provider_result.get(
                         "prompt_version",
                         COMPARISON_REPORT_PROMPT_VERSION,
+                    )
+                ),
+                status=status,
+                error_summary=error_summary,
+            )
+            session.add(analysis)
+            session.flush()
+            return analysis
+
+    def analyze_recommendation_review(self, *, limit: int = 50) -> AIAnalysisRun:
+        input_payload = _recommendation_review_input(self.engine, limit=limit)
+        if not input_payload["paper_recommendations"] and not input_payload["paper_combinations"]:
+            output_payload = _missing_recommendation_review_output()
+            with session_scope(self.engine) as session:
+                analysis = AIAnalysisRun(
+                    analysis_type="recommendation_review",
+                    source_type="paper_recommendations",
+                    source_id="empty",
+                    input_json=json.dumps(input_payload, sort_keys=True),
+                    output_json=json.dumps(output_payload, sort_keys=True),
+                    model_name=self.provider.model_name,
+                    prompt_version=RECOMMENDATION_REVIEW_PROMPT_VERSION,
+                    status="failed",
+                    error_summary="recommendation_inputs_missing",
+                )
+                session.add(analysis)
+                session.flush()
+                return analysis
+
+        provider_result = self.provider.analyze_recommendation_review(
+            build_recommendation_review_prompt(input_payload)
+        )
+        output_payload = provider_result["output"]
+        eval_result = evaluate_ai_analysis_output(output_payload)
+        status = "completed"
+        error_summary = None
+        if not eval_result.passed:
+            status = "failed"
+            error_summary = ", ".join(eval_result.failures)
+            output_payload = _failed_eval_output(input_payload, eval_result.failures)
+        with session_scope(self.engine) as session:
+            analysis = AIAnalysisRun(
+                analysis_type="recommendation_review",
+                source_type="paper_recommendations",
+                source_id="latest",
+                input_json=json.dumps(input_payload, sort_keys=True),
+                output_json=json.dumps(output_payload, sort_keys=True),
+                model_name=self.provider.model_name,
+                prompt_version=str(
+                    provider_result.get(
+                        "prompt_version",
+                        RECOMMENDATION_REVIEW_PROMPT_VERSION,
                     )
                 ),
                 status=status,
@@ -388,8 +459,209 @@ def _provider_health_output(input_payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _failed_eval_output(input_payload: dict[str, Any], failures: list[str]) -> dict[str, Any]:
+def _recommendation_review_input(engine: Engine, *, limit: int) -> dict[str, Any]:
+    with session_scope(engine) as session:
+        recommendations = session.scalars(
+            select(PaperRecommendation)
+            .order_by(PaperRecommendation.created_at.desc(), PaperRecommendation.id.desc())
+            .limit(max(1, min(limit, 200)))
+        ).all()
+        combinations = session.scalars(
+            select(PaperCombination)
+            .order_by(PaperCombination.rank.asc(), PaperCombination.id.asc())
+            .limit(max(1, min(limit, 200)))
+        ).all()
+        latest_provider_run = session.scalar(
+            select(LiveRun)
+            .where(LiveRun.provider == "misli_public")
+            .order_by(LiveRun.started_at.desc(), LiveRun.id.desc())
+            .limit(1)
+        )
+        latest_evaluation = session.scalar(
+            select(EvaluationRun)
+            .order_by(EvaluationRun.created_at.desc(), EvaluationRun.id.desc())
+            .limit(1)
+        )
     return {
+        "paper_recommendations": [
+            _recommendation_review_record(item) for item in recommendations
+        ],
+        "paper_combinations": [_combination_review_record(item) for item in combinations],
+        "provider_health": _live_run_input(latest_provider_run),
+        "historical_calibration": _evaluation_review_record(latest_evaluation),
+    }
+
+
+def _recommendation_review_record(recommendation: PaperRecommendation) -> dict[str, Any]:
+    return {
+        "id": recommendation.id,
+        "source_match_id": recommendation.source_match_id,
+        "bookmaker": recommendation.bookmaker,
+        "market": recommendation.market,
+        "selection": recommendation.selection,
+        "grade": recommendation.grade,
+        "status": recommendation.status,
+        "model_probability": recommendation.model_probability,
+        "implied_probability": recommendation.implied_probability,
+        "edge": recommendation.edge,
+        "confidence_score": recommendation.confidence_score,
+        "current_odds": recommendation.current_odds,
+        "expected_value": recommendation.expected_value,
+        "risk_flags": json.loads(recommendation.risk_flags_json),
+        "rationale": recommendation.rationale,
+    }
+
+
+def _combination_review_record(combination: PaperCombination) -> dict[str, Any]:
+    return {
+        "id": combination.id,
+        "leg_recommendation_ids": json.loads(combination.leg_recommendation_ids_json),
+        "leg_count": combination.leg_count,
+        "grade": combination.grade,
+        "status": combination.status,
+        "rank": combination.rank,
+        "combined_odds": combination.combined_odds,
+        "estimated_probability": combination.estimated_probability,
+        "combined_expected_value": combination.combined_expected_value,
+        "confidence_score": combination.confidence_score,
+        "risk_flags": json.loads(combination.risk_flags_json),
+        "rationale": combination.rationale,
+    }
+
+
+def _evaluation_review_record(evaluation: EvaluationRun | None) -> dict[str, Any] | None:
+    if evaluation is None:
+        return None
+    return {
+        "id": evaluation.id,
+        "model_name": evaluation.model_name,
+        "model_version": evaluation.model_version,
+        "total_bets": evaluation.total_bets,
+        "roi": evaluation.roi,
+        "brier_score": evaluation.brier_score,
+        "log_loss": evaluation.log_loss,
+    }
+
+
+def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, Any]:
+    recommendations = input_payload["paper_recommendations"]
+    combinations = input_payload["paper_combinations"]
+    risk_flags: list[str] = []
+    concerns: list[str] = []
+    next_checks = [
+        "Backtest recommendation and combination thresholds before trusting paper strategy.",
+        "Keep all outputs advisory and paper-only.",
+    ]
+    rejected_assumptions = [
+        "Recommendation approval does not imply real-money readiness.",
+        "Combination ranking does not prove independent leg probabilities.",
+    ]
+
+    unsafe_recommendations = [
+        item for item in recommendations if item["status"] != "active" or item["grade"] == "reject"
+    ]
+    low_confidence = [
+        item
+        for item in recommendations
+        if item["confidence_score"] is not None and float(item["confidence_score"]) < 0.65
+    ]
+    risky_combinations = [
+        item
+        for item in combinations
+        if item["leg_count"] > 1 or item["risk_flags"] != ["no_current_risk_flags"]
+    ]
+    provider_health = input_payload["provider_health"]
+    if provider_health is not None and provider_health["status"] == "failed":
+        risk_flags.append("provider_health_warning")
+        concerns.append(
+            "Latest Misli provider run failed; recommendations need fresh input checks."
+        )
+    if unsafe_recommendations:
+        risk_flags.append("rejected_recommendations_present")
+        concerns.append(
+            "Rejected or inactive recommendation records are present in the review set."
+        )
+    if low_confidence:
+        risk_flags.append("low_confidence_recommendations")
+        concerns.append("Some recommendation legs have confidence below the preferred review band.")
+    if risky_combinations:
+        risk_flags.append("combination_correlation_heuristic")
+        concerns.append(
+            "Multi-leg combinations rely on heuristic independence and exposure assumptions."
+        )
+
+    approval_state = "approve"
+    if risk_flags:
+        approval_state = "caution"
+    if "provider_health_warning" in risk_flags or "rejected_recommendations_present" in risk_flags:
+        approval_state = "reject"
+
+    source_ids = [
+        f"paper_recommendation:{item['id']}" for item in recommendations
+    ] + [f"paper_combination:{item['id']}" for item in combinations]
+    return {
+        "label": "AI-assisted advisory analysis",
+        "short_summary": (
+            f"Reviewed {len(recommendations)} paper recommendations and "
+            f"{len(combinations)} paper combinations."
+        ),
+        "root_cause": (
+            "Deterministic recommendation and combination records were reviewed "
+            "against risk flags, confidence, provider health, and calibration context."
+        ),
+        "risk_flags": risk_flags or ["no_current_risk_flags"],
+        "recommended_next_actions": next_checks,
+        "confidence": "medium" if risk_flags else "high",
+        "source_record_ids": source_ids,
+        "approval_state": approval_state,
+        "concerns": concerns,
+        "confidence_explanation": _recommendation_confidence_explanation(
+            recommendations,
+            combinations,
+            risk_flags,
+        ),
+        "rejected_assumptions": rejected_assumptions,
+        "next_checks": next_checks,
+    }
+
+
+def _recommendation_confidence_explanation(
+    recommendations: list[dict[str, Any]],
+    combinations: list[dict[str, Any]],
+    risk_flags: list[str],
+) -> str:
+    if risk_flags:
+        return (
+            "Confidence is limited by active risk flags and by the current heuristic "
+            "combination model."
+        )
+    return (
+        f"Confidence is based on {len(recommendations)} deterministic recommendation "
+        f"records and {len(combinations)} combination records with no current risk flags."
+    )
+
+
+def _missing_recommendation_review_output() -> dict[str, Any]:
+    return {
+        "label": "AI-assisted advisory analysis",
+        "short_summary": "No paper recommendations or combinations are available for review.",
+        "root_cause": "The recommendation review cannot run without persisted advisory inputs.",
+        "risk_flags": ["recommendation_inputs_missing"],
+        "recommended_next_actions": [
+            "Run generate-recommendations and generate-combinations before AI review."
+        ],
+        "confidence": "high",
+        "source_record_ids": [],
+        "approval_state": "reject",
+        "concerns": ["No deterministic recommendation inputs were available."],
+        "confidence_explanation": "The review is rejected because no source records exist.",
+        "rejected_assumptions": ["No recommendation quality can be inferred without inputs."],
+        "next_checks": ["Generate deterministic recommendation inputs first."],
+    }
+
+
+def _failed_eval_output(input_payload: dict[str, Any], failures: list[str]) -> dict[str, Any]:
+    output = {
         "label": "AI-assisted advisory analysis",
         "short_summary": "AI analysis failed safety or structure eval gates.",
         "root_cause": "Provider output did not satisfy AI advisory validation rules.",
@@ -401,6 +673,21 @@ def _failed_eval_output(input_payload: dict[str, Any], failures: list[str]) -> d
         "source_record_ids": _source_record_ids_from_input(input_payload),
         "eval_failures": failures,
     }
+    if "paper_recommendations" in input_payload:
+        output.update(
+            {
+                "approval_state": "reject",
+                "concerns": ["AI provider output failed recommendation-review eval gates."],
+                "confidence_explanation": (
+                    "Deterministic fallback rejected unsafe or unsupported review output."
+                ),
+                "rejected_assumptions": [
+                    "Unsafe AI review output must not be treated as recommendation approval."
+                ],
+                "next_checks": ["Fix provider output and rerun evals."],
+            }
+        )
+    return output
 
 
 def _short_summary(input_payload: dict[str, Any]) -> str:
@@ -427,6 +714,14 @@ def _source_record_ids(
 def _source_record_ids_from_input(input_payload: dict[str, Any]) -> list[str]:
     if "report_name" in input_payload:
         return [input_payload["report_name"]]
+    if "paper_recommendations" in input_payload:
+        return [
+            f"paper_recommendation:{item['id']}"
+            for item in input_payload["paper_recommendations"]
+        ] + [
+            f"paper_combination:{item['id']}"
+            for item in input_payload["paper_combinations"]
+        ]
     if "recent_runs" in input_payload:
         return [run["run_id"] for run in input_payload["recent_runs"] if run is not None]
     latest_run = input_payload["latest_run"]

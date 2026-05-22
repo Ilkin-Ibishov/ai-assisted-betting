@@ -395,6 +395,37 @@ def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> 
     assert "failed-run" in payload["output"]["source_record_ids"]
 
 
+def test_ai_recommendation_review_latest_endpoint_returns_latest_review(
+    tmp_path: Path,
+) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_recommendation_database(database_url)
+    engine = create_engine_from_url(database_url)
+    AIAnalysisService(engine).analyze_recommendation_review()
+    engine.dispose()
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/ai/recommendation-review/latest")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["analysis_type"] == "recommendation_review"
+    assert payload["output"]["approval_state"] == "approve"
+    assert payload["output"]["source_record_ids"] == ["paper_recommendation:1"]
+
+
+def test_ai_recommendation_review_latest_endpoint_returns_404_when_missing(
+    tmp_path: Path,
+) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/ai/recommendation-review/latest")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "AI recommendation review not found"
+
+
 def test_ai_analysis_runs_endpoint_lists_recent_advisories(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_live_status_database(database_url)

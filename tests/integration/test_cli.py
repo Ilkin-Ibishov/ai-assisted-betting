@@ -710,6 +710,67 @@ def test_generate_combinations_command_persists_paper_combinations(tmp_path) -> 
     assert max_leg_count == 2
 
 
+def test_analyze_recommendations_command_persists_ai_review(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "recommendation-review.sqlite"
+    env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}
+
+    assert runner.invoke(app, ["init-db"], env=env).exit_code == 0
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO matches (
+                    source, source_match_id, league, home_team, away_team,
+                    kickoff_time, status, created_at, updated_at
+                )
+                VALUES (
+                    'misli_public', 'misli:football:2816300', 'Sample Premier',
+                    'Forest City', 'Eastport Athletic',
+                    '2026-05-19T20:30:00+04:00', 'scheduled',
+                    '2026-05-19T11:00:00+00:00', '2026-05-19T11:00:00+00:00'
+                )
+                """
+            )
+        )
+        match_id = connection.execute(text("SELECT id FROM matches")).scalar_one()
+        connection.execute(
+            text(
+                """
+                INSERT INTO paper_recommendations (
+                    match_id, source_match_id, bookmaker, market, selection,
+                    latest_snapshot_time, model_name, model_version, grade, status,
+                    model_probability, implied_probability, edge, confidence_score,
+                    current_odds, expected_value, risk_flags_json, rationale, created_at
+                )
+                VALUES (
+                    :match_id, 'misli:football:2816300', 'Misli.az', '1X2', 'HOME',
+                    '2026-05-19T12:00:00+00:00', 'baseline_heuristic', 'v0',
+                    'recommended', 'active', 0.62, 0.5, 0.12, 0.72,
+                    2.0, 0.24, '["no_current_risk_flags"]',
+                    'Seed recommendation', '2026-05-19T12:00:00+00:00'
+                )
+                """
+            ),
+            {"match_id": match_id},
+        )
+
+    result = runner.invoke(app, ["analyze-recommendations"], env=env)
+
+    assert result.exit_code == 0
+    assert "analyze-recommendations: started" in result.output
+    assert "analysis_type=recommendation_review" in result.output
+    assert "approval_state=approve" in result.output
+
+    with engine.connect() as connection:
+        analysis_type = connection.execute(
+            text("SELECT analysis_type FROM ai_analysis_runs")
+        ).scalar_one()
+
+    assert analysis_type == "recommendation_review"
+
+
 def test_replay_football_data_runs_historical_pipeline(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "replay.sqlite"

@@ -5,10 +5,10 @@ from sqlalchemy import select
 
 from app.db.engine import create_engine_from_url, session_scope
 from app.db.migrations import init_db
-from app.db.models import AIAnalysisRun
+from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation
 from app.db.repositories import LiveRunRepository
 from app.services.ai_analysis_service import AIAnalysisProvider, AIAnalysisService
-from app.services.ai_prompt_registry import LiveStatusPrompt
+from app.services.ai_prompt_registry import LiveStatusPrompt, RecommendationReviewPrompt
 
 
 def test_ai_analysis_service_records_deterministic_live_status_advisory(tmp_path) -> None:
@@ -180,6 +180,79 @@ def test_provider_health_flags_parser_drift_stale_snapshot_and_low_confidence(
     engine.dispose()
 
 
+def test_ai_analysis_service_records_recommendation_review_advisory(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'recommendation-review.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+    _seed_recommendation_review_inputs(engine)
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_review()
+
+    assert analysis.analysis_type == "recommendation_review"
+    assert analysis.source_type == "paper_recommendations"
+    assert analysis.source_id == "latest"
+    assert analysis.prompt_version == "ai-recommendation-review-v1"
+    assert analysis.status == "completed"
+    output = json.loads(analysis.output_json)
+    assert output["label"] == "AI-assisted advisory analysis"
+    assert output["approval_state"] == "caution"
+    assert "combination_correlation_heuristic" in output["risk_flags"]
+    assert "combination" in output["short_summary"].lower()
+    assert output["concerns"]
+    assert output["confidence_explanation"]
+    assert output["rejected_assumptions"]
+    assert output["next_checks"]
+    assert "real-money" not in " ".join(output["recommended_next_actions"]).lower()
+    assert "paper_recommendation:1" in output["source_record_ids"]
+    assert "paper_combination:1" in output["source_record_ids"]
+
+    with session_scope(engine) as session:
+        stored = session.scalar(select(AIAnalysisRun))
+
+    assert stored is not None
+    assert "paper_combinations" in stored.input_json
+    engine.dispose()
+
+
+def test_ai_analysis_service_rejects_recommendation_review_without_inputs(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'empty-recommendation-review.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_review()
+
+    assert analysis.status == "failed"
+    assert analysis.error_summary == "recommendation_inputs_missing"
+    output = json.loads(analysis.output_json)
+    assert output["approval_state"] == "reject"
+    assert output["risk_flags"] == ["recommendation_inputs_missing"]
+    assert output["source_record_ids"] == []
+    engine.dispose()
+
+
+def test_ai_analysis_service_fails_closed_on_unsafe_recommendation_review_output(
+    tmp_path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'unsafe-recommendation-review.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+    _seed_recommendation_review_inputs(engine)
+
+    analysis = AIAnalysisService(
+        engine,
+        provider=UnsafeRecommendationReviewProvider(),
+    ).analyze_recommendation_review()
+
+    assert analysis.status == "failed"
+    assert analysis.error_summary is not None
+    assert "unsafe_real_money_language" in analysis.error_summary
+    output = json.loads(analysis.output_json)
+    assert output["risk_flags"] == ["ai_eval_failed"]
+    assert output["approval_state"] == "reject"
+    assert "real-money" not in " ".join(output["recommended_next_actions"]).lower()
+    engine.dispose()
+
+
 def _seed_failed_misli_run(engine) -> None:
     with session_scope(engine) as session:
         repository = LiveRunRepository(session)
@@ -286,6 +359,84 @@ def _write_comparison_report(path: Path) -> None:
             }
         ),
         encoding="utf-8",
+        )
+
+
+def _seed_recommendation_review_inputs(engine) -> None:
+    with session_scope(engine) as session:
+        match_one = _seed_match(session, source_match_id="match-1")
+        match_two = _seed_match(session, source_match_id="match-2")
+        first = PaperRecommendation(
+            match_id=match_one.id,
+            source_match_id=match_one.source_match_id,
+            bookmaker="Misli.az",
+            market="1X2",
+            selection="HOME",
+            latest_snapshot_time="2026-05-19T12:00:00+00:00",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            grade="recommended",
+            status="active",
+            model_probability=0.62,
+            implied_probability=0.5,
+            edge=0.12,
+            confidence_score=0.72,
+            current_odds=2.0,
+            expected_value=0.24,
+            risk_flags_json='["no_current_risk_flags"]',
+            rationale="Positive edge is above recommendation threshold.",
+        )
+        second = PaperRecommendation(
+            match_id=match_two.id,
+            source_match_id=match_two.source_match_id,
+            bookmaker="Misli.az",
+            market="1X2",
+            selection="AWAY",
+            latest_snapshot_time="2026-05-19T12:00:00+00:00",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            grade="lean",
+            status="active",
+            model_probability=0.58,
+            implied_probability=0.5,
+            edge=0.08,
+            confidence_score=0.66,
+            current_odds=1.9,
+            expected_value=0.102,
+            risk_flags_json='["no_current_risk_flags"]',
+            rationale="Positive edge is above minimum threshold.",
+        )
+        session.add_all([first, second])
+        session.flush()
+        session.add(
+            PaperCombination(
+                leg_recommendation_ids_json=json.dumps([first.id, second.id]),
+                leg_count=2,
+                model_name="baseline_heuristic",
+                model_version="v0",
+                grade="recommended",
+                status="active",
+                rank=1,
+                combined_odds=3.8,
+                estimated_probability=0.36,
+                combined_expected_value=0.368,
+                confidence_score=0.69,
+                risk_flags_json='["no_current_risk_flags"]',
+                rationale="Recommended paper combination with 2 legs.",
+            )
+        )
+
+
+def _seed_match(session, *, source_match_id: str):
+    from app.db.repositories import MatchRepository
+
+    return MatchRepository(session).add(
+        source="misli_public",
+        source_match_id=source_match_id,
+        league="Sample Premier",
+        home_team=f"{source_match_id} Home",
+        away_team=f"{source_match_id} Away",
+        kickoff_time="2026-05-19T20:30:00+04:00",
     )
 
 
@@ -307,6 +458,25 @@ class RecordingProvider(AIAnalysisProvider):
             },
         }
 
+    def analyze_recommendation_review(self, prompt: RecommendationReviewPrompt) -> dict:
+        return {
+            "prompt_version": prompt.version,
+            "output": {
+                "label": "AI-assisted advisory analysis",
+                "short_summary": "Custom recommendation review.",
+                "root_cause": "Custom provider reviewed deterministic recommendation inputs.",
+                "risk_flags": ["no_current_risk_flags"],
+                "recommended_next_actions": ["Keep analysis paper-only."],
+                "confidence": "medium",
+                "source_record_ids": ["paper_recommendation:1"],
+                "approval_state": "approve",
+                "concerns": [],
+                "confidence_explanation": "Custom provider confidence explanation.",
+                "rejected_assumptions": ["No real-money readiness is implied."],
+                "next_checks": ["Backtest recommendation thresholds."],
+            },
+        }
+
 
 class UnsafeProvider(AIAnalysisProvider):
     model_name = "unsafe_provider_model"
@@ -322,5 +492,28 @@ class UnsafeProvider(AIAnalysisProvider):
                 "recommended_next_actions": ["Place real-money stake on the home team."],
                 "confidence": "certain",
                 "source_record_ids": [],
+            },
+        }
+
+
+class UnsafeRecommendationReviewProvider(AIAnalysisProvider):
+    model_name = "unsafe_recommendation_review_provider"
+
+    def analyze_recommendation_review(self, prompt: RecommendationReviewPrompt) -> dict:
+        return {
+            "prompt_version": prompt.version,
+            "output": {
+                "label": "Betting advice",
+                "short_summary": "This is guaranteed. Place a real-money bet now.",
+                "root_cause": "Unsupported certainty.",
+                "risk_flags": [],
+                "recommended_next_actions": ["Place a bet through the bookmaker account."],
+                "confidence": "certain",
+                "source_record_ids": [],
+                "approval_state": "approve",
+                "concerns": [],
+                "confidence_explanation": "Guaranteed outcome.",
+                "rejected_assumptions": [],
+                "next_checks": [],
             },
         }

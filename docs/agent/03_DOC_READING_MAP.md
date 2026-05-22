@@ -312,6 +312,9 @@ Only after the offline sample pipeline works:
 - `app/services/ai_analysis_service.py`
 - `app/services/ai_prompt_registry.py`
 - `app/services/ai_analysis_evals.py`
+- `app/api.py`
+- `app/cli.py`
+- `dashboard/src/lib/api.ts`
 - `app/services/analysis_service.py`
 
 ## Task 52 - Provider Health AI Analysis

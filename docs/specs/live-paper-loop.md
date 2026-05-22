@@ -378,6 +378,8 @@ Task 55 added deterministic paper recommendations. `generate-recommendations` re
 
 Task 56 added ranked paper-only combinations. `generate-combinations` reads eligible active recommendations, rejects duplicate event exposure and unsafe legs, computes combined odds/probability/EV/confidence, persists `paper_combinations`, and exposes them through `GET /api/live/combinations`. Combination records remain advisory and do not create or execute bets.
 
+Task 57 added AI-assisted recommendation review. `analyze-recommendations` reads persisted recommendations, combinations, provider health, and latest evaluation context, persists `recommendation_review` records in `ai_analysis_runs`, and exposes the latest review through `GET /api/ai/recommendation-review/latest`. The review can approve, caution, or reject paper recommendations, but remains advisory and cannot override deterministic gates.
+
 ## Non-Goals
 
 - Real-money betting.
