@@ -142,6 +142,8 @@ Task 56 added paper bet combinations; see the accepted P2 combination-correlatio
 
 Task 57 added deterministic AI review over recommendations and combinations. It did not introduce new implementation debt, but optional LLM-backed recommendation review remains future work and must add provider-specific eval fixtures before enablement.
 
+Task 58 added a direct-rendered recommendation dashboard panel. It did not introduce a current performance issue, but the panel should be revisited for pagination or virtualization if recommendation history grows beyond the API-limited working set.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

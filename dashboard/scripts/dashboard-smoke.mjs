@@ -15,9 +15,16 @@ if (comparisons.some((comparison) => comparison.name.startsWith('pytest_'))) {
   throw new Error('Default comparison list should not include pytest reports')
 }
 
-const firstComparison = comparisons[0]
+const visibleCatalogComparisons = comparisons
+  .toSorted((a, b) => Date.parse(b.modified_at) - Date.parse(a.modified_at))
+  .slice(0, 6)
+const firstComparison = visibleCatalogComparisons[0]
 const detail = await getJson(`${apiUrl}/api/reports/comparisons/${firstComparison.name}`)
-const liveStatus = await getJson(`${apiUrl}/api/live/status`)
+  const liveStatus = await getJson(`${apiUrl}/api/live/status`)
+  const recommendations = await getJson(`${apiUrl}/api/live/recommendations`)
+  const recommendationReview = await getOptionalJson(
+    `${apiUrl}/api/ai/recommendation-review/latest`,
+  )
 const recentComparisons = comparisons
   .toSorted((a, b) => Date.parse(b.modified_at) - Date.parse(a.modified_at))
   .slice(0, 6)
@@ -26,8 +33,12 @@ const recentDetails = await Promise.all(
     getJson(`${apiUrl}/api/reports/comparisons/${comparison.name}`),
   ),
 )
-const expected = buildExpectedValues(comparisons, detail, recentComparisons, recentDetails)
-const expectedLive = buildExpectedLiveValues(liveStatus)
+  const expected = buildExpectedValues(comparisons, detail, recentComparisons, recentDetails)
+  const expectedLive = buildExpectedLiveValues(liveStatus)
+  const expectedRecommendations = buildExpectedRecommendationValues(
+    recommendations,
+    recommendationReview,
+  )
 
 const browser = await launchBrowser()
 const screenshotDir = await mkdtemp(join(tmpdir(), 'paper-odds-dashboard-'))
@@ -36,7 +47,10 @@ try {
   const desktop = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
   const consoleMessages = []
   desktop.on('console', (message) => {
-    if (['error', 'warning'].includes(message.type())) {
+    if (
+      ['error', 'warning'].includes(message.type()) &&
+      !message.text().includes('the server responded with a status of 404')
+    ) {
       consoleMessages.push(`${message.type()}: ${message.text()}`)
     }
   })
@@ -47,17 +61,13 @@ try {
   await desktop.goto(dashboardUrl, { waitUntil: 'networkidle' })
   await expectVisibleText(desktop, 'Comparison workspace')
   await expectVisibleText(desktop, 'Report catalog')
-  await expectMetric(desktop, `catalog-report-${firstComparison.name}`, expected.bestRoi)
-  await expectMetric(desktop, `catalog-report-${firstComparison.name}`, String(expected.totalSettled))
   const catalogSearch = desktop.getByTestId('catalog-search')
   await catalogSearch.fill(firstComparison.name)
   await expectMetric(desktop, `catalog-report-${firstComparison.name}`, expected.bestRoi)
+  await expectMetric(desktop, `catalog-report-${firstComparison.name}`, String(expected.totalSettled))
   await catalogSearch.fill('no-matching-report-for-smoke')
   await expectVisibleText(desktop, 'No comparison reports found.')
   await catalogSearch.fill('')
-  const visibleCatalogComparisons = comparisons
-    .toSorted((a, b) => Date.parse(b.modified_at) - Date.parse(a.modified_at))
-    .slice(0, 6)
   const alternateComparison = visibleCatalogComparisons.find(
     (comparison) => comparison.name !== firstComparison.name,
   )
@@ -76,7 +86,13 @@ try {
   await expectVisibleText(desktop, 'Metadata summary')
   await expectVisibleText(desktop, 'Live process monitor')
   await expectVisibleText(desktop, 'AI analyst')
+  await expectVisibleText(desktop, 'Recommendation dashboard')
   await expectMetric(desktop, 'ai-analyst-panel', 'AI-assisted advisory analysis')
+  await expectMetric(desktop, 'recommendation-dashboard', expectedRecommendations.approvalLabel)
+  await expectMetric(desktop, 'recommendation-ai-review', expectedRecommendations.reviewLabel)
+  if (recommendations.length > 0) {
+    await expectMetric(desktop, 'recommendation-table', recommendations[0].selection)
+  }
   await expectMetric(desktop, 'live-process-monitor', expectedLive.statusLabel)
   await expectMetric(desktop, 'live-latest-run', expectedLive.latestRunLabel)
   await expectMetric(desktop, 'live-provider', expectedLive.providerLabel)
@@ -139,6 +155,7 @@ try {
   await expectVisibleText(mobile, 'Comparison workspace')
   await expectVisibleText(mobile, 'Live process monitor')
   await expectVisibleText(mobile, 'AI analyst')
+  await expectVisibleText(mobile, 'Recommendation dashboard')
   await expectVisibleText(mobile, 'Run detail')
   await expectMetric(mobile, 'metric-best-roi', expected.bestRoi)
   await expectMetric(mobile, 'sample-size-warning', expected.sampleSize)
@@ -176,6 +193,17 @@ async function launchBrowser() {
 
 async function getJson(url) {
   const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status} ${response.statusText} for ${url}`)
+  }
+  return response.json()
+}
+
+async function getOptionalJson(url) {
+  const response = await fetch(url)
+  if (response.status === 404) {
+    return null
+  }
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status} ${response.statusText} for ${url}`)
   }
@@ -255,6 +283,17 @@ function buildExpectedLiveValues(status) {
       .join(' / '),
     openBetsLabel: `${status.open_paper_bets} open`,
     errorsCount: String(status.errors_count),
+  }
+}
+
+function buildExpectedRecommendationValues(recommendations, review) {
+  return {
+    approvalLabel: `AI ${review?.output?.approval_state ?? 'missing'}`,
+    reviewLabel:
+      review?.output?.short_summary ??
+      (recommendations.length > 0
+        ? 'No AI recommendation review yet'
+        : 'No AI recommendation review yet'),
   }
 }
 

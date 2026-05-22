@@ -104,6 +104,31 @@ export type OddsMovementSummary = {
   snapshots_count: number
 }
 
+export type PaperRecommendation = {
+  id: number
+  match_id: number
+  prediction_id?: number | null
+  source_run_id?: string | null
+  source_match_id: string
+  bookmaker: string
+  market: string
+  selection: string
+  latest_snapshot_time: string
+  model_name: string
+  model_version: string
+  grade: string
+  status: string
+  model_probability: number | null
+  implied_probability: number | null
+  edge: number | null
+  confidence_score: number | null
+  current_odds: number | null
+  expected_value: number | null
+  risk_flags: string[]
+  rationale: string
+  created_at: string
+}
+
 export type AIAnalysisOutput = {
   label: string
   short_summary: string
@@ -165,6 +190,10 @@ export async function fetchLiveStatus(): Promise<LiveStatus> {
 
 export async function fetchOddsMovement(): Promise<OddsMovementSummary[]> {
   return getJson('/api/live/odds-movement')
+}
+
+export async function fetchPaperRecommendations(): Promise<PaperRecommendation[]> {
+  return getJson('/api/live/recommendations')
 }
 
 export async function fetchPaperCombinations(): Promise<PaperCombination[]> {

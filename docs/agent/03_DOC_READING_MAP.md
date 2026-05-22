@@ -437,6 +437,8 @@ Only after the offline sample pipeline works:
 - `docs/decisions/ADR-0003-dashboard-stack.md`
 - `dashboard/src/App.tsx`
 - `dashboard/src/lib/api.ts`
+- `dashboard/src/lib/recommendations.ts`
+- `dashboard/scripts/dashboard-smoke.mjs`
 
 ## Task 59 - Historical Recommendation Backtesting
 

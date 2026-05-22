@@ -8,6 +8,7 @@ import {
   Bot,
   CalendarClock,
   Database,
+  Filter,
   RefreshCcw,
   Search,
   ShieldCheck,
@@ -36,13 +37,30 @@ import {
   fetchComparisonDetail,
   fetchComparisons,
   fetchLatestAIAnalysis,
+  fetchLatestRecommendationReview,
   fetchLiveStatus,
+  fetchOddsMovement,
+  fetchPaperCombinations,
+  fetchPaperRecommendations,
 } from '@/lib/api'
-import type { ComparisonReport, ComparisonRun, ComparisonSummary, LiveStatus } from '@/lib/api'
-import type { AIAnalysisRun } from '@/lib/api'
+import type {
+  AIAnalysisRun,
+  ComparisonReport,
+  ComparisonRun,
+  ComparisonSummary,
+  LiveStatus,
+  OddsMovementSummary,
+  PaperCombination,
+  PaperRecommendation,
+} from '@/lib/api'
 import { buildAIAdvisorySummary } from '@/lib/ai'
 import { getVisibleCatalogReports } from '@/lib/catalog'
 import { buildLiveProcessSummary } from '@/lib/live'
+import {
+  buildRecommendationDashboardSummary,
+  riskBadgeTone,
+} from '@/lib/recommendations'
+import type { RecommendationFilters } from '@/lib/recommendations'
 import {
   buildChartRows,
   buildCrossReportRows,
@@ -104,6 +122,26 @@ function App() {
   const aiAnalysis = useQuery({
     queryKey: ['ai-analysis-latest'],
     queryFn: fetchLatestAIAnalysis,
+  })
+
+  const recommendations = useQuery({
+    queryKey: ['paper-recommendations'],
+    queryFn: fetchPaperRecommendations,
+  })
+
+  const combinations = useQuery({
+    queryKey: ['paper-combinations'],
+    queryFn: fetchPaperCombinations,
+  })
+
+  const oddsMovement = useQuery({
+    queryKey: ['odds-movement'],
+    queryFn: fetchOddsMovement,
+  })
+
+  const recommendationReview = useQuery({
+    queryKey: ['ai-recommendation-review-latest'],
+    queryFn: fetchLatestRecommendationReview,
   })
 
   const selectedSummary = comparisons.data?.find((item) => item.name === currentName)
@@ -200,6 +238,22 @@ function App() {
               aiAnalysis={aiAnalysis.data}
               aiError={aiAnalysis.isError}
               aiLoading={aiAnalysis.isLoading}
+              combinations={combinations.data ?? []}
+              oddsMovement={oddsMovement.data ?? []}
+              recommendationError={
+                recommendations.isError ||
+                combinations.isError ||
+                oddsMovement.isError ||
+                recommendationReview.isError
+              }
+              recommendationLoading={
+                recommendations.isLoading ||
+                combinations.isLoading ||
+                oddsMovement.isLoading ||
+                recommendationReview.isLoading
+              }
+              recommendationReview={recommendationReview.data}
+              recommendations={recommendations.data ?? []}
               runs={rankedRuns}
             />
           )}
@@ -227,6 +281,12 @@ type DashboardContentProps = {
   aiAnalysis?: AIAnalysisRun | null
   aiError: boolean
   aiLoading: boolean
+  combinations: PaperCombination[]
+  oddsMovement: OddsMovementSummary[]
+  recommendationError: boolean
+  recommendationLoading: boolean
+  recommendationReview?: AIAnalysisRun | null
+  recommendations: PaperRecommendation[]
   runs: RankedComparisonRun[]
 }
 
@@ -248,6 +308,12 @@ function DashboardContent({
   aiAnalysis,
   aiError,
   aiLoading,
+  combinations,
+  oddsMovement,
+  recommendationError,
+  recommendationLoading,
+  recommendationReview,
+  recommendations,
   runs,
 }: DashboardContentProps) {
   const [selectedRunKey, setSelectedRunKey] = useState('')
@@ -303,6 +369,15 @@ function DashboardContent({
         analysis={aiAnalysis}
         error={aiError}
         loading={aiLoading}
+      />
+
+      <RecommendationDashboardPanel
+        combinations={combinations}
+        error={recommendationError}
+        loading={recommendationLoading}
+        movements={oddsMovement}
+        recommendations={recommendations}
+        review={recommendationReview}
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -650,6 +725,323 @@ function AIAnalystPanel({
     </Card>
   )
 }
+
+function RecommendationDashboardPanel({
+  combinations,
+  error,
+  loading,
+  movements,
+  recommendations,
+  review,
+}: {
+  combinations: PaperCombination[]
+  error: boolean
+  loading: boolean
+  movements: OddsMovementSummary[]
+  recommendations: PaperRecommendation[]
+  review?: AIAnalysisRun | null
+}) {
+  const [filters, setFilters] = useState<RecommendationFilters>({
+    approvalState: 'all',
+    confidence: 'all',
+    grade: 'all',
+    market: 'all',
+  })
+  const summary = useMemo(
+    () =>
+      buildRecommendationDashboardSummary({
+        combinations,
+        filters,
+        movements,
+        recommendations,
+        review,
+      }),
+    [combinations, filters, movements, recommendations, review],
+  )
+
+  return (
+    <Card data-testid="recommendation-dashboard">
+      <CardHeader>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>
+              <span className="flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                Recommendation dashboard
+              </span>
+            </CardTitle>
+            <CardDescription>
+              Live paper recommendations, combinations, risk flags, odds movement, and AI review.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge className={approvalBadgeClass(summary.approvalState)} variant="secondary">
+              AI {summary.approvalState}
+            </Badge>
+            {summary.topRiskFlags.slice(0, 3).map((flag) => (
+              <RiskBadge flag={flag} key={flag} />
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <RunTableSkeleton />
+        ) : error ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+            Recommendation APIs are not reachable.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <RecommendationFiltersBar
+              filters={filters}
+              gradeOptions={summary.gradeOptions}
+              marketOptions={summary.marketOptions}
+              onChange={setFilters}
+            />
+            <div
+              className="grid gap-3 text-sm md:grid-cols-3"
+              data-testid="recommendation-ai-review"
+            >
+              <InfoBlock label="AI review" value={summary.reviewLabel} />
+              <InfoBlock
+                label="Approval"
+                value={review?.output.approval_state ?? 'No AI approval state yet'}
+              />
+              <InfoBlock
+                label="Next check"
+                value={review?.output.next_checks?.[0] ?? 'Run analyze-recommendations.'}
+              />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">
+              <RecommendationTable rows={summary.rows} />
+              <CombinationList combinations={summary.combinations} />
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function RecommendationFiltersBar({
+  filters,
+  gradeOptions,
+  marketOptions,
+  onChange,
+}: {
+  filters: RecommendationFilters
+  gradeOptions: string[]
+  marketOptions: string[]
+  onChange: (filters: RecommendationFilters) => void
+}) {
+  return (
+    <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 md:grid-cols-4">
+      <FilterSelect
+        label="Grade"
+        value={filters.grade}
+        options={['all', ...gradeOptions]}
+        onChange={(grade) => onChange({ ...filters, grade })}
+      />
+      <FilterSelect
+        label="Market"
+        value={filters.market}
+        options={['all', ...marketOptions]}
+        onChange={(market) => onChange({ ...filters, market })}
+      />
+      <FilterSelect
+        label="Confidence"
+        value={filters.confidence}
+        options={['all', 'high', 'medium', 'low']}
+        onChange={(confidence) =>
+          onChange({
+            ...filters,
+            confidence: confidence as RecommendationFilters['confidence'],
+          })
+        }
+      />
+      <FilterSelect
+        label="AI approval"
+        value={filters.approvalState}
+        options={['all', 'approve', 'caution', 'reject']}
+        onChange={(approvalState) =>
+          onChange({
+            ...filters,
+            approvalState: approvalState as RecommendationFilters['approvalState'],
+          })
+        }
+      />
+    </div>
+  )
+}
+
+function FilterSelect({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string
+  onChange: (value: string) => void
+  options: string[]
+  value: string
+}) {
+  return (
+    <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      {label}
+      <select
+        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-normal normal-case tracking-normal text-slate-900 outline-none focus:ring-2 focus:ring-slate-400"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function RecommendationTable({ rows }: { rows: ReturnType<typeof buildRecommendationDashboardSummary>['rows'] }) {
+  if (!rows.length) {
+    return <EmptyState text="No recommendations match the active filters." />
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-slate-200">
+      <table className="w-full min-w-[980px] text-left text-sm">
+        <thead className="bg-slate-50 text-slate-600">
+          <tr>
+            <th className="border-b border-slate-200 px-3 py-2 font-medium">Candidate</th>
+            <th className="border-b border-slate-200 px-3 py-2 font-medium">Market</th>
+            <th className="border-b border-slate-200 px-3 py-2 font-medium">Odds</th>
+            <th className="border-b border-slate-200 px-3 py-2 font-medium">Move</th>
+            <th className="border-b border-slate-200 px-3 py-2 font-medium">Edge</th>
+            <th className="border-b border-slate-200 px-3 py-2 font-medium">Confidence</th>
+            <th className="border-b border-slate-200 px-3 py-2 font-medium">Risk</th>
+          </tr>
+        </thead>
+        <tbody data-testid="recommendation-table">
+          {rows.map((row) => (
+            <tr className="border-b border-slate-100 last:border-0" key={row.id}>
+              <td className="max-w-72 px-3 py-3">
+                <div className="font-semibold text-slate-950">{row.selection}</div>
+                <div className="truncate text-xs text-slate-500" title={row.match_label}>
+                  {row.match_label}
+                </div>
+                <div className="mt-1">
+                  <Badge variant="secondary">{row.grade}</Badge>
+                </div>
+              </td>
+              <td className="px-3 py-3 text-slate-700">{row.market}</td>
+              <td className="px-3 py-3 text-slate-900">
+                {formatOptionalDecimal(row.current_odds)}
+              </td>
+              <td className="px-3 py-3 text-slate-700">
+                {row.movement_direction ?? 'unknown'}
+              </td>
+              <td className="px-3 py-3 text-slate-900">
+                {formatOptionalPercent(row.edge)}
+              </td>
+              <td className="px-3 py-3 text-slate-900">
+                {formatOptionalPercent(row.confidence_score)}
+              </td>
+              <td className="px-3 py-3">
+                <div className="flex flex-wrap gap-1">
+                  {row.risk_flags.map((flag) => (
+                    <RiskBadge flag={flag} key={flag} />
+                  ))}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function CombinationList({ combinations }: { combinations: PaperCombination[] }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+        <Filter className="h-4 w-4" />
+        Ranked combinations
+      </div>
+      <div className="mt-3 grid gap-2" data-testid="combination-list">
+        {combinations.length ? (
+          combinations.slice(0, 6).map((combination) => (
+            <div
+              className="rounded-md border border-slate-200 bg-white p-3 text-sm"
+              key={combination.id}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-semibold text-slate-950">
+                    #{combination.rank} / {combination.leg_count} legs
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    EV {percent.format(combination.combined_expected_value)} / odds{' '}
+                    {decimal.format(combination.combined_odds)}
+                  </div>
+                </div>
+                <Badge variant="secondary">{combination.grade}</Badge>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {combination.risk_flags.map((flag) => (
+                  <RiskBadge flag={flag} key={flag} />
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <EmptyState text="No paper combinations match the active filters." />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function RiskBadge({ flag }: { flag: string }) {
+  return (
+    <Badge className={riskBadgeClass(riskBadgeTone(flag))} variant="secondary">
+      {flag}
+    </Badge>
+  )
+}
+
+function riskBadgeClass(tone: ReturnType<typeof riskBadgeTone>) {
+  if (tone === 'positive') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-950'
+  }
+  if (tone === 'danger') {
+    return 'border-rose-200 bg-rose-50 text-rose-950'
+  }
+  if (tone === 'warning') {
+    return 'border-amber-200 bg-amber-50 text-amber-950'
+  }
+  return 'border-slate-200 bg-slate-100 text-slate-700'
+}
+
+function approvalBadgeClass(state: RecommendationDashboardPanelState) {
+  if (state === 'approve') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-950'
+  }
+  if (state === 'reject') {
+    return 'border-rose-200 bg-rose-50 text-rose-950'
+  }
+  if (state === 'caution') {
+    return 'border-amber-200 bg-amber-50 text-amber-950'
+  }
+  return 'border-slate-200 bg-slate-100 text-slate-700'
+}
+
+type RecommendationDashboardPanelState = ReturnType<
+  typeof buildRecommendationDashboardSummary
+>['approvalState']
 
 function LiveStatusTile({
   helper,

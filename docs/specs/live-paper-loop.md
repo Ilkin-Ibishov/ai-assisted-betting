@@ -380,6 +380,8 @@ Task 56 added ranked paper-only combinations. `generate-combinations` reads elig
 
 Task 57 added AI-assisted recommendation review. `analyze-recommendations` reads persisted recommendations, combinations, provider health, and latest evaluation context, persists `recommendation_review` records in `ai_analysis_runs`, and exposes the latest review through `GET /api/ai/recommendation-review/latest`. The review can approve, caution, or reject paper recommendations, but remains advisory and cannot override deterministic gates.
 
+Task 58 added dashboard inspection for the live recommendation loop. The React dashboard can now show recommendations, combinations, odds movement, risk flags, and the latest AI recommendation review in one read-only panel with filters.
+
 ## Non-Goals
 
 - Real-money betting.

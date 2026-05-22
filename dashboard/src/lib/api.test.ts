@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildApiUrl, fetchOddsMovement } from '@/lib/api'
+import {
+  buildApiUrl,
+  fetchLatestRecommendationReview,
+  fetchOddsMovement,
+  fetchPaperRecommendations,
+} from '@/lib/api'
 
 describe('buildApiUrl', () => {
   it('keeps relative API paths when no deployed API base is configured', () => {
@@ -51,6 +56,65 @@ describe('fetchOddsMovement', () => {
 
       expect(summaries[0].movement_direction).toBe('up')
       expect(summaries[0].current_odds).toBe(2.3)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+})
+
+describe('recommendation API helpers', () => {
+  it('reads paper recommendations from the API', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string) => {
+      expect(url).toBe('/api/live/recommendations')
+      return new Response(
+        JSON.stringify([
+          {
+            id: 1,
+            match_id: 1,
+            source_match_id: 'misli:football:1',
+            bookmaker: 'Misli.az',
+            market: '1X2',
+            selection: 'HOME',
+            latest_snapshot_time: '2026-05-19T12:00:00+00:00',
+            model_name: 'baseline_heuristic',
+            model_version: 'v0',
+            grade: 'recommended',
+            status: 'active',
+            model_probability: 0.62,
+            implied_probability: 0.5,
+            edge: 0.12,
+            confidence_score: 0.72,
+            current_odds: 2,
+            expected_value: 0.24,
+            risk_flags: ['no_current_risk_flags'],
+            rationale: 'Seed recommendation',
+            created_at: '2026-05-19T12:00:00+00:00',
+          },
+        ]),
+        { status: 200 },
+      )
+    }) as typeof fetch
+
+    try {
+      const recommendations = await fetchPaperRecommendations()
+
+      expect(recommendations[0].grade).toBe('recommended')
+      expect(recommendations[0].risk_flags).toEqual(['no_current_risk_flags'])
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('returns null when no recommendation review exists yet', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string) => {
+      expect(url).toBe('/api/ai/recommendation-review/latest')
+      return new Response(JSON.stringify({ detail: 'missing' }), { status: 404 })
+    }) as typeof fetch
+
+    try {
+      await expect(fetchLatestRecommendationReview()).resolves.toBeNull()
     } finally {
       globalThis.fetch = originalFetch
     }

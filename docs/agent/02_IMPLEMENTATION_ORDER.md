@@ -73,6 +73,7 @@ Build in this order:
 - Task 55 - Paper Bet Recommendation Engine
 - Task 56 - Paper Bet Combination Engine
 - Task 57 - AI Recommendation Review Layer
+- Task 58 - Recommendation Dashboard
 - Task 52 - Provider Health AI Analysis
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
@@ -81,10 +82,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Task 58 - Recommendation Dashboard
+Task 59 - Historical Recommendation Backtesting
 ```
 
-Task 57 added AI-assisted advisory review for paper recommendations and combinations. Do not add real-money execution, account automation, or protected scraping while building the recommendation dashboard.
+Task 58 added dashboard visibility for recommendations, combinations, odds movement, risk flags, and AI approval. Do not add real-money execution, account automation, or protected scraping while building historical recommendation backtesting.
 
 Required verification commands after implementation:
 
@@ -147,7 +148,7 @@ Build the paper-only live loop in this order:
 17. Task 55 - Paper Bet Recommendation Engine, completed
 18. Task 56 - Paper Bet Combination Engine, completed
 19. Task 57 - AI Recommendation Review Layer, completed
-20. Task 58 - Recommendation Dashboard
+20. Task 58 - Recommendation Dashboard, completed
 21. Task 59 - Historical Recommendation Backtesting
 22. Task 51 - Railway Deployment Runbook And Production Smoke
 23. Task 60 - Railway Worker Deployment And Monitoring
@@ -195,7 +196,7 @@ Build live recommendation work in this order:
 3. Task 55 - Paper Bet Recommendation Engine
 4. Task 56 - Paper Bet Combination Engine, completed
 5. Task 57 - AI Recommendation Review Layer, completed
-6. Task 58 - Recommendation Dashboard
+6. Task 58 - Recommendation Dashboard, completed
 7. Task 59 - Historical Recommendation Backtesting
 
 ## Do Not Jump Ahead

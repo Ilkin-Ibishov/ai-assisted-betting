@@ -193,6 +193,21 @@ errors_count
 
 `GET /api/ai/recommendation-review/latest` returns the latest persisted AI-assisted advisory review for paper recommendations and combinations. The output includes approval state, concerns, confidence explanation, rejected assumptions, next checks, risk flags, and source record ids.
 
+Task 58 added the dashboard recommendation surface. It displays:
+
+```text
+live paper recommendations
+ranked paper combinations
+odds movement direction
+edge and confidence
+risk flags
+AI recommendation-review approval state
+AI review next checks
+filters for grade, market, confidence band, and AI approval state
+```
+
+The view remains read-only and does not expose bet placement or bookmaker account actions.
+
 Each live run payload includes:
 
 ```text
