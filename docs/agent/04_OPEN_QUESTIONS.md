@@ -4,9 +4,9 @@ Resolve these before or during the relevant implementation task.
 
 ## Live Recommendation Operations
 
-Open: choose the deployed scheduling topology for the paper worker. Options include a separate Railway worker service, Railway cron, or an API-triggered job runner. Decide during Tasks 50 and 60.
+Resolved direction: use a separate Railway worker service invoked by Railway cron or an equivalent scheduler. Keep the API and dashboard services with `LIVE_COLLECTION_ENABLED=false`; only the worker service uses `LIVE_COLLECTION_ENABLED=true`.
 
-Open: choose an external alert destination, if any, after dashboard/API guardrail status is stable. Keep notification bots out of scope until Task 61.
+Open: choose an external alert destination, if any, after dashboard/API guardrail status is stable in staging. Task 61 added API/dashboard guardrail status but intentionally did not add notification bots.
 
 ## Documentation Maintenance
 

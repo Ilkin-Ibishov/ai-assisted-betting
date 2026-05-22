@@ -474,6 +474,12 @@ Only after the offline sample pipeline works:
 - `docs/specs/live-paper-loop.md`
 - `docs/specs/dashboard.md`
 - `docs/agent/04_OPEN_QUESTIONS.md`
+- `docs/deployment/railway-readiness.md`
+- `app/services/operational_guardrail_service.py`
+- `app/api.py`
+- `app/cli.py`
+- `dashboard/src/App.tsx`
+- `dashboard/src/lib/api.ts`
 
 ## Task 62 - Final Production Readiness Review
 

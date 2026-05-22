@@ -372,6 +372,8 @@ Task 50 added `run-scheduled-paper-worker` as the first scheduler-safe one-shot 
 
 Task 60 added deployed worker monitoring. `GET /api/live/worker-status` reports whether the latest `scheduled_paper_worker` run is fresh, stale, failed, running, or missing. `production-smoke` now checks API health, database health, worker freshness, recommendation endpoint response, report catalog, and optional dashboard HTML.
 
+Task 61 added operational guardrails. `GET /api/operations/guardrails` and `operational-status` roll up worker freshness, repeated worker failures, provider data-quality warnings, AI eval failures, and empty recommendation cycles. The dashboard renders these as operator-visible `ok`, `warning`, or `critical` states before paper recommendations are trusted.
+
 Task 53 hardened Misli public snapshot parsing and health reporting. Misli imports now fail closed for empty identity fields, incomplete odds, empty snapshots, and low extraction confidence. Provider-health AI analysis distinguishes parser drift, stale snapshots, and low extraction confidence from generic validation errors.
 
 Task 54 added read-only odds movement summaries computed from existing `odds_snapshots`. The API can report opening odds, previous odds, current odds, movement direction, missing outcomes, and stale outcomes without inferring bet placement or bookmaker account state.

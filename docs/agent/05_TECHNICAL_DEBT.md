@@ -150,6 +150,8 @@ Task 51 added a Railway deployment runbook and `production-smoke` command. It di
 
 Task 60 added worker freshness monitoring, `/api/live/worker-status`, and production-smoke checks for worker freshness and recommendation endpoint health. It did not introduce new code debt. Railway cron cadence, cold starts, and service-to-service networking remain operational considerations documented in `docs/deployment/railway-readiness.md`.
 
+Task 61 added operational guardrails, `operational-status`, `/api/operations/guardrails`, and a dashboard guardrails panel. It did not introduce new code debt. External alert destinations remain an open product/operations decision in `docs/agent/04_OPEN_QUESTIONS.md`; notification bots are intentionally out of scope until staging use proves the guardrail states.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

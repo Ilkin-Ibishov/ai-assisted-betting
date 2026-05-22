@@ -243,9 +243,44 @@ Useful manual checks:
 curl https://<api-service>.up.railway.app/api/health
 curl https://<api-service>.up.railway.app/api/live/status
 curl https://<api-service>.up.railway.app/api/live/worker-status
+curl https://<api-service>.up.railway.app/api/operations/guardrails
 curl https://<api-service>.up.railway.app/api/live/recommendations?limit=5
 curl https://<api-service>.up.railway.app/api/reports/comparisons
 ```
+
+## Operational Guardrails
+
+Task 61 added:
+
+```text
+GET /api/operations/guardrails
+python -m app.cli operational-status
+```
+
+Overall status values:
+
+```text
+ok
+warning
+critical
+```
+
+Guardrail meanings:
+
+- `worker_freshness`: warns when the worker never ran, is stale, or is still running; critical when the latest worker failed.
+- `repeated_worker_failures`: critical when consecutive failed worker runs meet the configured threshold.
+- `provider_data_quality`: warns for Misli parser drift, stale snapshots, low extraction confidence, or unresolved kickoff-date failures.
+- `ai_eval_safety`: critical when an AI advisory output failed evals or has an `ai_eval_failed` risk flag.
+- `recommendation_output`: warns when a fresh worker cycle produces zero paper recommendations.
+
+What to check next:
+
+- Worker issues: Railway worker logs, cron cadence, `DATABASE_URL`, and `LIVE_COLLECTION_ENABLED=true` on the worker only.
+- Provider issues: collect a fresh public/user-provided snapshot and inspect parser confidence.
+- AI eval issues: keep deterministic fallback active and review the failed `ai_analysis_runs` output.
+- Empty recommendation issues: inspect odds movement, provider health, recommendation thresholds, and AI review state.
+
+Do not add notification bots until this API/dashboard guardrail status is stable in staging.
 
 ## Failure Triage
 

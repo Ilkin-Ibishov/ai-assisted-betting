@@ -77,6 +77,7 @@ Build in this order:
 - Task 59 - Historical Recommendation Backtesting
 - Task 51 - Railway Deployment Runbook And Production Smoke
 - Task 60 - Railway Worker Deployment And Monitoring
+- Task 61 - Operational Guardrails And Alerting
 - Task 52 - Provider Health AI Analysis
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
@@ -85,10 +86,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Task 61 - Operational Guardrails And Alerting
+Task 62 - Final Production Readiness Review
 ```
 
-Task 60 added worker freshness monitoring and production-smoke checks for worker status and recommendations. Do not add real-money execution, account automation, or protected scraping while building operational guardrails and alerting.
+Task 61 added operational guardrails API, CLI, and dashboard visibility. Do not add real-money execution, account automation, or protected scraping while doing the final readiness review.
 
 Required verification commands after implementation:
 
@@ -155,7 +156,7 @@ Build the paper-only live loop in this order:
 21. Task 59 - Historical Recommendation Backtesting, completed
 22. Task 51 - Railway Deployment Runbook And Production Smoke, completed
 23. Task 60 - Railway Worker Deployment And Monitoring, completed
-24. Task 61 - Operational Guardrails And Alerting
+24. Task 61 - Operational Guardrails And Alerting, completed
 25. Task 62 - Final Production Readiness Review
 
 ## AI-Assisted Product Phase Order
@@ -188,7 +189,7 @@ Build Railway readiness in this order:
 2. Task 50 - Scheduled Paper Worker
 3. Task 51 - Railway Deployment Runbook And Production Smoke, completed
 4. Task 60 - Railway Worker Deployment And Monitoring, completed
-5. Task 61 - Operational Guardrails And Alerting
+5. Task 61 - Operational Guardrails And Alerting, completed
 6. Task 62 - Final Production Readiness Review
 
 ## Recommendation Phase Order

@@ -101,6 +101,7 @@ GET /api/reports/comparisons/{name}
 GET /api/reports/comparisons/{name}/analysis
 GET /api/live/status
 GET /api/live/worker-status
+GET /api/operations/guardrails
 GET /api/live/runs
 GET /api/live/runs/{run_id}
 GET /api/live/odds-movement
@@ -204,6 +205,16 @@ latest_worker_run
 
 Statuses are `fresh`, `stale`, `failed`, `running`, or `never_run`.
 
+`GET /api/operations/guardrails` returns the operator-facing guardrail rollup:
+
+```text
+overall_status
+guardrails[]
+worker_status
+```
+
+Each guardrail includes `name`, `severity`, `state`, `observed_value`, `threshold`, and `remediation`.
+
 `GET /api/live/runs` returns recent live runs newest-first. `GET /api/live/runs/{run_id}` returns one run or 404.
 
 `GET /api/live/odds-movement` returns read-only current/opening/previous odds movement summaries grouped by match, bookmaker, market, and selection. Outcomes can be `active`, `missing`, or `stale`, with movement directions `new`, `up`, `down`, `stable`, `missing`, or `stale`.
@@ -228,6 +239,8 @@ filters for grade, market, confidence band, and AI approval state
 ```
 
 The view remains read-only and does not expose bet placement or bookmaker account actions.
+
+Task 61 added the dashboard operational guardrails surface. It shows worker freshness, repeated worker failures, provider data quality, AI eval safety, and recommendation output status as `ok`, `warning`, or `critical`.
 
 Task 59 added historical recommendation backtest exports. `backtest-recommendations` writes the canonical `_recommendation_backtest.json`, summary CSV, and dashboard-compatible `_comparison.json` companion report. `analyze-recommendation-backtest` persists an AI-assisted advisory summary for small samples, threshold sensitivity, ROI weakness, and combination underperformance.
 

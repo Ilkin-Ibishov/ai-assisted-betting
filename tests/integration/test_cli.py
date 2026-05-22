@@ -846,6 +846,21 @@ def test_production_smoke_command_reports_missing_api_url() -> None:
     assert "api_base_url_required" in result.output
 
 
+def test_operational_status_command_reports_guardrails(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "operational-status.sqlite"
+    env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}
+    runner.invoke(app, ["init-db"], env=env)
+
+    result = runner.invoke(app, ["operational-status"], env=env)
+
+    assert result.exit_code == 0
+    assert "operational-status: started" in result.output
+    assert "overall_status=warning" in result.output
+    assert "worker_freshness=warning" in result.output
+    assert "operational-status: finished" in result.output
+
+
 def test_analyze_recommendation_backtest_command_persists_ai_summary(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "backtest-ai-cli.sqlite"

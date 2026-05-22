@@ -21,6 +21,7 @@ const visibleCatalogComparisons = comparisons
 const firstComparison = visibleCatalogComparisons[0]
 const detail = await getJson(`${apiUrl}/api/reports/comparisons/${firstComparison.name}`)
   const liveStatus = await getJson(`${apiUrl}/api/live/status`)
+  const guardrails = await getJson(`${apiUrl}/api/operations/guardrails`)
   const recommendations = await getJson(`${apiUrl}/api/live/recommendations`)
   const recommendationReview = await getOptionalJson(
     `${apiUrl}/api/ai/recommendation-review/latest`,
@@ -85,6 +86,7 @@ try {
   }
   await expectVisibleText(desktop, 'Metadata summary')
   await expectVisibleText(desktop, 'Live process monitor')
+  await expectVisibleText(desktop, 'Operational guardrails')
   await expectVisibleText(desktop, 'AI analyst')
   await expectVisibleText(desktop, 'Recommendation dashboard')
   await expectMetric(desktop, 'ai-analyst-panel', 'AI-assisted advisory analysis')
@@ -98,6 +100,8 @@ try {
   await expectMetric(desktop, 'live-provider', expectedLive.providerLabel)
   await expectMetric(desktop, 'live-paper-bets', expectedLive.openBetsLabel)
   await expectMetric(desktop, 'live-errors', expectedLive.errorsCount)
+  await expectMetric(desktop, 'operational-guardrails', guardrails.overall_status)
+  await expectMetric(desktop, 'guardrail-worker_freshness', 'worker freshness')
   await expectMetric(desktop, 'metric-reports-indexed', String(expected.reportCount))
   await expectMetric(desktop, 'metric-selected-runs', String(expected.runCount))
   await expectMetric(desktop, 'metric-best-roi', expected.bestRoi)
@@ -154,6 +158,7 @@ try {
   await mobile.goto(dashboardUrl, { waitUntil: 'networkidle' })
   await expectVisibleText(mobile, 'Comparison workspace')
   await expectVisibleText(mobile, 'Live process monitor')
+  await expectVisibleText(mobile, 'Operational guardrails')
   await expectVisibleText(mobile, 'AI analyst')
   await expectVisibleText(mobile, 'Recommendation dashboard')
   await expectVisibleText(mobile, 'Run detail')

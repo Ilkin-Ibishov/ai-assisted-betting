@@ -13,6 +13,7 @@ from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.live_status_service import LiveStatusService
 from app.services.odds_movement_service import OddsMovementService
+from app.services.operational_guardrail_service import OperationalGuardrailService
 from app.services.worker_monitoring_service import WorkerMonitoringService
 
 
@@ -74,6 +75,18 @@ def create_api(
     ) -> dict[str, Any]:
         return WorkerMonitoringService(live_database_url).status(
             fresh_after_minutes=fresh_after_minutes,
+            now_iso=now,
+        )
+
+    @api.get("/api/operations/guardrails")
+    def get_operational_guardrails(
+        worker_fresh_after_minutes: int = 90,
+        repeated_failure_threshold: int = 3,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        return OperationalGuardrailService(live_database_url).status(
+            worker_fresh_after_minutes=worker_fresh_after_minutes,
+            repeated_failure_threshold=repeated_failure_threshold,
             now_iso=now,
         )
 

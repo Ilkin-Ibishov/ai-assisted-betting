@@ -82,6 +82,27 @@ export type LiveStatus = {
   errors_count: number
 }
 
+export type OperationalGuardrail = {
+  name: string
+  severity: 'ok' | 'warning' | 'critical'
+  state: string
+  observed_value: unknown
+  threshold: unknown
+  remediation: string
+}
+
+export type OperationalGuardrailStatus = {
+  overall_status: 'ok' | 'warning' | 'critical'
+  guardrails: OperationalGuardrail[]
+  worker_status: {
+    status: string
+    healthy: boolean
+    freshness_minutes: number | null
+    fresh_after_minutes: number
+    latest_worker_run: LiveRun | null
+  }
+}
+
 export type OddsMovementSummary = {
   match_id: number
   source: string
@@ -186,6 +207,10 @@ export async function fetchComparisonDetail(name: string): Promise<ComparisonRep
 
 export async function fetchLiveStatus(): Promise<LiveStatus> {
   return getJson('/api/live/status')
+}
+
+export async function fetchOperationalGuardrails(): Promise<OperationalGuardrailStatus> {
+  return getJson('/api/operations/guardrails')
 }
 
 export async function fetchOddsMovement(): Promise<OddsMovementSummary[]> {

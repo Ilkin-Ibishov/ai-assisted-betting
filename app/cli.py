@@ -16,6 +16,7 @@ from app.services.football_data_service import FootballDataImportRequest, Footba
 from app.services.live_collection_service import LiveCollectionRequest, LiveCollectionService
 from app.services.live_cycle_service import LivePaperCycleRequest, LivePaperCycleService
 from app.services.live_result_service import LiveResultRequest, LiveResultService
+from app.services.operational_guardrail_service import OperationalGuardrailService
 from app.services.prediction_service import PredictionService
 from app.services.production_smoke_service import (
     ProductionSmokeError,
@@ -363,6 +364,29 @@ def production_smoke(
         raise typer.Exit(code=1) from exc
     typer.echo(json.dumps(report, indent=2, sort_keys=True))
     typer.echo("production-smoke: finished")
+
+
+@app.command("operational-status")
+def operational_status(
+    worker_fresh_after_minutes: int = typer.Option(
+        90,
+        help="Minutes before the latest scheduled worker run is considered stale.",
+    ),
+    repeated_failure_threshold: int = typer.Option(
+        3,
+        help="Consecutive failed worker runs required for critical status.",
+    ),
+) -> None:
+    settings = load_settings()
+    report = OperationalGuardrailService(settings.database_url).status(
+        worker_fresh_after_minutes=worker_fresh_after_minutes,
+        repeated_failure_threshold=repeated_failure_threshold,
+    )
+    typer.echo("operational-status: started")
+    typer.echo(f"overall_status={report['overall_status']}")
+    for guardrail in report["guardrails"]:
+        typer.echo(f"{guardrail['name']}={guardrail['severity']}:{guardrail['state']}")
+    typer.echo("operational-status: finished")
 
 
 def _split_csv_option(value: str) -> list[str]:

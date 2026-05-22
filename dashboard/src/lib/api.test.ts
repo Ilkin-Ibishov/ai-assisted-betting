@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildApiUrl,
+  fetchOperationalGuardrails,
   fetchLatestRecommendationReview,
   fetchOddsMovement,
   fetchPaperRecommendations,
@@ -115,6 +116,47 @@ describe('recommendation API helpers', () => {
 
     try {
       await expect(fetchLatestRecommendationReview()).resolves.toBeNull()
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+})
+
+describe('fetchOperationalGuardrails', () => {
+  it('reads operational guardrail status from the API', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string) => {
+      expect(url).toBe('/api/operations/guardrails')
+      return new Response(
+        JSON.stringify({
+          overall_status: 'warning',
+          guardrails: [
+            {
+              name: 'worker_freshness',
+              severity: 'warning',
+              state: 'stale',
+              observed_value: 120,
+              threshold: 90,
+              remediation: 'Check worker cadence.',
+            },
+          ],
+          worker_status: {
+            status: 'stale',
+            healthy: false,
+            freshness_minutes: 120,
+            fresh_after_minutes: 90,
+            latest_worker_run: null,
+          },
+        }),
+        { status: 200 },
+      )
+    }) as typeof fetch
+
+    try {
+      const status = await fetchOperationalGuardrails()
+
+      expect(status.overall_status).toBe('warning')
+      expect(status.guardrails[0].name).toBe('worker_freshness')
     } finally {
       globalThis.fetch = originalFetch
     }

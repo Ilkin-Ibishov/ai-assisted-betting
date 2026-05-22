@@ -40,6 +40,7 @@ import {
   fetchLatestRecommendationReview,
   fetchLiveStatus,
   fetchOddsMovement,
+  fetchOperationalGuardrails,
   fetchPaperCombinations,
   fetchPaperRecommendations,
 } from '@/lib/api'
@@ -50,6 +51,7 @@ import type {
   ComparisonSummary,
   LiveStatus,
   OddsMovementSummary,
+  OperationalGuardrailStatus,
   PaperCombination,
   PaperRecommendation,
 } from '@/lib/api'
@@ -117,6 +119,11 @@ function App() {
   const liveStatus = useQuery({
     queryKey: ['live-status'],
     queryFn: fetchLiveStatus,
+  })
+
+  const guardrails = useQuery({
+    queryKey: ['operational-guardrails'],
+    queryFn: fetchOperationalGuardrails,
   })
 
   const aiAnalysis = useQuery({
@@ -235,6 +242,9 @@ function App() {
               liveError={liveStatus.isError}
               liveLoading={liveStatus.isLoading}
               liveStatus={liveStatus.data}
+              guardrailError={guardrails.isError}
+              guardrailLoading={guardrails.isLoading}
+              guardrailStatus={guardrails.data}
               aiAnalysis={aiAnalysis.data}
               aiError={aiAnalysis.isError}
               aiLoading={aiAnalysis.isLoading}
@@ -278,6 +288,9 @@ type DashboardContentProps = {
   liveError: boolean
   liveLoading: boolean
   liveStatus?: LiveStatus
+  guardrailError: boolean
+  guardrailLoading: boolean
+  guardrailStatus?: OperationalGuardrailStatus
   aiAnalysis?: AIAnalysisRun | null
   aiError: boolean
   aiLoading: boolean
@@ -305,6 +318,9 @@ function DashboardContent({
   liveError,
   liveLoading,
   liveStatus,
+  guardrailError,
+  guardrailLoading,
+  guardrailStatus,
   aiAnalysis,
   aiError,
   aiLoading,
@@ -363,6 +379,12 @@ function DashboardContent({
         error={liveError}
         loading={liveLoading}
         status={liveStatus}
+      />
+
+      <OperationalGuardrailsPanel
+        error={guardrailError}
+        loading={guardrailLoading}
+        status={guardrailStatus}
       />
 
       <AIAnalystPanel
@@ -673,6 +695,81 @@ function LiveProcessMonitor({
             </div>
           </div>
         ) : null}
+      </CardContent>
+    </Card>
+  )
+}
+
+function OperationalGuardrailsPanel({
+  error,
+  loading,
+  status,
+}: {
+  error: boolean
+  loading: boolean
+  status?: OperationalGuardrailStatus
+}) {
+  const visibleGuardrails = status?.guardrails ?? []
+
+  return (
+    <Card data-testid="operational-guardrails">
+      <CardHeader>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <CardTitle>
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                Operational guardrails
+              </span>
+            </CardTitle>
+            <CardDescription>
+              Warning and critical states before paper recommendations become misleading.
+            </CardDescription>
+          </div>
+          <Badge className={guardrailBadgeClass(status?.overall_status)} variant="secondary">
+            {loading ? 'Loading guardrails' : (status?.overall_status ?? 'unknown')}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : error ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+            Operational guardrails API is not reachable.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {visibleGuardrails.map((guardrail) => (
+              <div
+                className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm"
+                data-testid={`guardrail-${guardrail.name}`}
+                key={guardrail.name}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {guardrail.name.replaceAll('_', ' ')}
+                  </div>
+                  <Badge className={guardrailBadgeClass(guardrail.severity)} variant="secondary">
+                    {guardrail.severity}
+                  </Badge>
+                </div>
+                <div className="mt-2 truncate font-semibold text-slate-950">
+                  {guardrail.state.replaceAll('_', ' ')}
+                </div>
+                <div className="mt-1 line-clamp-2 text-slate-500">
+                  {guardrail.remediation}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -1079,6 +1176,19 @@ function liveStatusClass(tone: ReturnType<typeof buildLiveProcessSummary>['statu
   }
   if (tone === 'running') {
     return 'border-sky-200 bg-sky-50 text-sky-950'
+  }
+  return 'border-slate-200 bg-slate-100 text-slate-700'
+}
+
+function guardrailBadgeClass(severity?: OperationalGuardrailStatus['overall_status']) {
+  if (severity === 'ok') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-950'
+  }
+  if (severity === 'critical') {
+    return 'border-rose-200 bg-rose-50 text-rose-950'
+  }
+  if (severity === 'warning') {
+    return 'border-amber-200 bg-amber-50 text-amber-950'
   }
   return 'border-slate-200 bg-slate-100 text-slate-700'
 }

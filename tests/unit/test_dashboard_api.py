@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.api import create_api
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import Base, PaperCombination, PaperRecommendation
+from app.db.models import AIAnalysisRun, Base, PaperCombination, PaperRecommendation
 from app.db.repositories import (
     LiveRunRepository,
     MatchRepository,
@@ -302,6 +302,46 @@ def test_worker_status_endpoint_returns_latest_worker_freshness(tmp_path: Path) 
     assert payload["healthy"] is True
     assert payload["freshness_minutes"] == 29
     assert payload["latest_worker_run"]["run_id"] == "scheduled-worker-api"
+
+
+def test_operational_guardrails_endpoint_reports_critical_ai_failure(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        session.add(
+            AIAnalysisRun(
+                analysis_type="recommendation_review",
+                source_type="paper_recommendations",
+                source_id="latest",
+                input_json="{}",
+                output_json=json.dumps(
+                    {
+                        "label": "AI-assisted advisory analysis",
+                        "short_summary": "AI eval failed.",
+                        "root_cause": "Unsafe output.",
+                        "risk_flags": ["ai_eval_failed"],
+                        "recommended_next_actions": ["Review provider output."],
+                        "confidence": "high",
+                        "source_record_ids": [],
+                    }
+                ),
+                model_name="deterministic_ai_fallback",
+                prompt_version="ai-recommendation-review-v1",
+                status="failed",
+                error_summary="unsafe_real_money_language",
+            )
+        )
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/operations/guardrails")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["overall_status"] == "critical"
+    assert any(
+        item["name"] == "ai_eval_safety" and item["severity"] == "critical"
+        for item in payload["guardrails"]
+    )
 
 
 def test_live_status_endpoint_returns_latest_success_failure_and_bet_counts(
