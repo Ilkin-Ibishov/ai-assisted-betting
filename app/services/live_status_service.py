@@ -80,6 +80,10 @@ def _live_run_error_count(session: Session) -> int:
 
 
 def _live_run_payload(live_run: LiveRun | None) -> dict[str, Any] | None:
+    return live_run_payload(live_run)
+
+
+def live_run_payload(live_run: LiveRun | None) -> dict[str, Any] | None:
     if live_run is None:
         return None
     return {

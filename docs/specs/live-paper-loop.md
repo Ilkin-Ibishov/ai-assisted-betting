@@ -370,6 +370,8 @@ Task 46 resolved the P3 run-scoping debt: `run-live-paper-cycle` now processes o
 
 Task 50 added `run-scheduled-paper-worker` as the first scheduler-safe one-shot entrypoint. It is ready for external cadence configuration but still depends on Task 53 scraper hardening before real Misli public data should be trusted continuously.
 
+Task 60 added deployed worker monitoring. `GET /api/live/worker-status` reports whether the latest `scheduled_paper_worker` run is fresh, stale, failed, running, or missing. `production-smoke` now checks API health, database health, worker freshness, recommendation endpoint response, report catalog, and optional dashboard HTML.
+
 Task 53 hardened Misli public snapshot parsing and health reporting. Misli imports now fail closed for empty identity fields, incomplete odds, empty snapshots, and low extraction confidence. Provider-health AI analysis distinguishes parser drift, stale snapshots, and low extraction confidence from generic validation errors.
 
 Task 54 added read-only odds movement summaries computed from existing `odds_snapshots`. The API can report opening odds, previous odds, current odds, movement direction, missing outcomes, and stale outcomes without inferring bet placement or bookmaker account state.

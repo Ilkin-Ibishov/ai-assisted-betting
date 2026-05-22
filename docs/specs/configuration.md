@@ -95,6 +95,12 @@ Run command:
 python -m app.cli run-scheduled-paper-worker --provider misli-public --snapshot <snapshot.json> --model baseline_heuristic
 ```
 
+Monitoring:
+
+```text
+GET /api/live/worker-status?fresh_after_minutes=90
+```
+
 Dashboard:
 
 ```env

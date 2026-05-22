@@ -19,6 +19,17 @@ Deploy the API, dashboard, database, and scheduled paper worker to Railway with 
 - Deployment runbook includes exact environment variables, commands, smoke checks, and failure triage.
 - Production smoke verifies API health, database health, dashboard load, worker freshness, and recommendation API response.
 
+## Implementation Notes
+
+Implemented in Task 60:
+
+- Added `WorkerMonitoringService` over `live_runs.run_type = scheduled_paper_worker`.
+- Added `GET /api/live/worker-status` with `healthy`, `status`, `freshness_minutes`, `fresh_after_minutes`, and latest worker run payload.
+- Extended `production-smoke` to verify worker freshness through `/api/live/worker-status`.
+- Extended `production-smoke` to verify the deployed recommendation endpoint through `/api/live/recommendations?limit=5`.
+- Updated the Railway runbook with worker service topology, cron/cadence guidance, monitoring checks, smoke checks, and failure triage.
+- Kept worker enablement paper-only through `LIVE_COLLECTION_ENABLED=true` on the worker service only.
+
 ## Verification
 
 ```powershell
@@ -37,8 +48,8 @@ Task 61 - Operational Guardrails And Alerting.
 
 ## Blockers
 
-Requires Task 50 worker and Task 51 Railway runbook, with recommendation pipeline tasks completed for full monitoring.
+No code blocker remains. Actual Railway scheduling still requires deployed service URLs, Railway project access, and a valid public/user-provided snapshot path or collection setup.
 
 ## Technical Debt
 
-Record Railway limitations around cron cadence, cold starts, and service-to-service networking.
+No new code debt. Railway cron cadence, cold starts, and service-to-service networking limits remain operational considerations documented in the runbook.

@@ -100,6 +100,7 @@ GET /api/reports/comparisons
 GET /api/reports/comparisons/{name}
 GET /api/reports/comparisons/{name}/analysis
 GET /api/live/status
+GET /api/live/worker-status
 GET /api/live/runs
 GET /api/live/runs/{run_id}
 GET /api/live/odds-movement
@@ -190,6 +191,18 @@ settled_paper_bets
 runs_count
 errors_count
 ```
+
+`GET /api/live/worker-status` returns deployed worker freshness for the latest `scheduled_paper_worker` run:
+
+```text
+status
+healthy
+freshness_minutes
+fresh_after_minutes
+latest_worker_run
+```
+
+Statuses are `fresh`, `stale`, `failed`, `running`, or `never_run`.
 
 `GET /api/live/runs` returns recent live runs newest-first. `GET /api/live/runs/{run_id}` returns one run or 404.
 

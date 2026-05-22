@@ -463,6 +463,10 @@ Only after the offline sample pipeline works:
 - `docs/deployment/railway-readiness.md`
 - `.env.example`
 - `docs/specs/configuration.md`
+- `app/services/worker_monitoring_service.py`
+- `app/services/production_smoke_service.py`
+- `app/api.py`
+- `tests/unit/test_worker_monitoring_service.py`
 
 ## Task 61 - Operational Guardrails And Alerting
 

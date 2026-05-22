@@ -275,6 +275,35 @@ def test_live_status_endpoint_returns_empty_state(tmp_path: Path) -> None:
     }
 
 
+def test_worker_status_endpoint_returns_latest_worker_freshness(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        repository = LiveRunRepository(session)
+        repository.start(
+            run_id="scheduled-worker-api",
+            run_type="scheduled_paper_worker",
+            provider="misli_public",
+        )
+        repository.complete(run_id="scheduled-worker-api", items_read=3, items_created=1)
+        live_run = repository.get_by_run_id("scheduled-worker-api")
+        assert live_run is not None
+        live_run.started_at = "2026-05-22T08:30:00+00:00"
+        live_run.finished_at = "2026-05-22T08:31:00+00:00"
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get(
+        "/api/live/worker-status?fresh_after_minutes=60&now=2026-05-22T09:00:00+00:00"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "fresh"
+    assert payload["healthy"] is True
+    assert payload["freshness_minutes"] == 29
+    assert payload["latest_worker_run"]["run_id"] == "scheduled-worker-api"
+
+
 def test_live_status_endpoint_returns_latest_success_failure_and_bet_counts(
     tmp_path: Path,
 ) -> None:

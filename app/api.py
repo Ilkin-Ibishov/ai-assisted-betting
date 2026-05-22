@@ -13,6 +13,7 @@ from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.live_status_service import LiveStatusService
 from app.services.odds_movement_service import OddsMovementService
+from app.services.worker_monitoring_service import WorkerMonitoringService
 
 
 def create_api(
@@ -65,6 +66,16 @@ def create_api(
     @api.get("/api/live/status")
     def get_live_status() -> dict[str, Any]:
         return live_status.status()
+
+    @api.get("/api/live/worker-status")
+    def get_worker_status(
+        fresh_after_minutes: int = 90,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        return WorkerMonitoringService(live_database_url).status(
+            fresh_after_minutes=fresh_after_minutes,
+            now_iso=now,
+        )
 
     @api.get("/api/live/runs")
     def list_live_runs(limit: int = 20) -> list[dict[str, Any]]:

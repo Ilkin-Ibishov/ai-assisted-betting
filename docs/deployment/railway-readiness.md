@@ -2,21 +2,24 @@
 
 ## Service Layout
 
-Use three Railway services for the first staging deployment:
+Use four Railway services for the monitored staging deployment:
 
 ```text
 postgres: Railway Postgres plugin
 api: FastAPI backend
 dashboard: Vite static frontend
+worker: one-shot scheduled paper worker
 ```
 
-Add the scheduled worker only after Task 50.
+The worker is separate from the API so API deploys and public health checks do not accidentally collect live data.
 
-Task 51 deployment runbook status:
+Task 60 deployment monitoring status:
 
 ```text
 local production-smoke command implemented
 Railway operator steps documented
+worker freshness endpoint implemented
+recommendation endpoint smoke implemented
 deployed smoke requires real Railway service URLs and credentials
 ```
 
@@ -104,9 +107,15 @@ Deploy notes:
 
 ## Scheduled Worker Service
 
-Task 50 implemented the one-shot worker command, but Task 51 does not enable scheduled production collection by default.
+Task 50 implemented the one-shot worker command. Task 60 adds monitoring and production smoke checks for that worker.
 
-Use this only after Task 60 monitoring is in place:
+Worker build command:
+
+```powershell
+python -m pip install -e .
+```
+
+Worker start command:
 
 ```powershell
 python -m app.cli run-scheduled-paper-worker --provider misli-public --snapshot <snapshot.json> --model baseline_heuristic
@@ -118,10 +127,70 @@ Required worker-only variable:
 LIVE_COLLECTION_ENABLED=true
 ```
 
+Recommended worker variables:
+
+```env
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+DEFAULT_SPORT=football
+DEFAULT_MARKET=1X2
+DEFAULT_STAKE_UNITS=1.0
+MIN_EDGE=0.07
+MIN_ODDS=1.70
+MAX_ODDS=3.50
+FEATURE_VERSION=v0_baseline
+MODEL_NAME=baseline_heuristic
+MODEL_VERSION=v0
+ELO_INITIAL_RATING=1500
+ELO_K_FACTOR=20
+ELO_HOME_ADVANTAGE=65
+LOG_LEVEL=INFO
+LIVE_COLLECTION_ENABLED=true
+AI_ANALYSIS_MODE=deterministic
+AI_ANALYSIS_MODEL_NAME=deterministic_ai_fallback
+```
+
 Keep API and dashboard services on:
 
 ```env
 LIVE_COLLECTION_ENABLED=false
+```
+
+Cadence guidance:
+
+- Use Railway cron or an equivalent scheduler to invoke the one-shot worker.
+- Start conservatively, for example every 30 to 60 minutes.
+- Avoid overlapping runs. The worker skips when another `scheduled_paper_worker` run is still `running`.
+- Keep snapshots public/user-provided and paper-only. Do not add login automation, account actions, CAPTCHA/bot bypass, proxy evasion, or real-money betting.
+
+Worker monitoring endpoint:
+
+```text
+GET /api/live/worker-status
+GET /api/live/worker-status?fresh_after_minutes=90
+```
+
+Healthy response shape:
+
+```json
+{
+  "status": "fresh",
+  "healthy": true,
+  "freshness_minutes": 24,
+  "fresh_after_minutes": 90,
+  "latest_worker_run": {
+    "run_type": "scheduled_paper_worker",
+    "status": "completed"
+  }
+}
+```
+
+Unhealthy statuses:
+
+```text
+never_run
+stale
+failed
+running
 ```
 
 ## Postgres Notes
@@ -154,6 +223,8 @@ The smoke command verifies:
 GET /api/health
 GET /api/live/status
 GET /api/live/runs?limit=5
+GET /api/live/worker-status
+GET /api/live/recommendations?limit=5
 GET /api/reports/comparisons
 dashboard HTML root
 ```
@@ -171,8 +242,29 @@ Useful manual checks:
 ```powershell
 curl https://<api-service>.up.railway.app/api/health
 curl https://<api-service>.up.railway.app/api/live/status
+curl https://<api-service>.up.railway.app/api/live/worker-status
+curl https://<api-service>.up.railway.app/api/live/recommendations?limit=5
 curl https://<api-service>.up.railway.app/api/reports/comparisons
 ```
+
+## Failure Triage
+
+Worker freshness:
+
+- `never_run`: Railway cron has not invoked the worker, the worker service is not deployed, or `DATABASE_URL` points to a different database than the API.
+- `stale`: the worker has not completed within `fresh_after_minutes`; inspect worker deploy logs and Railway cron cadence.
+- `failed`: inspect `latest_worker_run.error_summary`; common causes are provider parser drift, missing snapshot file, `LIVE_COLLECTION_ENABLED=false`, or database connectivity.
+- `running`: a worker is currently active or a previous run was interrupted before marking completion.
+
+Recommendation endpoint:
+
+- Empty response can be valid immediately after deploy.
+- Repeated empty response after fresh worker runs means the pipeline produced no eligible recommendations; inspect `/api/live/odds-movement`, provider health, and recommendation risk flags.
+
+AI review:
+
+- If `GET /api/ai/recommendation-review/latest` is missing, run `python -m app.cli analyze-recommendations` after recommendations exist.
+- AI review remains advisory and does not execute bets.
 
 ## Rollback And Recovery
 
@@ -181,8 +273,9 @@ Rollback order:
 1. Roll back the last failed Railway deployment for the affected service.
 2. Confirm API `/api/health` before dashboard checks.
 3. Rebuild the dashboard if the API URL changed.
-4. Keep `LIVE_COLLECTION_ENABLED=false` while recovering API or database health.
-5. If Postgres is unhealthy, pause worker scheduling and inspect Railway Postgres logs before running any collection command.
+4. Keep API and dashboard `LIVE_COLLECTION_ENABLED=false` while recovering API or database health.
+5. Pause worker scheduling if Postgres, provider parsing, or recommendation endpoints are unhealthy.
+6. If Postgres is unhealthy, inspect Railway Postgres logs before running any collection command.
 
 Recovery notes:
 
@@ -191,4 +284,4 @@ Recovery notes:
 - Dashboard failures are usually build-time API URL or static publish-directory issues.
 - API failures are usually missing `DATABASE_URL`, dependency install failure, or Postgres connectivity.
 
-Keep all live workflows paper-only. Do not enable scheduled collection until Task 60 monitoring is implemented.
+Keep all live workflows paper-only. Scheduled collection is allowed only through the separate monitored worker service.

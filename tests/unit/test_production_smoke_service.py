@@ -22,6 +22,11 @@ def test_production_smoke_checks_api_and_dashboard_contracts() -> None:
                 "settled_paper_bets": 0,
             },
             "https://api.example.test/api/live/runs?limit=5": [],
+            "https://api.example.test/api/live/worker-status": {
+                "status": "fresh",
+                "healthy": True,
+            },
+            "https://api.example.test/api/live/recommendations?limit=5": [],
             "https://api.example.test/api/reports/comparisons": [],
             "https://dashboard.example.test/": "<!doctype html><div id=\"root\"></div>",
         }
@@ -41,6 +46,8 @@ def test_production_smoke_checks_api_and_dashboard_contracts() -> None:
         "api_health",
         "live_status",
         "live_runs",
+        "worker_status",
+        "recommendations",
         "comparison_catalog",
         "dashboard_html",
     ]
@@ -76,6 +83,11 @@ def test_production_smoke_requires_dashboard_root_when_dashboard_url_is_set() ->
                 "settled_paper_bets": 0,
             },
             "https://api.example.test/api/live/runs?limit=5": [],
+            "https://api.example.test/api/live/worker-status": {
+                "status": "fresh",
+                "healthy": True,
+            },
+            "https://api.example.test/api/live/recommendations?limit=5": [],
             "https://api.example.test/api/reports/comparisons": [],
             "https://dashboard.example.test/": "<!doctype html><main>missing app root</main>",
         }
@@ -87,6 +99,34 @@ def test_production_smoke_requires_dashboard_root_when_dashboard_url_is_set() ->
                 api_base_url="https://api.example.test",
                 dashboard_url="https://dashboard.example.test/",
             )
+        )
+
+
+def test_production_smoke_fails_when_worker_is_stale() -> None:
+    client = FakeSmokeClient(
+        {
+            "https://api.example.test/api/health": {
+                "status": "ok",
+                "database": "ok",
+            },
+            "https://api.example.test/api/live/status": {
+                "latest_run": None,
+                "open_paper_bets": 0,
+                "settled_paper_bets": 0,
+            },
+            "https://api.example.test/api/live/runs?limit=5": [],
+            "https://api.example.test/api/live/worker-status": {
+                "status": "stale",
+                "healthy": False,
+            },
+            "https://api.example.test/api/live/recommendations?limit=5": [],
+            "https://api.example.test/api/reports/comparisons": [],
+        }
+    )
+
+    with pytest.raises(ProductionSmokeError, match="worker_status"):
+        ProductionSmokeService(client=client).run(
+            ProductionSmokeRequest(api_base_url="https://api.example.test")
         )
 
 

@@ -55,6 +55,8 @@ class ProductionSmokeService:
             health_check,
             self._check_live_status(api_base_url),
             self._check_live_runs(api_base_url),
+            self._check_worker_status(api_base_url),
+            self._check_recommendations(api_base_url),
             self._check_comparison_catalog(api_base_url),
         ]
         dashboard_url = _normalize_optional_url(request.dashboard_url)
@@ -102,6 +104,23 @@ class ProductionSmokeService:
         payload = self.client.get_json(f"{api_base_url}/api/live/runs?limit=5")
         return {
             "name": "live_runs",
+            "ok": isinstance(payload, list),
+            "count": len(payload) if isinstance(payload, list) else None,
+        }
+
+    def _check_worker_status(self, api_base_url: str) -> dict[str, Any]:
+        payload = self.client.get_json(f"{api_base_url}/api/live/worker-status")
+        return {
+            "name": "worker_status",
+            "ok": isinstance(payload, dict) and payload.get("healthy") is True,
+            "status": _dict_value(payload, "status"),
+            "freshness_minutes": _dict_value(payload, "freshness_minutes"),
+        }
+
+    def _check_recommendations(self, api_base_url: str) -> dict[str, Any]:
+        payload = self.client.get_json(f"{api_base_url}/api/live/recommendations?limit=5")
+        return {
+            "name": "recommendations",
             "ok": isinstance(payload, list),
             "count": len(payload) if isinstance(payload, list) else None,
         }

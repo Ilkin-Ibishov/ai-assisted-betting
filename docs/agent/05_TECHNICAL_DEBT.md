@@ -148,6 +148,8 @@ Task 59 added historical recommendation backtesting, dashboard-compatible compan
 
 Task 51 added a Railway deployment runbook and `production-smoke` command. It did not introduce new implementation debt. First deployed smoke evidence still requires real Railway staging URLs and credentials, which is an operational prerequisite rather than code debt.
 
+Task 60 added worker freshness monitoring, `/api/live/worker-status`, and production-smoke checks for worker freshness and recommendation endpoint health. It did not introduce new code debt. Railway cron cadence, cold starts, and service-to-service networking remain operational considerations documented in `docs/deployment/railway-readiness.md`.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.
