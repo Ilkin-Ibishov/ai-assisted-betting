@@ -446,6 +446,12 @@ Only after the offline sample pipeline works:
 - `docs/specs/logging-and-evaluation.md`
 - `docs/specs/pipeline-flow.md`
 - `docs/specs/ai-assisted-backbone.md`
+- `docs/specs/dashboard.md`
+- `app/services/recommendation_backtest_service.py`
+- `app/services/ai_analysis_service.py`
+- `app/services/ai_prompt_registry.py`
+- `app/cli.py`
+- `tests/unit/test_recommendation_backtest_service.py`
 
 ## Task 60 - Railway Worker Deployment And Monitoring
 

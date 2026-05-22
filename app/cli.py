@@ -17,6 +17,10 @@ from app.services.live_collection_service import LiveCollectionRequest, LiveColl
 from app.services.live_cycle_service import LivePaperCycleRequest, LivePaperCycleService
 from app.services.live_result_service import LiveResultRequest, LiveResultService
 from app.services.prediction_service import PredictionService
+from app.services.recommendation_backtest_service import (
+    RecommendationBacktestRequest,
+    RecommendationBacktestService,
+)
 from app.services.recommendation_service import RecommendationService
 from app.services.replay_service import ReplayService
 from app.services.scheduled_worker_service import (
@@ -44,6 +48,11 @@ LIVE_PROVIDER_OPTION = typer.Option("misli-public", help="Live provider key.")
 SNAPSHOT_OPTION = typer.Option(..., help="Live provider snapshot JSON path.")
 RESULT_PROVIDER_OPTION = typer.Option("manual", help="Result provider key.")
 RESULT_PATH_OPTION = typer.Option(..., help="Manual result JSON path.")
+RECOMMENDATION_BACKTEST_REPORT_OPTION = typer.Option(
+    ...,
+    help="Recommendation backtest JSON report path.",
+)
+REPORTS_DIR_OPTION = typer.Option(Path("reports"), help="Directory for report exports.")
 
 
 def _not_implemented(command_name: str) -> None:
@@ -271,6 +280,55 @@ def analyze_recommendations(
     typer.echo(f"approval_state={output.get('approval_state')}")
     typer.echo(f"short_summary={output.get('short_summary')}")
     typer.echo("analyze-recommendations: finished")
+
+
+@app.command("backtest-recommendations")
+def backtest_recommendations(
+    report_name: str = typer.Option("recommendation_backtest", help="Backtest report name."),
+    reports_dir: Path = REPORTS_DIR_OPTION,
+    min_edge: float = typer.Option(0.0, help="Minimum edge for included recommendations."),
+    min_confidence: float = typer.Option(
+        0.0,
+        help="Minimum confidence for included recommendations.",
+    ),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    csv_path, json_path, report = RecommendationBacktestService(engine).export(
+        RecommendationBacktestRequest(
+            report_name=report_name,
+            min_edge=min_edge,
+            min_confidence=min_confidence,
+        ),
+        reports_dir=reports_dir,
+    )
+    typer.echo("backtest-recommendations: started")
+    typer.echo(f"report_csv={csv_path}")
+    typer.echo(f"report_json={json_path}")
+    typer.echo(f"singles.settled_bets={report['singles']['settled_bets']}")
+    typer.echo(f"singles.roi={report['singles']['roi']}")
+    typer.echo(f"combinations.settled_bets={report['combinations']['settled_bets']}")
+    typer.echo(f"combinations.roi={report['combinations']['roi']}")
+    typer.echo("backtest-recommendations: finished")
+
+
+@app.command("analyze-recommendation-backtest")
+def analyze_recommendation_backtest(
+    report: Path = RECOMMENDATION_BACKTEST_REPORT_OPTION,
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    analysis = AIAnalysisService(engine).analyze_recommendation_backtest_report(report)
+    output = json.loads(analysis.output_json)
+    typer.echo("analyze-recommendation-backtest: started")
+    typer.echo(f"analysis_id={analysis.id}")
+    typer.echo(f"analysis_type={analysis.analysis_type}")
+    typer.echo(f"model_name={analysis.model_name}")
+    typer.echo(f"prompt_version={analysis.prompt_version}")
+    typer.echo(f"status={analysis.status}")
+    typer.echo(f"label={output.get('label')}")
+    typer.echo(f"short_summary={output.get('short_summary')}")
+    typer.echo("analyze-recommendation-backtest: finished")
 
 
 def _split_csv_option(value: str) -> list[str]:

@@ -118,6 +118,14 @@ Example:
 reports/e0_compare_comparison.json -> e0_compare
 ```
 
+Task 59 recommendation backtests also emit a companion report named:
+
+```text
+reports/<name>_comparison.json
+```
+
+with `metadata.report_type = recommendation_backtest`, comparison-style `runs`, and the canonical backtest payload under `recommendation_backtest`. This lets the existing dashboard catalog list historical recommendation backtests without a separate catalog endpoint.
+
 The FastAPI app should be runnable with:
 
 ```powershell
@@ -207,6 +215,8 @@ filters for grade, market, confidence band, and AI approval state
 ```
 
 The view remains read-only and does not expose bet placement or bookmaker account actions.
+
+Task 59 added historical recommendation backtest exports. `backtest-recommendations` writes the canonical `_recommendation_backtest.json`, summary CSV, and dashboard-compatible `_comparison.json` companion report. `analyze-recommendation-backtest` persists an AI-assisted advisory summary for small samples, threshold sensitivity, ROI weakness, and combination underperformance.
 
 Each live run payload includes:
 

@@ -19,6 +19,17 @@ Evaluate whether live recommendation and combination rules would have performed 
 - AI analysis can summarize backtest weaknesses and next experiment ideas.
 - Tests cover deterministic report generation and threshold-sensitive ranking changes.
 
+## Implementation Notes
+
+Implemented in Task 59:
+
+- Added `RecommendationBacktestService` to evaluate persisted active recommendations joined to completed matches.
+- Reported singles and combinations separately with ROI, hit rate, Brier score, log loss, drawdown, edge buckets, market buckets, model/provider buckets, and threshold-sensitivity scenarios.
+- Added `backtest-recommendations` CLI export for CSV plus canonical recommendation-backtest JSON.
+- Added a dashboard-compatible `_comparison.json` companion report so the existing report catalog can list backtest outputs.
+- Added `analyze-recommendation-backtest` and `recommendation_backtest_summary` AI analysis records over exported backtest JSON.
+- Added deterministic advisory risk flags for small samples, negative ROI, combination underperformance, under-sampled combinations, and threshold sensitivity.
+
 ## Verification
 
 ```powershell
@@ -33,12 +44,12 @@ npm run smoke
 
 ## Next
 
-Task 60 - Railway Worker Deployment And Monitoring.
+Task 51 - Railway Deployment Runbook And Production Smoke, then Task 60 - Railway Worker Deployment And Monitoring.
 
 ## Blockers
 
-Requires Task 55 and enough stored paper recommendations to evaluate.
+No implementation blocker remains. Meaningful conclusions still require enough stored paper recommendations and completed results.
 
 ## Technical Debt
 
-Document any mismatch between historical bookmaker fields and live Misli fields.
+Current reports use historical settled recommendations and companion dashboard comparison JSON. Deeper bankroll sizing, exposure caps, and richer combination correlation modeling remain tracked in `docs/agent/05_TECHNICAL_DEBT.md`.

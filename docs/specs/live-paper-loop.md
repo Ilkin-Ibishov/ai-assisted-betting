@@ -382,6 +382,8 @@ Task 57 added AI-assisted recommendation review. `analyze-recommendations` reads
 
 Task 58 added dashboard inspection for the live recommendation loop. The React dashboard can now show recommendations, combinations, odds movement, risk flags, and the latest AI recommendation review in one read-only panel with filters.
 
+Task 59 added historical recommendation backtesting for the live recommendation loop. `backtest-recommendations` evaluates settled persisted recommendations and combinations, exports singles-versus-combination performance with calibration and drawdown metrics, and writes a dashboard-compatible report companion. `analyze-recommendation-backtest` records an AI-assisted advisory summary for the backtest.
+
 ## Non-Goals
 
 - Real-money betting.

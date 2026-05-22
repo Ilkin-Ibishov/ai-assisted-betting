@@ -144,6 +144,8 @@ Task 57 added deterministic AI review over recommendations and combinations. It 
 
 Task 58 added a direct-rendered recommendation dashboard panel. It did not introduce a current performance issue, but the panel should be revisited for pagination or virtualization if recommendation history grows beyond the API-limited working set.
 
+Task 59 added historical recommendation backtesting, dashboard-compatible companion exports, and deterministic AI backtest summaries. It did not introduce new technical debt. Existing recommendation and combination risk-model limitations remain tracked above until larger backtests justify stronger thresholds or richer exposure modeling.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

@@ -74,6 +74,7 @@ Build in this order:
 - Task 56 - Paper Bet Combination Engine
 - Task 57 - AI Recommendation Review Layer
 - Task 58 - Recommendation Dashboard
+- Task 59 - Historical Recommendation Backtesting
 - Task 52 - Provider Health AI Analysis
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
@@ -82,10 +83,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Task 59 - Historical Recommendation Backtesting
+Task 51 - Railway Deployment Runbook And Production Smoke
 ```
 
-Task 58 added dashboard visibility for recommendations, combinations, odds movement, risk flags, and AI approval. Do not add real-money execution, account automation, or protected scraping while building historical recommendation backtesting.
+Task 59 added historical recommendation backtesting, dashboard-compatible export, and AI backtest summaries. Do not add real-money execution, account automation, or protected scraping while preparing Railway deployment runbooks and smoke checks.
 
 Required verification commands after implementation:
 
@@ -149,7 +150,7 @@ Build the paper-only live loop in this order:
 18. Task 56 - Paper Bet Combination Engine, completed
 19. Task 57 - AI Recommendation Review Layer, completed
 20. Task 58 - Recommendation Dashboard, completed
-21. Task 59 - Historical Recommendation Backtesting
+21. Task 59 - Historical Recommendation Backtesting, completed
 22. Task 51 - Railway Deployment Runbook And Production Smoke
 23. Task 60 - Railway Worker Deployment And Monitoring
 24. Task 61 - Operational Guardrails And Alerting
@@ -170,9 +171,10 @@ Build AI assistance in this order:
 3. Implemented: Task 48 comparison-report analyst mode through `analyze-comparison-ai`.
 4. Implemented: Task 52 provider-health analyst mode through `analyze-provider-health`.
 5. Implemented: Task 57 recommendation and combination AI review mode through `analyze-recommendations`.
-6. Later: optional LLM-backed analysis provider using official OpenAI docs and secure credential handling.
-7. Later: richer AI-assisted experiment design over historical replay/comparison results.
-8. Later: deployment readiness analyst mode.
+6. Implemented: Task 59 recommendation backtest analyst mode through `analyze-recommendation-backtest`.
+7. Later: optional LLM-backed analysis provider using official OpenAI docs and secure credential handling.
+8. Later: richer AI-assisted experiment design over historical replay/comparison results.
+9. Later: deployment readiness analyst mode.
 
 AI assistance must remain advisory and paper-only. It must not place bets, automate accounts, or override safety rules.
 
@@ -197,7 +199,7 @@ Build live recommendation work in this order:
 4. Task 56 - Paper Bet Combination Engine, completed
 5. Task 57 - AI Recommendation Review Layer, completed
 6. Task 58 - Recommendation Dashboard, completed
-7. Task 59 - Historical Recommendation Backtesting
+7. Task 59 - Historical Recommendation Backtesting, completed
 
 ## Do Not Jump Ahead
 

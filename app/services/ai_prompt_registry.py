@@ -5,6 +5,7 @@ LIVE_STATUS_PROMPT_VERSION = "ai-live-status-v1"
 COMPARISON_REPORT_PROMPT_VERSION = "ai-comparison-report-v1"
 PROVIDER_HEALTH_PROMPT_VERSION = "ai-provider-health-v1"
 RECOMMENDATION_REVIEW_PROMPT_VERSION = "ai-recommendation-review-v1"
+RECOMMENDATION_BACKTEST_PROMPT_VERSION = "ai-recommendation-backtest-v1"
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,14 @@ class ProviderHealthPrompt:
 
 @dataclass(frozen=True)
 class RecommendationReviewPrompt:
+    version: str
+    system_message: str
+    input_payload: dict[str, Any]
+    response_schema: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RecommendationBacktestPrompt:
     version: str
     system_message: str
     input_payload: dict[str, Any]
@@ -186,6 +195,44 @@ def build_recommendation_review_prompt(
                 "confidence_explanation": {"type": "string"},
                 "rejected_assumptions": {"type": "array", "items": {"type": "string"}},
                 "next_checks": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    )
+
+
+def build_recommendation_backtest_prompt(
+    input_payload: dict[str, Any],
+) -> RecommendationBacktestPrompt:
+    return RecommendationBacktestPrompt(
+        version=RECOMMENDATION_BACKTEST_PROMPT_VERSION,
+        system_message=(
+            "You are an AI-assisted advisory analyst for paper-only recommendation "
+            "backtests. Review settled singles, combinations, threshold sensitivity, "
+            "calibration, and drawdown from supplied structured report data. Prefer "
+            "sample-size and calibration evidence over ROI-only conclusions. Do not "
+            "recommend real-money betting, bookmaker account automation, proxy use, "
+            "or CAPTCHA bypass. Return concise structured JSON."
+        ),
+        input_payload=input_payload,
+        response_schema={
+            "type": "object",
+            "required": [
+                "label",
+                "short_summary",
+                "root_cause",
+                "risk_flags",
+                "recommended_next_actions",
+                "confidence",
+                "source_record_ids",
+            ],
+            "properties": {
+                "label": {"type": "string"},
+                "short_summary": {"type": "string"},
+                "root_cause": {"type": "string"},
+                "risk_flags": {"type": "array", "items": {"type": "string"}},
+                "recommended_next_actions": {"type": "array", "items": {"type": "string"}},
+                "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
+                "source_record_ids": {"type": "array", "items": {"type": "string"}},
             },
         },
     )

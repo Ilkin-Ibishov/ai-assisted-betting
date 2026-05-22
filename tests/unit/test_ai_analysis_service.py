@@ -253,6 +253,52 @@ def test_ai_analysis_service_fails_closed_on_unsafe_recommendation_review_output
     engine.dispose()
 
 
+def test_ai_analysis_service_records_recommendation_backtest_advisory(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'backtest-ai.sqlite').as_posix()}"
+    init_db(database_url)
+    report_path = tmp_path / "pytest_rec_recommendation_backtest.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "report_type": "recommendation_backtest",
+                    "report_name": "pytest_rec",
+                },
+                "singles": {
+                    "settled_bets": 20,
+                    "roi": -0.1,
+                    "hit_rate": 0.4,
+                    "max_drawdown_units": 4.0,
+                },
+                "combinations": {
+                    "settled_bets": 5,
+                    "roi": -0.4,
+                    "hit_rate": 0.2,
+                    "max_drawdown_units": 3.0,
+                },
+                "threshold_sensitivity": [
+                    {"min_edge": 0.0, "min_confidence": 0.0, "settled_bets": 20, "roi": -0.1},
+                    {"min_edge": 0.1, "min_confidence": 0.7, "settled_bets": 8, "roi": 0.05},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    engine = create_engine_from_url(database_url)
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_backtest_report(report_path)
+
+    assert analysis.analysis_type == "recommendation_backtest_summary"
+    assert analysis.source_type == "recommendation_backtest_report"
+    assert analysis.source_id == "pytest_rec"
+    output = json.loads(analysis.output_json)
+    assert "negative_singles_roi" in output["risk_flags"]
+    assert "combination_underperformance" in output["risk_flags"]
+    assert output["source_record_ids"] == ["pytest_rec"]
+    assert "real-money" not in " ".join(output["recommended_next_actions"]).lower()
+    engine.dispose()
+
+
 def _seed_failed_misli_run(engine) -> None:
     with session_scope(engine) as session:
         repository = LiveRunRepository(session)

@@ -95,6 +95,16 @@ approval_state, concerns, rejected assumptions, and next checks
 fail-closed evals for hype, unsafe betting instructions, and missing inputs
 ```
 
+Implemented by Task 59 recommendation backtest analyst slice:
+
+```text
+recommendation-backtest prompt/version registry
+recommendation_backtest_summary AI analysis persistence
+analyze-recommendation-backtest CLI command
+small-sample, threshold-sensitivity, negative ROI, and combination-underperformance risk flags
+paper-only next experiment recommendations
+```
+
 ## Recommended Architecture
 
 ### 1. Deterministic Data And Policy Core
@@ -234,6 +244,7 @@ live_run_root_cause
 model_comparison_summary
 provider_health_summary
 recommendation_review
+recommendation_backtest_summary
 next_experiment_plan
 deployment_readiness_review
 ```
@@ -257,6 +268,7 @@ python -m app.cli analyze-comparison --report <path>
 python -m app.cli analyze-comparison-ai --report <path>
 python -m app.cli analyze-provider-health --provider misli_public
 python -m app.cli analyze-recommendations
+python -m app.cli analyze-recommendation-backtest --report <path>
 python -m app.cli plan-next-experiment
 ```
 
@@ -282,6 +294,7 @@ Implemented: keeps next actions within paper-only safety boundaries
 Implemented: flags ROI/calibration disagreement in comparison reports
 Implemented: identifies missing kickoff dates as provider blocker in provider-health mode
 Implemented: rejects recommendation-review hype, real-money/account instructions, unsupported certainty, bad review shape, and missing deterministic inputs
+Implemented: flags recommendation-backtest sample-size, threshold-sensitivity, ROI, and combination-performance risks
 Next: add stricter no-invented-facts fixtures across comparison report variants
 ```
 
@@ -295,9 +308,10 @@ Next: add stricter no-invented-facts fixtures across comparison report variants
 6. Implemented: add model-comparison analyst mode over replay comparison JSON.
 7. Implemented: add provider-health analyst mode over live provider runs.
 8. Implemented: add recommendation and combination review analyst mode.
-9. Next: add optional LLM provider integration behind configuration.
-10. Next: add richer AI-assisted next-experiment planner.
-11. Next: add deployment-readiness analyst mode.
+9. Implemented: add recommendation backtest analyst mode over exported backtest JSON.
+10. Next: add optional LLM provider integration behind configuration.
+11. Next: add richer AI-assisted next-experiment planner.
+12. Next: add deployment-readiness analyst mode.
 
 ## Non-Goals
 

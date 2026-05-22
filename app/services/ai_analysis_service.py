@@ -18,14 +18,17 @@ from app.services.ai_prompt_registry import (
     COMPARISON_REPORT_PROMPT_VERSION,
     LIVE_STATUS_PROMPT_VERSION,
     PROVIDER_HEALTH_PROMPT_VERSION,
+    RECOMMENDATION_BACKTEST_PROMPT_VERSION,
     RECOMMENDATION_REVIEW_PROMPT_VERSION,
     ComparisonReportPrompt,
     LiveStatusPrompt,
     ProviderHealthPrompt,
+    RecommendationBacktestPrompt,
     RecommendationReviewPrompt,
     build_comparison_report_prompt,
     build_live_status_prompt,
     build_provider_health_prompt,
+    build_recommendation_backtest_prompt,
     build_recommendation_review_prompt,
 )
 from app.services.analysis_service import ComparisonAnalysisService
@@ -46,6 +49,12 @@ class AIAnalysisProvider(Protocol):
         pass
 
     def analyze_recommendation_review(self, prompt: RecommendationReviewPrompt) -> dict[str, Any]:
+        pass
+
+    def analyze_recommendation_backtest(
+        self,
+        prompt: RecommendationBacktestPrompt,
+    ) -> dict[str, Any]:
         pass
 
 
@@ -74,6 +83,15 @@ class DeterministicAIAnalysisProvider:
         return {
             "prompt_version": prompt.version,
             "output": _recommendation_review_output(prompt.input_payload),
+        }
+
+    def analyze_recommendation_backtest(
+        self,
+        prompt: RecommendationBacktestPrompt,
+    ) -> dict[str, Any]:
+        return {
+            "prompt_version": prompt.version,
+            "output": _recommendation_backtest_output(prompt.input_payload),
         }
 
 
@@ -247,6 +265,40 @@ class AIAnalysisService:
             session.flush()
             return analysis
 
+    def analyze_recommendation_backtest_report(self, report_path: Path) -> AIAnalysisRun:
+        input_payload = _recommendation_backtest_input(report_path)
+        provider_result = self.provider.analyze_recommendation_backtest(
+            build_recommendation_backtest_prompt(input_payload)
+        )
+        output_payload = provider_result["output"]
+        eval_result = evaluate_ai_analysis_output(output_payload)
+        status = "completed"
+        error_summary = None
+        if not eval_result.passed:
+            status = "failed"
+            error_summary = ", ".join(eval_result.failures)
+            output_payload = _failed_eval_output(input_payload, eval_result.failures)
+        with session_scope(self.engine) as session:
+            analysis = AIAnalysisRun(
+                analysis_type="recommendation_backtest_summary",
+                source_type="recommendation_backtest_report",
+                source_id=input_payload["report_name"],
+                input_json=json.dumps(input_payload, sort_keys=True),
+                output_json=json.dumps(output_payload, sort_keys=True),
+                model_name=self.provider.model_name,
+                prompt_version=str(
+                    provider_result.get(
+                        "prompt_version",
+                        RECOMMENDATION_BACKTEST_PROMPT_VERSION,
+                    )
+                ),
+                status=status,
+                error_summary=error_summary,
+            )
+            session.add(analysis)
+            session.flush()
+            return analysis
+
 
 def _ordered_live_runs():
     return select(LiveRun).order_by(LiveRun.started_at.desc(), LiveRun.id.desc())
@@ -370,6 +422,78 @@ def _comparison_report_output(input_payload: dict[str, Any]) -> dict[str, Any]:
             input_payload["next_experiment"],
             "Keep conclusions paper-only until larger replay samples confirm calibration.",
         ],
+        "confidence": "medium" if risk_flags else "high",
+        "source_record_ids": [input_payload["report_name"]],
+    }
+
+
+def _recommendation_backtest_input(report_path: Path) -> dict[str, Any]:
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    metadata = report["metadata"]
+    return {
+        "report_name": metadata.get(
+            "report_name",
+            report_path.name.removesuffix("_recommendation_backtest.json"),
+        ),
+        "report_path": str(report_path),
+        "metadata": metadata,
+        "singles": report["singles"],
+        "combinations": report["combinations"],
+        "edge_buckets": report.get("edge_buckets", {}),
+        "market_buckets": report.get("market_buckets", {}),
+        "model_provider_splits": report.get("model_provider_splits", {}),
+        "threshold_sensitivity": report.get("threshold_sensitivity", []),
+    }
+
+
+def _recommendation_backtest_output(input_payload: dict[str, Any]) -> dict[str, Any]:
+    singles = input_payload["singles"]
+    combinations = input_payload["combinations"]
+    threshold_sensitivity = input_payload["threshold_sensitivity"]
+    singles_roi = _metric_value(singles.get("roi"))
+    combinations_roi = _metric_value(combinations.get("roi"))
+    risk_flags: list[str] = []
+    recommended_actions = [
+        "Replay a larger historical sample before changing paper recommendation thresholds.",
+        "Keep recommendation output advisory and paper-only while monitoring calibration.",
+    ]
+    if int(singles.get("settled_bets") or 0) < 300:
+        risk_flags.append("small_backtest_sample")
+    if int(combinations.get("settled_bets") or 0) < 100:
+        risk_flags.append("combination_under_sampled")
+    if singles_roi is not None and singles_roi < 0:
+        risk_flags.append("negative_singles_roi")
+    if combinations_roi is not None and combinations_roi < 0:
+        risk_flags.append("negative_combination_roi")
+    if (
+        singles_roi is not None
+        and combinations_roi is not None
+        and combinations_roi < singles_roi
+    ):
+        risk_flags.append("combination_underperformance")
+        recommended_actions.insert(
+            0,
+            "Tighten or pause combination ranking until backtests show repeatable lift.",
+        )
+    if _has_threshold_sensitivity(threshold_sensitivity):
+        risk_flags.append("threshold_sensitivity_present")
+        recommended_actions.append(
+            "Compare stricter edge and confidence thresholds in the next replay batch."
+        )
+    return {
+        "label": "AI-assisted advisory analysis",
+        "short_summary": (
+            f"Recommendation backtest {input_payload['report_name']} reviewed with "
+            f"{singles.get('settled_bets', 0)} settled singles at ROI "
+            f"{singles.get('roi')} and {combinations.get('settled_bets', 0)} "
+            f"settled combinations at ROI {combinations.get('roi')}."
+        ),
+        "root_cause": (
+            "Recommendation and combination rules were evaluated on settled historical "
+            "records with threshold-sensitivity and calibration metrics."
+        ),
+        "risk_flags": risk_flags or ["no_current_risk_flags"],
+        "recommended_next_actions": recommended_actions,
         "confidence": "medium" if risk_flags else "high",
         "source_record_ids": [input_payload["report_name"]],
     }
@@ -639,6 +763,24 @@ def _recommendation_confidence_explanation(
         f"Confidence is based on {len(recommendations)} deterministic recommendation "
         f"records and {len(combinations)} combination records with no current risk flags."
     )
+
+
+def _metric_value(value: Any) -> float | None:
+    if value is None:
+        return None
+    return float(value)
+
+
+def _has_threshold_sensitivity(scenarios: list[dict[str, Any]]) -> bool:
+    if len(scenarios) < 2:
+        return False
+    settled_counts = {int(scenario.get("settled_bets") or 0) for scenario in scenarios}
+    roi_values = {
+        round(float(scenario["roi"]), 6)
+        for scenario in scenarios
+        if scenario.get("roi") is not None
+    }
+    return len(settled_counts) > 1 or len(roi_values) > 1
 
 
 def _missing_recommendation_review_output() -> dict[str, Any]:

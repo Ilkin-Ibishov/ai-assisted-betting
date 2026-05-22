@@ -771,6 +771,133 @@ def test_analyze_recommendations_command_persists_ai_review(tmp_path) -> None:
     assert analysis_type == "recommendation_review"
 
 
+def test_backtest_recommendations_command_exports_report(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "recommendation-backtest.sqlite"
+    env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}
+
+    assert runner.invoke(app, ["init-db"], env=env).exit_code == 0
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO matches (
+                    source, source_match_id, league, home_team, away_team,
+                    kickoff_time, status, result, created_at, updated_at
+                )
+                VALUES (
+                    'misli_public', 'misli:football:2816300', 'Sample Premier',
+                    'Forest City', 'Eastport Athletic',
+                    '2026-05-19T20:30:00+04:00', 'completed', 'HOME',
+                    '2026-05-19T11:00:00+00:00', '2026-05-19T11:00:00+00:00'
+                )
+                """
+            )
+        )
+        match_id = connection.execute(text("SELECT id FROM matches")).scalar_one()
+        connection.execute(
+            text(
+                """
+                INSERT INTO paper_recommendations (
+                    match_id, source_match_id, bookmaker, market, selection,
+                    latest_snapshot_time, model_name, model_version, grade, status,
+                    model_probability, implied_probability, edge, confidence_score,
+                    current_odds, expected_value, risk_flags_json, rationale, created_at
+                )
+                VALUES (
+                    :match_id, 'misli:football:2816300', 'Misli.az', '1X2', 'HOME',
+                    '2026-05-19T12:00:00+00:00', 'baseline_heuristic', 'v0',
+                    'recommended', 'active', 0.62, 0.5, 0.12, 0.72,
+                    2.0, 0.24, '["no_current_risk_flags"]',
+                    'Seed recommendation', '2026-05-19T12:00:00+00:00'
+                )
+                """
+            ),
+            {"match_id": match_id},
+        )
+
+    result = runner.invoke(
+        app,
+        [
+            "backtest-recommendations",
+            "--report-name",
+            "pytest_cli_rec_backtest",
+            "--reports-dir",
+            str(tmp_path / "reports"),
+        ],
+        env=env,
+    )
+
+    assert result.exit_code == 0
+    assert "backtest-recommendations: started" in result.output
+    assert "singles.settled_bets=1" in result.output
+    assert "singles.roi=1.0" in result.output
+    assert (tmp_path / "reports" / "pytest_cli_rec_backtest_recommendation_backtest.json").exists()
+
+
+def test_analyze_recommendation_backtest_command_persists_ai_summary(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "backtest-ai-cli.sqlite"
+    report_path = tmp_path / "pytest_cli_rec_recommendation_backtest.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "report_type": "recommendation_backtest",
+                    "report_name": "pytest_cli_rec",
+                },
+                "singles": {
+                    "settled_bets": 20,
+                    "roi": -0.1,
+                    "hit_rate": 0.4,
+                    "max_drawdown_units": 4.0,
+                },
+                "combinations": {
+                    "settled_bets": 5,
+                    "roi": -0.4,
+                    "hit_rate": 0.2,
+                    "max_drawdown_units": 3.0,
+                },
+                "threshold_sensitivity": [
+                    {
+                        "min_edge": 0.0,
+                        "min_confidence": 0.0,
+                        "settled_bets": 20,
+                        "roi": -0.1,
+                    },
+                    {
+                        "min_edge": 0.1,
+                        "min_confidence": 0.7,
+                        "settled_bets": 8,
+                        "roi": 0.05,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}
+    runner.invoke(app, ["init-db"], env=env)
+
+    result = runner.invoke(
+        app,
+        [
+            "analyze-recommendation-backtest",
+            "--report",
+            str(report_path),
+        ],
+        env=env,
+    )
+
+    assert result.exit_code == 0
+    assert "analyze-recommendation-backtest: started" in result.output
+    assert "analysis_type=recommendation_backtest_summary" in result.output
+    assert "prompt_version=ai-recommendation-backtest-v1" in result.output
+    assert "short_summary=Recommendation backtest pytest_cli_rec reviewed" in result.output
+    assert "analyze-recommendation-backtest: finished" in result.output
+
+
 def test_replay_football_data_runs_historical_pipeline(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "replay.sqlite"
