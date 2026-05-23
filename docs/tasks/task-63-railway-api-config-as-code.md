@@ -10,6 +10,8 @@ Fix the first Railway API deployment failure by making the service start command
 
 - Added `railway.json` with Railpack builder, editable Python install build command, API start command, `/api/health` healthcheck, and restart policy.
 - Updated Railway readiness docs with the linked project/environment/service and the current deploy triage.
+- Switched the API service to an explicit Dockerfile after Railway's Railpack runtime crashed with `ModuleNotFoundError: No module named 'typer'`.
+- Kept `/api/health`, restart policy, and timeout in `railway.json`, while the Dockerfile owns dependency installation and process startup.
 
 ## Verification
 
@@ -41,7 +43,7 @@ railway logs --service ai-assisted-betting --environment production --lines 100
 ## Blockers
 
 - Railway MCP tools are not exposed in the current Codex session. The project is connected through the Railway CLI instead.
-- Deployed smoke cannot run until Railway has a successful deployment and a reachable API URL.
+- Deployed smoke cannot run until the Dockerfile-backed Railway deployment is successful and a reachable API URL exists.
 
 ## Technical Debt
 

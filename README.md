@@ -97,7 +97,7 @@ Railway setup, smoke checks, rollback, and guardrail triage are documented in:
 docs/deployment/railway-readiness.md
 ```
 
-The API service includes repo-level Railway config in `railway.json` for Railpack build, API start, healthcheck, and restart policy.
+The API service includes repo-level Railway config in `railway.json` and `Dockerfile` for dependency installation, API start, healthcheck, and restart policy.
 
 The system remains paper-only and advisory. Deployed Railway smoke evidence is still required before calling it fully production-proven.
 

@@ -29,17 +29,26 @@ The API service has repo-level Railway config in:
 
 ```text
 railway.json
+Dockerfile
 ```
 
-Railway reads this config during deployment and the file overrides matching dashboard service settings for that deployment. Keep the API Railway service root at the repo root when using this file.
+Railway reads this config during deployment and the file overrides matching dashboard service settings for that deployment. Keep the API Railway service root at the repo root when using these files.
 
-Build command:
+Builder:
+
+```text
+DOCKERFILE
+```
+
+The Dockerfile installs package dependencies into the final runtime image and starts the API through its `CMD`.
+
+Legacy/manual Railpack build command:
 
 ```powershell
 python -m pip install -e .
 ```
 
-Start command:
+Dockerfile start command:
 
 ```powershell
 python -m app.cli init-db && python -m uvicorn app.api:api --host 0.0.0.0 --port $PORT
@@ -57,7 +66,7 @@ Deploy notes:
 2. Add a Railway Postgres database.
 3. Add an API service from the GitHub repo.
 4. Set the API root directory to the repo root.
-5. Confirm the API service uses `railway.json`, or configure the build and start commands above directly in Railway settings.
+5. Confirm the API service uses `railway.json` and `Dockerfile`, or configure an equivalent Dockerfile deployment directly in Railway settings.
 6. Add the required variables below.
 7. Deploy and confirm `/api/health` returns `{"status":"ok","database":"ok"}`.
 
@@ -360,6 +369,8 @@ Current deploy triage:
 ```text
 Railpack detected Python but failed because no start command was configured.
 railway.json now supplies the API build command, start command, healthcheck, and restart policy.
+The first Railpack config-as-code attempt built successfully but the runtime image crashed with ModuleNotFoundError: No module named 'typer'.
+The API service now uses an explicit Dockerfile so dependencies are installed in the final runtime image.
 ```
 
 Next operational checks:
