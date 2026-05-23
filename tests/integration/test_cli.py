@@ -29,6 +29,20 @@ def test_init_db_command_creates_configured_sqlite_database(tmp_path) -> None:
     assert "init-db: created tables" in result.output
 
 
+def test_show_config_redacts_database_password() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["show-config"],
+        env={"DATABASE_URL": "postgresql://postgres:secret@postgres.railway.internal:5432/railway"},
+    )
+
+    assert result.exit_code == 0
+    assert "postgres:***@postgres.railway.internal" in result.output
+    assert "secret" not in result.output
+
+
 def test_import_sample_data_command_populates_database_idempotently(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "sample.sqlite"

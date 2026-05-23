@@ -17,6 +17,7 @@ Fix the first Railway API deployment failure by making the service start command
 - Generated Railway public API domain: `https://ai-assisted-betting-production.up.railway.app`.
 - Added Railway Postgres and set the API `DATABASE_URL` to the Railway Postgres reference.
 - Added database URL normalization so Railway's plain `postgresql://...` URL uses the installed SQLAlchemy `psycopg` driver instead of defaulting to missing `psycopg2`.
+- Redacted CLI database URL output for `init-db` and `show-config` so Railway deployment logs do not print credentials.
 
 ## Verification
 

@@ -375,6 +375,7 @@ The Dockerfile-backed API deployment for commit ad00259 succeeded and Railway he
 Railway Postgres was added, and the API service `DATABASE_URL` now references the Railway Postgres service.
 The first Postgres-backed redeploy failed because Railway supplies `postgresql://...`, which SQLAlchemy maps to the missing `psycopg2` driver by default.
 The database engine now normalizes plain `postgresql://...` URLs to `postgresql+psycopg://...` so the installed `psycopg` driver is used.
+CLI database URL output is redacted so Railway logs do not print database credentials.
 ```
 
 Next operational checks:

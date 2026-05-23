@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import typer
+from sqlalchemy.engine import make_url
 
 from app.config import load_settings
 from app.db.engine import create_engine_from_url
@@ -97,6 +98,10 @@ def _settings_with_model(settings, model: str | None):
     return settings.__class__(**{**settings.__dict__, "model_name": model})
 
 
+def _safe_database_url(database_url: str) -> str:
+    return make_url(database_url).render_as_string(hide_password=True)
+
+
 @app.callback()
 def main() -> None:
     """Run Paper Odds Lab commands."""
@@ -106,7 +111,7 @@ def main() -> None:
 def init_db() -> None:
     settings = load_settings()
     run_init_db(settings.database_url)
-    typer.echo(f"init-db: created tables at {settings.database_url}")
+    typer.echo(f"init-db: created tables at {_safe_database_url(settings.database_url)}")
 
 
 @app.command("import-sample-data")
@@ -616,7 +621,7 @@ def evaluate() -> None:
 @app.command("show-config")
 def show_config() -> None:
     settings = load_settings()
-    typer.echo(f"database_url={settings.database_url}")
+    typer.echo(f"database_url={_safe_database_url(settings.database_url)}")
     typer.echo(f"default_market={settings.default_market}")
     typer.echo(f"min_edge={settings.min_edge}")
     typer.echo(f"odds_range={settings.min_odds}-{settings.max_odds}")
