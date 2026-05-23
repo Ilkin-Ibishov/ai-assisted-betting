@@ -376,14 +376,15 @@ Railway Postgres was added, and the API service `DATABASE_URL` now references th
 The first Postgres-backed redeploy failed because Railway supplies `postgresql://...`, which SQLAlchemy maps to the missing `psycopg2` driver by default.
 The database engine now normalizes plain `postgresql://...` URLs to `postgresql+psycopg://...` so the installed `psycopg` driver is used.
 CLI database URL output is redacted so Railway logs do not print database credentials.
+The Postgres-backed API deployment for commit e129e8a succeeded; `/api/health` returns 200 with `{"status":"ok","database":"ok"}`.
+Railway agent tooling was installed through `railway setup agent -y`; Codex may need a restart before the Railway MCP server appears in the active tool list.
 ```
 
 Next operational checks:
 
-1. Push the Postgres URL normalization fix and wait for Railway redeploy.
-2. Confirm `/api/health` succeeds while using Railway Postgres.
-3. Add the scheduled worker service and run it at least once.
-4. Rerun `python -m app.cli production-smoke --api-base-url https://ai-assisted-betting-production.up.railway.app`.
+1. Add the scheduled worker service and run it at least once.
+2. Rerun `python -m app.cli production-smoke --api-base-url https://ai-assisted-betting-production.up.railway.app`.
+3. Add the dashboard service or configure the deployed dashboard URL when that service exists.
 
 Current API URL:
 
@@ -398,4 +399,5 @@ Current deployed smoke result:
 /api/live/status: 200, no live runs yet
 /api/live/worker-status: 200 {"status":"never_run","healthy":false}
 production-smoke: fails at worker_status until the worker has run
+latest API logs redact the database password
 ```

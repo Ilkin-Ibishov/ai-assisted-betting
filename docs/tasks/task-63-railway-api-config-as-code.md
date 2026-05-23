@@ -18,6 +18,8 @@ Fix the first Railway API deployment failure by making the service start command
 - Added Railway Postgres and set the API `DATABASE_URL` to the Railway Postgres reference.
 - Added database URL normalization so Railway's plain `postgresql://...` URL uses the installed SQLAlchemy `psycopg` driver instead of defaulting to missing `psycopg2`.
 - Redacted CLI database URL output for `init-db` and `show-config` so Railway deployment logs do not print credentials.
+- Confirmed the Postgres-backed Railway API deployment for commit `e129e8a` is healthy.
+- Installed Railway agent tooling with `railway setup agent -y`; restart Codex if the Railway MCP server is not visible in the active tool list.
 
 ## Verification
 
@@ -42,13 +44,12 @@ railway logs --service ai-assisted-betting --environment production --lines 100
 
 ## What's Next
 
-- Confirm the Postgres-backed API redeploy reaches healthy state.
 - Add and run the scheduled worker service.
 - Rerun deployed `production-smoke`.
 
 ## Blockers
 
-- Railway MCP tools are not exposed in the current Codex session. The project is connected through the Railway CLI instead.
+- Railway MCP tooling is configured locally, but this active Codex session may need a restart before new MCP tools appear.
 - Full deployed smoke currently fails at `worker_status` because the fresh API deployment has no scheduled worker run yet.
 
 ## Technical Debt
