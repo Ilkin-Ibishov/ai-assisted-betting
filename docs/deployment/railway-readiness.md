@@ -90,6 +90,8 @@ LOG_LEVEL=INFO
 LIVE_COLLECTION_ENABLED=false
 AI_ANALYSIS_MODE=deterministic
 AI_ANALYSIS_MODEL_NAME=deterministic_ai_fallback
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+CORS_ALLOWED_ORIGIN_REGEX=^(http://(localhost|127\.0\.0\.1):\d+|https://[a-z0-9-]+\.up\.railway\.app)$
 ```
 
 ## Dashboard Service
@@ -117,10 +119,18 @@ When `VITE_API_BASE_URL` is empty, the dashboard keeps using local relative `/ap
 Deploy notes:
 
 1. Add a dashboard service from the same GitHub repo.
-2. Set the build command to `cd dashboard && npm ci && npm run build`.
-3. Set the publish directory to `dashboard/dist`.
+2. Set the service root directory to `dashboard`.
+3. Use `dashboard/railway.json` and `dashboard/Dockerfile` for the static build/runtime.
 4. Set `VITE_API_BASE_URL` to the deployed API base URL without a trailing `/api`.
 5. Redeploy whenever the API URL changes because Vite injects this value at build time.
+
+Dashboard service files:
+
+```text
+dashboard/railway.json
+dashboard/Dockerfile
+dashboard/nginx.conf.template
+```
 
 ## Scheduled Worker Service
 

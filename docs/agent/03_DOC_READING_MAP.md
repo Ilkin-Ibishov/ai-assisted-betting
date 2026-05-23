@@ -489,6 +489,21 @@ Only after the offline sample pipeline works:
 - `docs/agent/04_OPEN_QUESTIONS.md`
 - `docs/deployment/railway-readiness.md`
 
+## Task 64 - Railway Dashboard Service
+
+- `docs/tasks/task-64-railway-dashboard-service.md`
+- `docs/deployment/railway-readiness.md`
+- `docs/deployment/production-readiness-review.md`
+- `docs/specs/configuration.md`
+- `.env.example`
+- `dashboard/railway.json`
+- `dashboard/Dockerfile`
+- `dashboard/nginx.conf.template`
+- `app/api.py`
+- `app/config.py`
+- `tests/unit/test_config.py`
+- `tests/unit/test_dashboard_api.py`
+
 ## Task 22 - Dashboard Data API
 
 - `docs/tasks/task-22-dashboard-data-api.md`

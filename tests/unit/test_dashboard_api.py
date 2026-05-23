@@ -129,6 +129,24 @@ def test_comparison_report_list_returns_dashboard_report_summaries(tmp_path: Pat
     assert payload[0]["modified_at"].endswith("+00:00")
 
 
+def test_api_cors_allows_railway_dashboard_origin(tmp_path: Path) -> None:
+    client = TestClient(create_api(reports_dir=tmp_path))
+
+    response = client.options(
+        "/api/health",
+        headers={
+            "Origin": "https://paper-dashboard-production.up.railway.app",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.headers["access-control-allow-origin"]
+        == "https://paper-dashboard-production.up.railway.app"
+    )
+
+
 def test_health_endpoint_returns_service_status(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))

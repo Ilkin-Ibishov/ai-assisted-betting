@@ -22,15 +22,13 @@ def create_api(
     database_url: str | None = None,
 ) -> FastAPI:
     api = FastAPI(title="Paper Odds Lab API")
-    live_database_url = database_url or load_settings().database_url
+    settings = load_settings()
+    live_database_url = database_url or settings.database_url
     live_status = LiveStatusService(live_database_url)
     api.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-        ],
-        allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):\d+$",
+        allow_origins=list(settings.cors_allowed_origins),
+        allow_origin_regex=settings.cors_allowed_origin_regex,
         allow_credentials=True,
         allow_methods=["GET"],
         allow_headers=["*"],

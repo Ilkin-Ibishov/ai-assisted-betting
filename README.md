@@ -99,7 +99,17 @@ docs/deployment/railway-readiness.md
 
 The API service includes repo-level Railway config in `railway.json` and `Dockerfile` for dependency installation, API start, healthcheck, and restart policy.
 
-The system remains paper-only and advisory. Deployed Railway smoke evidence is still required before calling it fully production-proven.
+The dashboard service is packaged from `dashboard/` with:
+
+```text
+dashboard/railway.json
+dashboard/Dockerfile
+dashboard/nginx.conf.template
+```
+
+Set the dashboard service variable `VITE_API_BASE_URL` to the deployed API URL.
+
+The system remains paper-only and advisory. Dedicated Railway dashboard and scheduled worker services are still required before calling it fully production-proven.
 
 ## Live Paper Phase
 

@@ -34,6 +34,9 @@ LOG_LEVEL=INFO
 AI_ANALYSIS_MODE=deterministic
 AI_ANALYSIS_MODEL_NAME=deterministic_ai_fallback
 
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+CORS_ALLOWED_ORIGIN_REGEX=^(http://(localhost|127\.0\.0\.1):\d+|https://[a-z0-9-]+\.up\.railway\.app)$
+
 LIVE_COLLECTION_ENABLED=false
 VITE_API_BASE_URL=
 ```
@@ -58,6 +61,7 @@ FOOTBALL_API_KEY=
 - Keep `AI_ANALYSIS_MODE=deterministic` unless an LLM provider is explicitly implemented and verified.
 - Do not require AI provider credentials for the core paper-betting loop.
 - `run-scheduled-paper-worker` must use `LIVE_COLLECTION_ENABLED=true`; keep it `false` for local/API services that should not collect live data.
+- Keep API CORS GET-only. Add deployed dashboard origins through `CORS_ALLOWED_ORIGINS` or the Railway app regex; do not open API CORS to arbitrary origins.
 
 ## Environments
 
@@ -79,6 +83,7 @@ API:
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 LIVE_COLLECTION_ENABLED=false
 AI_ANALYSIS_MODE=deterministic
+CORS_ALLOWED_ORIGIN_REGEX=^(http://(localhost|127\.0\.0\.1):\d+|https://[a-z0-9-]+\.up\.railway\.app)$
 ```
 
 Scheduled worker:

@@ -23,6 +23,13 @@ class Settings:
     live_collection_enabled: bool
     ai_analysis_mode: str = "deterministic"
     ai_analysis_model_name: str = "deterministic_ai_fallback"
+    cors_allowed_origins: tuple[str, ...] = (
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    )
+    cors_allowed_origin_regex: str = (
+        r"^(http://(localhost|127\.0\.0\.1):\d+|https://[a-z0-9-]+\.up\.railway\.app)$"
+    )
 
 
 def _get_float(name: str, default: str) -> float:
@@ -35,6 +42,10 @@ def _get_float(name: str, default: str) -> float:
 
 def _get_bool(name: str, default: str) -> bool:
     return getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _get_csv(name: str, default: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in getenv(name, default).split(",") if part.strip())
 
 
 def load_settings() -> Settings:
@@ -57,4 +68,12 @@ def load_settings() -> Settings:
         live_collection_enabled=_get_bool("LIVE_COLLECTION_ENABLED", "false"),
         ai_analysis_mode=getenv("AI_ANALYSIS_MODE", "deterministic"),
         ai_analysis_model_name=getenv("AI_ANALYSIS_MODEL_NAME", "deterministic_ai_fallback"),
+        cors_allowed_origins=_get_csv(
+            "CORS_ALLOWED_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173",
+        ),
+        cors_allowed_origin_regex=getenv(
+            "CORS_ALLOWED_ORIGIN_REGEX",
+            r"^(http://(localhost|127\.0\.0\.1):\d+|https://[a-z0-9-]+\.up\.railway\.app)$",
+        ),
     )
