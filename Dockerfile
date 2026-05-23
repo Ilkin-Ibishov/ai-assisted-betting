@@ -11,9 +11,6 @@ COPY app ./app
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir .
 
-COPY reports ./reports
-COPY data ./data
-
 RUN mkdir -p data reports
 
 CMD ["sh", "-c", "python -m app.cli init-db && exec python -m uvicorn app.api:api --host 0.0.0.0 --port ${PORT:-8000}"]

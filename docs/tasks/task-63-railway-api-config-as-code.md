@@ -12,6 +12,7 @@ Fix the first Railway API deployment failure by making the service start command
 - Updated Railway readiness docs with the linked project/environment/service and the current deploy triage.
 - Switched the API service to an explicit Dockerfile after Railway's Railpack runtime crashed with `ModuleNotFoundError: No module named 'typer'`.
 - Kept `/api/health`, restart policy, and timeout in `railway.json`, while the Dockerfile owns dependency installation and process startup.
+- Updated the Dockerfile to create runtime `data` and `reports` directories instead of copying local/generated directories that may not exist in the Git build context.
 
 ## Verification
 
