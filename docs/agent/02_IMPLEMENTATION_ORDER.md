@@ -80,6 +80,7 @@ Build in this order:
 - Task 61 - Operational Guardrails And Alerting
 - Task 62 - Final Production Readiness Review
 - Task 52 - Provider Health AI Analysis
+- Task 63 - Railway API Config As Code
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -87,7 +88,7 @@ Build in this order:
 The next implementation task is:
 
 ```text
-No numbered implementation task remains in the current Tasks 53-62 roadmap.
+Confirm the GitHub-triggered Railway API deployment is healthy, connect Railway Postgres if missing, then run deployed production smoke.
 ```
 
 Task 62 recorded conditional production readiness for monitored paper-only Railway staging. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML until deployed Railway smoke evidence exists and the user explicitly chooses the next advanced phase.
@@ -192,6 +193,7 @@ Build Railway readiness in this order:
 4. Task 60 - Railway Worker Deployment And Monitoring, completed
 5. Task 61 - Operational Guardrails And Alerting, completed
 6. Task 62 - Final Production Readiness Review, completed
+7. Task 63 - Railway API Config As Code, completed
 
 ## Recommendation Phase Order
 

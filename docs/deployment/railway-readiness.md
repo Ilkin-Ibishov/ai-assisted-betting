@@ -25,6 +25,14 @@ deployed smoke requires real Railway service URLs and credentials
 
 ## API Service
 
+The API service has repo-level Railway config in:
+
+```text
+railway.json
+```
+
+Railway reads this config during deployment and the file overrides matching dashboard service settings for that deployment. Keep the API Railway service root at the repo root when using this file.
+
 Build command:
 
 ```powershell
@@ -49,7 +57,7 @@ Deploy notes:
 2. Add a Railway Postgres database.
 3. Add an API service from the GitHub repo.
 4. Set the API root directory to the repo root.
-5. Configure the build and start commands above.
+5. Confirm the API service uses `railway.json`, or configure the build and start commands above directly in Railway settings.
 6. Add the required variables below.
 7. Deploy and confirm `/api/health` returns `{"status":"ok","database":"ok"}`.
 
@@ -336,3 +344,27 @@ conditionally ready for continuous paper-only Railway staging
 ```
 
 Full production proof is pending until deployed Railway smoke passes against real service URLs.
+
+## Current Railway Link
+
+The local Railway CLI has been linked to:
+
+```text
+project: dynamic-unity
+environment: production
+service: ai-assisted-betting
+```
+
+Current deploy triage:
+
+```text
+Railpack detected Python but failed because no start command was configured.
+railway.json now supplies the API build command, start command, healthcheck, and restart policy.
+```
+
+Next operational checks:
+
+1. Push `railway.json` to GitHub and let Railway redeploy the API service.
+2. Confirm `DATABASE_URL` is connected to Railway Postgres before treating staging as durable.
+3. Generate or attach a public Railway domain for the API service.
+4. Run `python -m app.cli production-smoke --api-base-url https://<api-service>.up.railway.app`.

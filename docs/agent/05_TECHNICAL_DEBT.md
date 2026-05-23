@@ -160,6 +160,8 @@ Task 61 added operational guardrails, `operational-status`, `/api/operations/gua
 
 Task 62 added the final production readiness review. It did not introduce new code debt. The system is conditionally ready for monitored paper-only Railway staging, with deployed Railway smoke evidence still pending.
 
+Task 63 added Railway API config-as-code through `railway.json`. It did not introduce new code debt. Railway MCP tools are not exposed in the current Codex session, so Railway operations are currently handled through the linked Railway CLI. Deployed smoke evidence still requires a successful Railway deployment, a reachable API URL, and durable `DATABASE_URL` configuration.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.
