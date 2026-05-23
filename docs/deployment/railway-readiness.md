@@ -371,11 +371,28 @@ Railpack detected Python but failed because no start command was configured.
 railway.json now supplies the API build command, start command, healthcheck, and restart policy.
 The first Railpack config-as-code attempt built successfully but the runtime image crashed with ModuleNotFoundError: No module named 'typer'.
 The API service now uses an explicit Dockerfile so dependencies are installed in the final runtime image.
+The Dockerfile-backed API deployment for commit ad00259 succeeded and Railway healthcheck returned 200.
 ```
 
 Next operational checks:
 
-1. Push `railway.json` to GitHub and let Railway redeploy the API service.
-2. Confirm `DATABASE_URL` is connected to Railway Postgres before treating staging as durable.
-3. Generate or attach a public Railway domain for the API service.
-4. Run `python -m app.cli production-smoke --api-base-url https://<api-service>.up.railway.app`.
+1. Refresh Railway CLI authentication if database provisioning is needed from Codex; `railway add --database postgres` currently returns `Unauthorized. Please run railway login again.`
+2. Add or connect Railway Postgres and set `DATABASE_URL` for the API service.
+3. Redeploy the API service after `DATABASE_URL` is set.
+4. Add the scheduled worker service and run it at least once.
+5. Rerun `python -m app.cli production-smoke --api-base-url https://ai-assisted-betting-production.up.railway.app`.
+
+Current API URL:
+
+```text
+https://ai-assisted-betting-production.up.railway.app
+```
+
+Current deployed smoke result:
+
+```text
+/api/health: 200 {"status":"ok","database":"ok"}
+/api/live/status: 200, no live runs yet
+/api/live/worker-status: 200 {"status":"never_run","healthy":false}
+production-smoke: fails at worker_status until the worker has run
+```
