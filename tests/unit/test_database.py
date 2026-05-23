@@ -3,7 +3,7 @@ import sqlite3
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.db.engine import create_engine_from_url, session_scope
+from app.db.engine import create_engine_from_url, normalize_database_url, session_scope
 from app.db.migrations import (
     _create_schema_migrations,
     _record_noop_migrations_for_model_managed_database,
@@ -66,6 +66,22 @@ def test_postgres_model_managed_migrations_are_recorded_as_noops() -> None:
     assert len(connection.statements) == 6
     assert all("ON CONFLICT" in statement for statement, _params in connection.statements)
     assert connection.statements[0][1] == {"migration_name": "001_add_feature_elo_columns"}
+
+
+def test_plain_postgresql_url_uses_psycopg_driver() -> None:
+    normalized_url = normalize_database_url(
+        "postgresql://postgres:secret@postgres.railway.internal:5432/railway"
+    )
+
+    assert normalized_url == (
+        "postgresql+psycopg://postgres:secret@postgres.railway.internal:5432/railway"
+    )
+
+
+def test_explicit_postgresql_driver_url_is_preserved() -> None:
+    database_url = "postgresql+psycopg://postgres:secret@postgres.railway.internal:5432/railway"
+
+    assert normalize_database_url(database_url) == database_url
 
 
 def test_init_db_upgrades_old_database_with_missing_elo_feature_columns(tmp_path) -> None:

@@ -372,15 +372,17 @@ railway.json now supplies the API build command, start command, healthcheck, and
 The first Railpack config-as-code attempt built successfully but the runtime image crashed with ModuleNotFoundError: No module named 'typer'.
 The API service now uses an explicit Dockerfile so dependencies are installed in the final runtime image.
 The Dockerfile-backed API deployment for commit ad00259 succeeded and Railway healthcheck returned 200.
+Railway Postgres was added, and the API service `DATABASE_URL` now references the Railway Postgres service.
+The first Postgres-backed redeploy failed because Railway supplies `postgresql://...`, which SQLAlchemy maps to the missing `psycopg2` driver by default.
+The database engine now normalizes plain `postgresql://...` URLs to `postgresql+psycopg://...` so the installed `psycopg` driver is used.
 ```
 
 Next operational checks:
 
-1. Refresh Railway CLI authentication if database provisioning is needed from Codex; `railway add --database postgres` currently returns `Unauthorized. Please run railway login again.`
-2. Add or connect Railway Postgres and set `DATABASE_URL` for the API service.
-3. Redeploy the API service after `DATABASE_URL` is set.
-4. Add the scheduled worker service and run it at least once.
-5. Rerun `python -m app.cli production-smoke --api-base-url https://ai-assisted-betting-production.up.railway.app`.
+1. Push the Postgres URL normalization fix and wait for Railway redeploy.
+2. Confirm `/api/health` succeeds while using Railway Postgres.
+3. Add the scheduled worker service and run it at least once.
+4. Rerun `python -m app.cli production-smoke --api-base-url https://ai-assisted-betting-production.up.railway.app`.
 
 Current API URL:
 

@@ -7,6 +7,13 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 
+def normalize_database_url(database_url: str) -> str:
+    url = make_url(database_url)
+    if url.drivername == "postgresql":
+        return url.set(drivername="postgresql+psycopg").render_as_string(hide_password=False)
+    return database_url
+
+
 def ensure_sqlite_parent_directory(database_url: str) -> None:
     url = make_url(database_url)
     if url.drivername != "sqlite" or not url.database or url.database == ":memory:":
@@ -17,10 +24,11 @@ def ensure_sqlite_parent_directory(database_url: str) -> None:
 
 
 def create_engine_from_url(database_url: str) -> Engine:
-    ensure_sqlite_parent_directory(database_url)
-    engine = create_engine(database_url, future=True)
+    normalized_database_url = normalize_database_url(database_url)
+    ensure_sqlite_parent_directory(normalized_database_url)
+    engine = create_engine(normalized_database_url, future=True)
 
-    if make_url(database_url).drivername == "sqlite":
+    if make_url(normalized_database_url).drivername == "sqlite":
 
         @event.listens_for(engine, "connect")
         def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
@@ -47,4 +55,3 @@ def session_scope(engine: Engine) -> Iterator[Session]:
         raise
     finally:
         session.close()
-
