@@ -20,7 +20,7 @@ local production-smoke command implemented
 Railway operator steps documented
 worker freshness endpoint implemented
 recommendation endpoint smoke implemented
-deployed smoke requires real Railway service URLs and credentials
+deployed smoke passed against the Railway API after a one-off paper worker run
 ```
 
 ## API Service
@@ -352,7 +352,7 @@ Current decision:
 conditionally ready for continuous paper-only Railway staging
 ```
 
-Full production proof is pending until deployed Railway smoke passes against real service URLs.
+Railway API and Postgres proof is complete for the current single-service deployment. Continuous worker proof is pending until a dedicated scheduled worker service is created.
 
 ## Current Railway Link
 
@@ -378,12 +378,16 @@ The database engine now normalizes plain `postgresql://...` URLs to `postgresql+
 CLI database URL output is redacted so Railway logs do not print database credentials.
 The Postgres-backed API deployment for commit e129e8a succeeded; `/api/health` returns 200 with `{"status":"ok","database":"ok"}`.
 Railway agent tooling was installed through `railway setup agent -y`; Codex may need a restart before the Railway MCP server appears in the active tool list.
+After Codex restart, the Railway skill remains installed but no dedicated Railway MCP namespace is exposed in the active tool list; Railway operations continue through the linked Railway CLI.
+A one-off scheduled paper worker was run locally against Railway Postgres using the Postgres public database URL because `railway run` injects the private `postgres.railway.internal` hostname, which does not resolve from the local machine.
+The one-off worker completed with 1 collected match, 3 odds snapshots, 3 features, 3 predictions, and 1 paper bet.
+Production smoke passed against `https://ai-assisted-betting-production.up.railway.app`.
 ```
 
 Next operational checks:
 
-1. Add the scheduled worker service and run it at least once.
-2. Rerun `python -m app.cli production-smoke --api-base-url https://ai-assisted-betting-production.up.railway.app`.
+1. Add a dedicated scheduled worker service with a worker-specific start command or role-aware entrypoint.
+2. Configure Railway cron for the worker service and keep `LIVE_COLLECTION_ENABLED=true` only there.
 3. Add the dashboard service or configure the deployed dashboard URL when that service exists.
 
 Current API URL:
@@ -396,8 +400,8 @@ Current deployed smoke result:
 
 ```text
 /api/health: 200 {"status":"ok","database":"ok"}
-/api/live/status: 200, no live runs yet
-/api/live/worker-status: 200 {"status":"never_run","healthy":false}
-production-smoke: fails at worker_status until the worker has run
+/api/live/status: 200, latest worker run completed, open_paper_bets=1
+/api/live/worker-status: 200 {"status":"fresh","healthy":true}
+production-smoke: passed against https://ai-assisted-betting-production.up.railway.app
 latest API logs redact the database password
 ```

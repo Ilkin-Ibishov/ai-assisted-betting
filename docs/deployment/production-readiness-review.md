@@ -8,7 +8,7 @@ Scope: paper-only AI-assisted betting intelligence system for local and Railway 
 
 Status: conditionally ready for continuous paper-only staging.
 
-The project is ready to deploy to Railway staging and run monitored paper-only cycles after Railway services, environment variables, and snapshot/cadence setup are configured. It is not yet fully production-proven because deployed Railway smoke evidence is still pending.
+The project is deployed to Railway with a healthy API and Railway Postgres. A one-off paper worker cycle has completed against Railway Postgres and deployed `production-smoke` passes against the public API. It is not yet fully continuous-staging complete because the worker is not yet a dedicated Railway cron service and the dashboard is not yet deployed as a Railway service.
 
 ## Safety Boundary
 
@@ -68,7 +68,7 @@ curl https://<api-service>.up.railway.app/api/live/recommendations?limit=5
 curl https://<api-service>.up.railway.app/api/reports/comparisons
 ```
 
-Deployment cannot be called fully proven until these checks pass against real Railway URLs.
+API deployment proof is complete for the current Railway URL. Full continuous-staging proof still requires the scheduled worker service and dashboard service checks.
 
 ## Readiness Checklist
 
@@ -83,7 +83,8 @@ Deployment cannot be called fully proven until these checks pass against real Ra
 | AI assistance | Pass for deterministic advisory mode | AI analysis records, prompt versions, eval gates, recommendation review, and backtest summaries exist. Optional LLM provider is not implemented. |
 | Monitoring and guardrails | Pass | Worker freshness, repeated failures, provider quality, AI eval failure, and empty recommendation cycle guardrails are visible. |
 | Railway deployment docs | Pass | Service topology, env vars, commands, smoke, rollback, and triage are documented. |
-| Railway deployed proof | Pending | Requires Railway credentials, deployed service URLs, and successful production smoke. |
+| Railway deployed API proof | Pass | API health, live status, worker freshness, recommendations, and comparison catalog passed deployed smoke against the Railway API URL. |
+| Railway scheduled worker proof | Pending | Current worker evidence is a one-off run against Railway Postgres, not a cron-managed Railway worker service. |
 
 ## Release Criteria
 
@@ -94,7 +95,7 @@ Before calling the system fully ready for continuous Railway staging:
 3. API and dashboard have `LIVE_COLLECTION_ENABLED=false`.
 4. Worker has `LIVE_COLLECTION_ENABLED=true`.
 5. Worker cadence is configured through Railway cron or equivalent scheduler.
-6. `production-smoke` passes against deployed URLs.
+6. `production-smoke` passes against deployed API and dashboard URLs.
 7. `/api/operations/guardrails` returns `ok` or a known accepted warning.
 8. At least one monitored worker cycle has completed without provider validation failure.
 9. Any fresh Misli data source remains public/user-provided and paper-only.
@@ -107,7 +108,8 @@ Before calling the system fully ready for continuous Railway staging:
 - Combination correlation and exposure controls remain heuristic.
 - Odds movement is computed directly from snapshots instead of a dedicated summary table.
 - External alert destination is not selected yet.
-- Deployed Railway smoke evidence is pending.
+- Deployed Railway API smoke evidence is captured.
+- Dedicated Railway worker and dashboard services are pending.
 
 ## Final Position
 
