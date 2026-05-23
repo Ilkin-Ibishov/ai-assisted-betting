@@ -109,7 +109,13 @@ dashboard/nginx.conf.template
 
 Set the dashboard service variable `VITE_API_BASE_URL` to the deployed API URL.
 
-The system remains paper-only and advisory. Dedicated Railway dashboard and scheduled worker services are still required before calling it fully production-proven.
+Current deployed dashboard:
+
+```text
+https://dashboard-production-0a69.up.railway.app
+```
+
+The system remains paper-only and advisory. A dedicated Railway scheduled worker service is still required before calling it fully production-proven.
 
 ## Live Paper Phase
 

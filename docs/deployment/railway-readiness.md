@@ -132,6 +132,19 @@ dashboard/Dockerfile
 dashboard/nginx.conf.template
 ```
 
+Current dashboard URL:
+
+```text
+https://dashboard-production-0a69.up.railway.app
+```
+
+Current dashboard deployment notes:
+
+```text
+The dashboard service was created as an empty Railway service and deployed with `railway up . --path-as-root --service dashboard` from the `dashboard/` directory.
+The GitHub repo-link creation path returned an OAuth authorization error from the Railway CLI, so dashboard deployments currently use explicit CLI uploads.
+```
+
 ## Scheduled Worker Service
 
 Task 50 implemented the one-shot worker command. Task 60 adds monitoring and production smoke checks for that worker.
@@ -398,7 +411,7 @@ Next operational checks:
 
 1. Add a dedicated scheduled worker service with a worker-specific start command or role-aware entrypoint.
 2. Configure Railway cron for the worker service and keep `LIVE_COLLECTION_ENABLED=true` only there.
-3. Add the dashboard service or configure the deployed dashboard URL when that service exists.
+3. Add the dedicated scheduled worker service and Railway cron.
 
 Current API URL:
 
@@ -413,5 +426,6 @@ Current deployed smoke result:
 /api/live/status: 200, latest worker run completed, open_paper_bets=1
 /api/live/worker-status: 200 {"status":"fresh","healthy":true}
 production-smoke: passed against https://ai-assisted-betting-production.up.railway.app
+production-smoke with dashboard URL: passed against https://dashboard-production-0a69.up.railway.app
 latest API logs redact the database password
 ```

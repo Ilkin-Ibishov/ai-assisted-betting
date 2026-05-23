@@ -8,7 +8,7 @@ Scope: paper-only AI-assisted betting intelligence system for local and Railway 
 
 Status: conditionally ready for continuous paper-only staging.
 
-The project is deployed to Railway with a healthy API and Railway Postgres. A one-off paper worker cycle has completed against Railway Postgres and deployed `production-smoke` passes against the public API. It is not yet fully continuous-staging complete because the worker is not yet a dedicated Railway cron service and the dashboard is not yet deployed as a Railway service.
+The project is deployed to Railway with a healthy API, Railway Postgres, and a public dashboard. A one-off paper worker cycle has completed against Railway Postgres and deployed `production-smoke` passes against the public API plus dashboard URL. It is not yet fully continuous-staging complete because the worker is not yet a dedicated Railway cron service.
 
 ## Safety Boundary
 
@@ -68,7 +68,7 @@ curl https://<api-service>.up.railway.app/api/live/recommendations?limit=5
 curl https://<api-service>.up.railway.app/api/reports/comparisons
 ```
 
-API deployment proof is complete for the current Railway URL. Full continuous-staging proof still requires the scheduled worker service and dashboard service checks.
+API and dashboard deployment proof is complete for the current Railway URLs. Full continuous-staging proof still requires the scheduled worker service.
 
 ## Readiness Checklist
 
@@ -84,6 +84,7 @@ API deployment proof is complete for the current Railway URL. Full continuous-st
 | Monitoring and guardrails | Pass | Worker freshness, repeated failures, provider quality, AI eval failure, and empty recommendation cycle guardrails are visible. |
 | Railway deployment docs | Pass | Service topology, env vars, commands, smoke, rollback, and triage are documented. |
 | Railway deployed API proof | Pass | API health, live status, worker freshness, recommendations, and comparison catalog passed deployed smoke against the Railway API URL. |
+| Railway deployed dashboard proof | Pass | Dashboard HTML and rendered React mount verified at the Railway dashboard URL. |
 | Railway scheduled worker proof | Pending | Current worker evidence is a one-off run against Railway Postgres, not a cron-managed Railway worker service. |
 
 ## Release Criteria
@@ -108,8 +109,8 @@ Before calling the system fully ready for continuous Railway staging:
 - Combination correlation and exposure controls remain heuristic.
 - Odds movement is computed directly from snapshots instead of a dedicated summary table.
 - External alert destination is not selected yet.
-- Deployed Railway API smoke evidence is captured.
-- Dedicated Railway worker and dashboard services are pending.
+- Deployed Railway API and dashboard smoke evidence is captured.
+- Dedicated Railway worker service is pending.
 
 ## Final Position
 

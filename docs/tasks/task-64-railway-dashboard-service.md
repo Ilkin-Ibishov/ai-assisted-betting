@@ -1,6 +1,6 @@
 # Task 64 - Railway Dashboard Service
 
-Status: in progress
+Status: completed
 
 ## Goal
 
@@ -14,6 +14,10 @@ Deploy the React analytical dashboard as a public Railway service wired to the l
 - Added an Nginx template that listens on Railway's injected `PORT`.
 - Made API CORS configurable and allowed Railway app dashboard origins for GET-only API access.
 - Documented dashboard service configuration and CORS variables.
+- Created a Railway `dashboard` service.
+- Set `VITE_API_BASE_URL=https://ai-assisted-betting-production.up.railway.app` on the dashboard service.
+- Deployed the dashboard folder to Railway with `railway up . --path-as-root --service dashboard`.
+- Generated the public dashboard domain `https://dashboard-production-0a69.up.railway.app`.
 
 ## Verification
 
@@ -35,16 +39,25 @@ After deployment:
 python -m app.cli production-smoke --api-base-url https://ai-assisted-betting-production.up.railway.app --dashboard-url https://<dashboard-service>.up.railway.app
 ```
 
+Completed deployment verification:
+
+```text
+dashboard URL: https://dashboard-production-0a69.up.railway.app
+dashboard deployment: SUCCESS
+production-smoke with dashboard_url: passed
+rendered browser check: React root mounted, API requests reached the live Railway API
+```
+
 ## What's Next
 
-- Create or configure the Railway dashboard service with root directory `dashboard`.
-- Set `VITE_API_BASE_URL=https://ai-assisted-betting-production.up.railway.app`.
-- Deploy and verify the public dashboard URL in a browser.
+- Add the dedicated Railway scheduled worker service with cron.
+- Consider running recommendation review analysis after fresh recommendation output exists so the dashboard AI review panels have live records instead of nullable 404 responses.
 
 ## Blockers
 
-- Railway MCP tools are still not exposed in this Codex session, so service setup uses the Railway CLI.
+- No dashboard deployment blocker remains.
+- Railway MCP tools are still not exposed in this Codex session, so service setup used the Railway CLI.
 
 ## Technical Debt
 
-No new code debt is intended. Continuous readiness still depends on a separate scheduled worker service after the dashboard is online.
+No new code debt was introduced. Continuous readiness still depends on a separate scheduled worker service after the dashboard is online.
