@@ -9,6 +9,7 @@ Deploy the React analytical dashboard as a public Railway service wired to the l
 ## What Changed
 
 - Added a dashboard-specific Dockerfile that builds the Vite app and serves it with Nginx.
+- The dashboard Dockerfile uses `npm install` during Railway image build because npm 11 rejected the existing cross-platform optional-dependency lock entries under `npm ci` in the Linux builder.
 - Added `dashboard/railway.json` so the dashboard service can use its own Dockerfile and `/` healthcheck.
 - Added an Nginx template that listens on Railway's injected `PORT`.
 - Made API CORS configurable and allowed Railway app dashboard origins for GET-only API access.
