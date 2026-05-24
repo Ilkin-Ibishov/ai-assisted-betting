@@ -417,13 +417,14 @@ After Codex restart, the Railway skill remains installed but no dedicated Railwa
 A one-off scheduled paper worker was run locally against Railway Postgres using the Postgres public database URL because `railway run` injects the private `postgres.railway.internal` hostname, which does not resolve from the local machine.
 The one-off worker completed with 1 collected match, 3 odds snapshots, 3 features, 3 predictions, and 1 paper bet.
 Production smoke passed against `https://ai-assisted-betting-production.up.railway.app`.
+The dedicated Railway `worker` service was created, deployed with `Dockerfile.worker`, and configured with cron schedule `*/30 * * * *`.
+The cron-triggered worker run at `2026-05-24T14:01:20Z` completed and refreshed `/api/live/worker-status`.
 ```
 
 Next operational checks:
 
-1. Add a dedicated scheduled worker service with a worker-specific start command or role-aware entrypoint.
-2. Configure Railway cron for the worker service and keep `LIVE_COLLECTION_ENABLED=true` only there.
-3. Add the dedicated scheduled worker service and Railway cron.
+1. Replace the deterministic Task 45 fixture with a safe fresh public/user-provided snapshot generation workflow.
+2. Add scheduled recommendation/combinations/AI review generation if every worker run should refresh dashboard recommendations.
 
 Current API URL:
 
@@ -439,5 +440,6 @@ Current deployed smoke result:
 /api/live/worker-status: 200 {"status":"fresh","healthy":true}
 production-smoke: passed against https://ai-assisted-betting-production.up.railway.app
 production-smoke with dashboard URL: passed against https://dashboard-production-0a69.up.railway.app
+Railway cron worker: completed run started at 2026-05-24T14:01:20Z
 latest API logs redact the database password
 ```

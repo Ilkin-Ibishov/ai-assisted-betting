@@ -8,7 +8,7 @@ Scope: paper-only AI-assisted betting intelligence system for local and Railway 
 
 Status: conditionally ready for continuous paper-only staging.
 
-The project is deployed to Railway with a healthy API, Railway Postgres, and a public dashboard. A one-off paper worker cycle has completed against Railway Postgres and deployed `production-smoke` passes against the public API plus dashboard URL. It is not yet fully continuous-staging complete because the worker is not yet a dedicated Railway cron service.
+The project is deployed to Railway with a healthy API, Railway Postgres, public dashboard, and a dedicated cron-managed worker service. A Railway cron-triggered paper worker cycle completed against Railway Postgres and deployed `production-smoke` passes against the public API plus dashboard URL. It is not yet fully live-provider complete because the worker currently uses the deterministic Task 45 fixture instead of scheduled fresh public Misli snapshots.
 
 ## Safety Boundary
 
@@ -68,7 +68,7 @@ curl https://<api-service>.up.railway.app/api/live/recommendations?limit=5
 curl https://<api-service>.up.railway.app/api/reports/comparisons
 ```
 
-API and dashboard deployment proof is complete for the current Railway URLs. Full continuous-staging proof still requires the scheduled worker service.
+API, dashboard, and scheduled-worker deployment proof is complete for the current Railway services. Full live-provider proof still requires fresh public/user-provided snapshot generation.
 
 ## Readiness Checklist
 
@@ -85,7 +85,7 @@ API and dashboard deployment proof is complete for the current Railway URLs. Ful
 | Railway deployment docs | Pass | Service topology, env vars, commands, smoke, rollback, and triage are documented. |
 | Railway deployed API proof | Pass | API health, live status, worker freshness, recommendations, and comparison catalog passed deployed smoke against the Railway API URL. |
 | Railway deployed dashboard proof | Pass | Dashboard HTML and rendered React mount verified at the Railway dashboard URL. |
-| Railway scheduled worker proof | Pending | Current worker evidence is a one-off run against Railway Postgres, not a cron-managed Railway worker service. |
+| Railway scheduled worker proof | Pass | Dedicated Railway worker service ran successfully from cron and refreshed worker status. |
 
 ## Release Criteria
 
@@ -104,14 +104,14 @@ Before calling the system fully ready for continuous Railway staging:
 ## Residual Risks
 
 - Misli public snapshot parsing depends on rendered DOM structure.
-- Railway worker cron proof may initially use the deterministic Task 45 fixture until fresh public snapshot generation is scheduled safely.
+- Railway worker cron currently uses the deterministic Task 45 fixture until fresh public snapshot generation is scheduled safely.
 - Bare time-only Misli kickoff rows remain fail-closed until a safe date source is proven.
 - Recommendation expected value uses simplified unit-stake arithmetic.
 - Combination correlation and exposure controls remain heuristic.
 - Odds movement is computed directly from snapshots instead of a dedicated summary table.
 - External alert destination is not selected yet.
 - Deployed Railway API and dashboard smoke evidence is captured.
-- Dedicated Railway worker service and cron proof are pending.
+- Fresh public Misli snapshot generation is pending for live-provider coverage.
 
 ## Final Position
 

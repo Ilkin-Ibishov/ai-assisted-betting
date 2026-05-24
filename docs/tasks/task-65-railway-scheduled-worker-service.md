@@ -1,6 +1,6 @@
 # Task 65 - Railway Scheduled Worker Service
 
-Status: in progress
+Status: completed
 
 ## Goal
 
@@ -16,6 +16,11 @@ Deploy a dedicated Railway worker service that runs `run-scheduled-paper-worker`
   - `WORKER_LEAGUE`
   - `WORKER_SEASON`
 - Kept `LIVE_COLLECTION_ENABLED=true` as a required worker-service variable only.
+- Created the Railway `worker` service.
+- Set worker-only Railway variables, including shared `DATABASE_URL`, `LIVE_COLLECTION_ENABLED=true`, `MIN_EDGE=0.01`, and worker snapshot/model defaults.
+- Deployed a worker-specific upload context using `Dockerfile.worker` as `Dockerfile`.
+- Configured Railway cron through worker config-as-code with `deploy.cronSchedule="*/30 * * * *"`.
+- Confirmed a cron-triggered worker run started at `2026-05-24T14:01:20Z` and refreshed `/api/live/worker-status`.
 
 ## Verification
 
@@ -38,18 +43,27 @@ python -m app.cli production-smoke --api-base-url https://ai-assisted-betting-pr
 curl https://ai-assisted-betting-production.up.railway.app/api/live/worker-status
 ```
 
+Completed deployment verification:
+
+```text
+worker service: worker
+worker deployment: SUCCESS
+cron schedule: */30 * * * *
+cron-triggered run: completed at 2026-05-24T14:01:20Z
+worker status: fresh
+production-smoke with API and dashboard: passed
+```
+
 ## What's Next
 
-- Create or configure the Railway `worker` service.
-- Set `DATABASE_URL=${{Postgres.DATABASE_URL}}` and `LIVE_COLLECTION_ENABLED=true`.
-- Deploy with `Dockerfile.worker`.
-- Configure Railway cron.
-- Confirm a cron-managed worker run updates `/api/live/worker-status`.
+- Replace the deterministic fixture snapshot with a safe fresh public/user-provided snapshot generation workflow.
+- Add recommendation/combinations/AI review generation to the scheduled pipeline if the dashboard should show fresh recommendation records after every worker run.
 
 ## Blockers
 
-- The first scheduled worker proof uses the deterministic fixture snapshot. Real repeated Misli collection still needs a safe public snapshot generation workflow before it replaces the fixture.
+- No scheduled worker deployment blocker remains.
+- Real repeated Misli collection still needs a safe public snapshot generation workflow before it replaces the deterministic fixture.
 
 ## Technical Debt
 
-No code debt is intended. Operational debt remains until the worker consumes fresh public/user-provided snapshots instead of the deterministic fixture.
+No code debt was introduced. Operational debt remains until the worker consumes fresh public/user-provided snapshots instead of the deterministic fixture.
