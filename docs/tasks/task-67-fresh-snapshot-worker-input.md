@@ -50,6 +50,14 @@ Dashboard build: passed
 Dashboard smoke: passed
 ```
 
+Railway deployment verification:
+
+```text
+API GitHub deployment for commit b1faa48: SUCCESS
+Worker upload deployment: 95a519c2-3c27-4d33-b6f5-755b866bd77a SUCCESS
+Production smoke with API and dashboard: passed
+```
+
 ## Railway Usage
 
 To use a fresh externally hosted snapshot JSON in Railway, set:

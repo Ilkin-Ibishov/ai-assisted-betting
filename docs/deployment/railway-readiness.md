@@ -427,6 +427,7 @@ The one-off worker completed with 1 collected match, 3 odds snapshots, 3 feature
 Production smoke passed against `https://ai-assisted-betting-production.up.railway.app`.
 The dedicated Railway `worker` service was created, deployed with `Dockerfile.worker`, and configured with cron schedule `*/30 * * * *`.
 The cron-triggered worker run at `2026-05-24T14:01:20Z` completed and refreshed `/api/live/worker-status`.
+Task 67 commit `b1faa48` deployed successfully to the API service through GitHub. The updated worker image was deployed through Railway upload deployment `95a519c2-3c27-4d33-b6f5-755b866bd77a` after recreating the worker upload `railway.json` without a UTF-8 BOM. Production smoke passed after the deploy.
 ```
 
 Next operational checks:
@@ -449,5 +450,6 @@ Current deployed smoke result:
 production-smoke: passed against https://ai-assisted-betting-production.up.railway.app
 production-smoke with dashboard URL: passed against https://dashboard-production-0a69.up.railway.app
 Railway cron worker: completed run started at 2026-05-24T14:01:20Z
+Task 67 worker image deploy: SUCCESS
 latest API logs redact the database password
 ```
