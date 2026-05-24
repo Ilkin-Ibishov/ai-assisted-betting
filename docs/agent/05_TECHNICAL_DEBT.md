@@ -168,6 +168,8 @@ Task 65 added `Dockerfile.worker` and a Railway scheduled worker deployment path
 
 Task 66 simplified the dashboard into a daily decision card and moved historical model analytics into collapsed diagnostics. It did not introduce new code debt. Existing product debt remains: the scheduled worker still uses deterministic fixture input, and recommendations do not yet consume richer current league, club, player, injury, lineup, or schedule context from external research sources.
 
+Task 67 added `WORKER_SNAPSHOT_URL` / `--snapshot-url` support, so the scheduled worker can consume fresh HTTPS JSON snapshots and refresh recommendations, combinations, and AI review after each successful cycle. It did not introduce new code debt. The deterministic fixture remains as a safe fallback. Remaining product debt: a browser-enabled snapshot producer still needs to create and publish fresh Misli snapshot JSON, and recommendations still do not consume richer current league, club, player, injury, lineup, or schedule context from external research sources.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

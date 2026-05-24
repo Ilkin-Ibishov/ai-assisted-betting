@@ -12,6 +12,6 @@ COPY docs/fixtures ./docs/fixtures
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir .
 
-RUN mkdir -p data reports
+RUN mkdir -p data reports data/live-snapshots
 
-CMD ["sh", "-c", "python -m app.cli init-db && python -m app.cli run-scheduled-paper-worker --provider ${WORKER_PROVIDER:-misli-public} --snapshot ${WORKER_SNAPSHOT:-docs/fixtures/task45-live-dry-run-snapshot.json} --model ${WORKER_MODEL:-baseline_heuristic} --league ${WORKER_LEAGUE:-railway-fixture} --season ${WORKER_SEASON:-2026}"]
+CMD ["sh", "-c", "python -m app.cli init-db && if [ -n \"$WORKER_SNAPSHOT_URL\" ]; then python -m app.cli run-scheduled-paper-worker --provider ${WORKER_PROVIDER:-misli-public} --snapshot-url \"$WORKER_SNAPSHOT_URL\" --model ${WORKER_MODEL:-baseline_heuristic} --league ${WORKER_LEAGUE:-fresh-snapshot} --season ${WORKER_SEASON:-2026}; else python -m app.cli run-scheduled-paper-worker --provider ${WORKER_PROVIDER:-misli-public} --snapshot ${WORKER_SNAPSHOT:-docs/fixtures/task45-live-dry-run-snapshot.json} --model ${WORKER_MODEL:-baseline_heuristic} --league ${WORKER_LEAGUE:-railway-fixture} --season ${WORKER_SEASON:-2026}; fi"]

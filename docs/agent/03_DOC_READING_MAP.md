@@ -527,6 +527,18 @@ Only after the offline sample pipeline works:
 - `dashboard/scripts/dashboard-smoke.mjs`
 - `docs/agent/05_TECHNICAL_DEBT.md`
 
+## Task 67 - Fresh Snapshot Worker Input
+
+- `docs/tasks/task-67-fresh-snapshot-worker-input.md`
+- `docs/tasks/task-65-railway-scheduled-worker-service.md`
+- `docs/deployment/railway-readiness.md`
+- `docs/specs/live-paper-loop.md`
+- `.env.example`
+- `Dockerfile.worker`
+- `app/services/scheduled_worker_service.py`
+- `app/cli.py`
+- `tests/unit/test_scheduled_paper_worker_service.py`
+
 ## Task 22 - Dashboard Data API
 
 - `docs/tasks/task-22-dashboard-data-api.md`

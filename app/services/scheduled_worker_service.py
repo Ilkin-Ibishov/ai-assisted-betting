@@ -1,5 +1,8 @@
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 from sqlalchemy import Engine, select
 
@@ -7,17 +10,23 @@ from app.config import Settings
 from app.db.engine import session_scope
 from app.db.models import LiveRun, utc_now_iso
 from app.db.repositories import LiveRunRepository
+from app.services.ai_analysis_service import AIAnalysisService
+from app.services.combination_service import CombinationService
 from app.services.live_cycle_service import (
     LivePaperCycleRequest,
     LivePaperCycleService,
     LivePaperCycleSummary,
 )
+from app.services.recommendation_service import RecommendationService
+
+MAX_SNAPSHOT_DOWNLOAD_BYTES = 5_000_000
 
 
 @dataclass(frozen=True)
 class ScheduledPaperWorkerRequest:
     provider: str
-    snapshot: Path
+    snapshot: Path | None = None
+    snapshot_url: str | None = None
     model: str | None = None
     league: str | None = None
     season: str | None = None
@@ -29,6 +38,10 @@ class ScheduledPaperWorkerSummary:
     run_id: str | None
     cycle_summary: LivePaperCycleSummary | None
     error_summary: str | None = None
+    snapshot_path: Path | None = None
+    recommendation_items: int = 0
+    combination_items: int = 0
+    ai_review_id: int | None = None
 
     @property
     def items_read(self) -> int:
@@ -69,6 +82,7 @@ class ScheduledPaperWorkerService:
 
         run_id = _run_id(request)
         provider = _provider_source(request.provider)
+        snapshot_path = _snapshot_reference(request)
         with session_scope(self.engine) as session:
             LiveRunRepository(session).start(
                 run_id=run_id,
@@ -92,13 +106,15 @@ class ScheduledPaperWorkerService:
                 run_id=run_id,
                 cycle_summary=None,
                 error_summary=error_summary,
+                snapshot_path=snapshot_path,
             )
 
         try:
+            resolved_snapshot = resolve_worker_snapshot(request)
             cycle_summary = LivePaperCycleService(self.engine, self.settings).run(
                 LivePaperCycleRequest(
                     provider=request.provider,
-                    snapshot=request.snapshot,
+                    snapshot=resolved_snapshot,
                     model=request.model,
                     league=request.league,
                     season=request.season,
@@ -117,7 +133,19 @@ class ScheduledPaperWorkerService:
                 run_id=run_id,
                 cycle_summary=None,
                 error_summary=error_summary,
+                snapshot_path=snapshot_path,
             )
+
+        recommendation_items = 0
+        combination_items = 0
+        ai_review_id = None
+        if cycle_summary.status == "completed":
+            recommendation_summary = RecommendationService(self.engine, self.settings).generate()
+            recommendation_items = recommendation_summary.items_created
+            combination_summary = CombinationService(self.engine).generate()
+            combination_items = combination_summary.items_created
+            ai_review = AIAnalysisService(self.engine).analyze_recommendation_review()
+            ai_review_id = ai_review.id
 
         with session_scope(self.engine) as session:
             live_runs = LiveRunRepository(session)
@@ -145,7 +173,41 @@ class ScheduledPaperWorkerService:
             run_id=run_id,
             cycle_summary=cycle_summary,
             error_summary="paper cycle failed" if cycle_summary.status == "failed" else None,
+            snapshot_path=resolved_snapshot,
+            recommendation_items=recommendation_items,
+            combination_items=combination_items,
+            ai_review_id=ai_review_id,
         )
+
+
+def resolve_worker_snapshot(request: ScheduledPaperWorkerRequest) -> Path:
+    if request.snapshot_url:
+        return _download_snapshot_url(request.snapshot_url)
+    if request.snapshot is not None:
+        return request.snapshot
+    raise ValueError("Either snapshot or snapshot_url must be provided")
+
+
+def _download_snapshot_url(snapshot_url: str) -> Path:
+    parsed = urlparse(snapshot_url)
+    if parsed.scheme != "https":
+        raise ValueError("snapshot_url must be an https URL")
+
+    target = Path("data/live-snapshots") / f"scheduled-worker-{utc_now_iso_filename()}.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with urlopen(snapshot_url, timeout=30) as response:
+        content_type = response.headers.get("content-type", "")
+        if "json" not in content_type.lower():
+            raise ValueError(f"snapshot_url must return JSON, got content-type {content_type!r}")
+        payload = response.read(MAX_SNAPSHOT_DOWNLOAD_BYTES + 1)
+
+    if len(payload) > MAX_SNAPSHOT_DOWNLOAD_BYTES:
+        raise ValueError("snapshot_url response is too large")
+
+    parsed_json = json.loads(payload.decode("utf-8"))
+    target.write_text(json.dumps(parsed_json, indent=2) + "\n", encoding="utf-8")
+    return target
 
 
 def _running_worker_exists(engine: Engine) -> bool:
@@ -161,10 +223,24 @@ def _running_worker_exists(engine: Engine) -> bool:
 
 def _run_id(request: ScheduledPaperWorkerRequest) -> str:
     model = request.model or "default"
+    snapshot_ref = _snapshot_reference(request)
     return (
         "scheduled_paper_worker:"
-        f"{request.provider}:{model}:{request.snapshot.resolve().as_posix()}:{utc_now_iso()}"
+        f"{request.provider}:{model}:{snapshot_ref}:{utc_now_iso()}"
     )
+
+
+def _snapshot_reference(request: ScheduledPaperWorkerRequest) -> str:
+    if request.snapshot_url:
+        parsed = urlparse(request.snapshot_url)
+        return f"url:{parsed.netloc}{parsed.path}"
+    if request.snapshot is not None:
+        return request.snapshot.resolve().as_posix()
+    return "snapshot:missing"
+
+
+def utc_now_iso_filename() -> str:
+    return utc_now_iso().replace(":", "-").replace("+", "_")
 
 
 def _provider_source(provider: str) -> str:

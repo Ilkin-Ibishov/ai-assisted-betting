@@ -282,6 +282,14 @@ python -m app.cli run-scheduled-paper-worker --provider misli-public --snapshot 
 
 The worker records `live_runs.run_type='scheduled_paper_worker'`, refuses to run unless `LIVE_COLLECTION_ENABLED=true`, skips when another worker run is already `running`, and delegates the paper cycle to `run-live-paper-cycle` behavior. It intentionally does not perform settlement.
 
+Task 67 added fresh snapshot URL support:
+
+```powershell
+python -m app.cli run-scheduled-paper-worker --provider misli-public --snapshot-url https://<host>/misli/latest.json --model baseline_heuristic
+```
+
+The worker downloads HTTPS JSON snapshots into `data/live-snapshots/`, runs the scoped live paper cycle, then refreshes paper recommendations, paper combinations, and deterministic AI recommendation review after a successful cycle. If `--snapshot-url` is absent, the worker still accepts `--snapshot` for deterministic fixtures or manually supplied files.
+
 ## Error Handling
 
 Provider or normalization failures should:
@@ -387,6 +395,8 @@ Task 57 added AI-assisted recommendation review. `analyze-recommendations` reads
 Task 58 added dashboard inspection for the live recommendation loop. The React dashboard can now show recommendations, combinations, odds movement, risk flags, and the latest AI recommendation review in one read-only panel with filters.
 
 Task 59 added historical recommendation backtesting for the live recommendation loop. `backtest-recommendations` evaluates settled persisted recommendations and combinations, exports singles-versus-combination performance with calibration and drawdown metrics, and writes a dashboard-compatible report companion. `analyze-recommendation-backtest` records an AI-assisted advisory summary for the backtest.
+
+Task 67 added fresh snapshot consumption for scheduled workers. The worker can now consume an HTTPS JSON snapshot URL and refresh recommendations, combinations, and AI review after successful collection. It still needs a separate safe browser-enabled snapshot producer before the Railway system is fully self-refreshing from Misli public pages.
 
 ## Non-Goals
 

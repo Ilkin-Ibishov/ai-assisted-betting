@@ -53,6 +53,11 @@ MODELS_OPTION = typer.Option("baseline_heuristic,elo", help="Comma-separated mod
 BOOKMAKERS_OPTION = typer.Option("B365,Avg", help="Comma-separated bookmaker codes.")
 LIVE_PROVIDER_OPTION = typer.Option("misli-public", help="Live provider key.")
 SNAPSHOT_OPTION = typer.Option(..., help="Live provider snapshot JSON path.")
+WORKER_SNAPSHOT_OPTION = typer.Option(None, help="Live provider snapshot JSON path.")
+SNAPSHOT_URL_OPTION = typer.Option(
+    None,
+    help="HTTPS URL returning a fresh live provider snapshot JSON document.",
+)
 RESULT_PROVIDER_OPTION = typer.Option("manual", help="Result provider key.")
 RESULT_PATH_OPTION = typer.Option(..., help="Manual result JSON path.")
 RECOMMENDATION_BACKTEST_REPORT_OPTION = typer.Option(
@@ -475,7 +480,8 @@ def run_live_paper_cycle(
 @app.command("run-scheduled-paper-worker")
 def run_scheduled_paper_worker(
     provider: str = LIVE_PROVIDER_OPTION,
-    snapshot: Path = SNAPSHOT_OPTION,
+    snapshot: Path | None = WORKER_SNAPSHOT_OPTION,
+    snapshot_url: str | None = SNAPSHOT_URL_OPTION,
     model: str | None = MODEL_OPTION,
     league: str | None = typer.Option(None, help="Live league name or provider sport."),
     season: str | None = typer.Option(None, help="Season label for imported live rows."),
@@ -486,6 +492,7 @@ def run_scheduled_paper_worker(
         ScheduledPaperWorkerRequest(
             provider=provider,
             snapshot=snapshot,
+            snapshot_url=snapshot_url,
             model=model,
             league=league,
             season=season,
@@ -507,6 +514,11 @@ def run_scheduled_paper_worker(
             summary.cycle_summary.generate_predictions,
         )
         _print_stage_summary("cycle.write_paper_bets", summary.cycle_summary.write_paper_bets)
+    if summary.snapshot_path is not None:
+        typer.echo(f"snapshot_path={summary.snapshot_path}")
+    typer.echo(f"recommendations.created={summary.recommendation_items}")
+    typer.echo(f"combinations.created={summary.combination_items}")
+    typer.echo(f"ai_review_id={summary.ai_review_id}")
     if summary.error_summary:
         typer.echo(f"error_summary={summary.error_summary}")
     typer.echo(f"items_read={summary.items_read}")
