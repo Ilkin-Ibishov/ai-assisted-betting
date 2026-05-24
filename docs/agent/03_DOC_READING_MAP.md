@@ -504,6 +504,18 @@ Only after the offline sample pipeline works:
 - `tests/unit/test_config.py`
 - `tests/unit/test_dashboard_api.py`
 
+## Task 65 - Railway Scheduled Worker Service
+
+- `docs/tasks/task-65-railway-scheduled-worker-service.md`
+- `docs/deployment/railway-readiness.md`
+- `docs/deployment/production-readiness-review.md`
+- `docs/fixtures/task45-live-dry-run-snapshot.json`
+- `Dockerfile.worker`
+- `app/cli.py`
+- `app/services/scheduled_worker_service.py`
+- `tests/unit/test_scheduled_paper_worker_service.py`
+- `tests/unit/test_worker_monitoring_service.py`
+
 ## Task 22 - Dashboard Data API
 
 - `docs/tasks/task-22-dashboard-data-api.md`

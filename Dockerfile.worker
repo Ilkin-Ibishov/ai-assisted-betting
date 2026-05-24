@@ -1,0 +1,17 @@
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY app ./app
+COPY docs/fixtures ./docs/fixtures
+
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir .
+
+RUN mkdir -p data reports
+
+CMD ["sh", "-c", "python -m app.cli init-db && python -m app.cli run-scheduled-paper-worker --provider ${WORKER_PROVIDER:-misli-public} --snapshot ${WORKER_SNAPSHOT:-docs/fixtures/task45-live-dry-run-snapshot.json} --model ${WORKER_MODEL:-baseline_heuristic} --league ${WORKER_LEAGUE:-railway-fixture} --season ${WORKER_SEASON:-2026}"]

@@ -155,6 +155,12 @@ Worker build command:
 python -m pip install -e .
 ```
 
+Worker Dockerfile:
+
+```text
+Dockerfile.worker
+```
+
 Worker start command:
 
 ```powershell
@@ -187,6 +193,11 @@ LOG_LEVEL=INFO
 LIVE_COLLECTION_ENABLED=true
 AI_ANALYSIS_MODE=deterministic
 AI_ANALYSIS_MODEL_NAME=deterministic_ai_fallback
+WORKER_PROVIDER=misli-public
+WORKER_SNAPSHOT=docs/fixtures/task45-live-dry-run-snapshot.json
+WORKER_MODEL=baseline_heuristic
+WORKER_LEAGUE=railway-fixture
+WORKER_SEASON=2026
 ```
 
 Keep API and dashboard services on:
@@ -201,6 +212,7 @@ Cadence guidance:
 - Start conservatively, for example every 30 to 60 minutes.
 - Avoid overlapping runs. The worker skips when another `scheduled_paper_worker` run is still `running`.
 - Keep snapshots public/user-provided and paper-only. Do not add login automation, account actions, CAPTCHA/bot bypass, proxy evasion, or real-money betting.
+- The initial Railway cron proof may use the deterministic Task 45 fixture. Replace it with a safe fresh public/user-provided snapshot workflow before treating provider collection as live production coverage.
 
 Worker monitoring endpoint:
 

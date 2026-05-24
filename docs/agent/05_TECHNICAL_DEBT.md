@@ -164,6 +164,8 @@ Task 63 added Railway API config-as-code through `railway.json` and an explicit 
 
 Task 64 added Railway dashboard service packaging and configurable API CORS for Railway dashboard origins. It did not introduce new code debt. The dashboard is deployed at `https://dashboard-production-0a69.up.railway.app` and deployed dashboard smoke passes. The dashboard service was deployed with `railway up` because the Railway CLI repo-link creation path returned an OAuth authorization error; future dashboard redeploys can use the same CLI upload path or the user can reconnect the service to GitHub in Railway's UI. Continuous readiness still needs a dedicated scheduled worker service.
 
+Task 65 adds `Dockerfile.worker` and a Railway scheduled worker deployment path. It does not introduce code debt. The first cron proof may use the deterministic Task 45 fixture snapshot, which is operationally acceptable for scheduler/database proof but not a substitute for fresh Misli public snapshot collection. Replace the fixture with a safe public/user-provided snapshot generation workflow before treating the worker as live provider coverage.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

@@ -104,13 +104,14 @@ Before calling the system fully ready for continuous Railway staging:
 ## Residual Risks
 
 - Misli public snapshot parsing depends on rendered DOM structure.
+- Railway worker cron proof may initially use the deterministic Task 45 fixture until fresh public snapshot generation is scheduled safely.
 - Bare time-only Misli kickoff rows remain fail-closed until a safe date source is proven.
 - Recommendation expected value uses simplified unit-stake arithmetic.
 - Combination correlation and exposure controls remain heuristic.
 - Odds movement is computed directly from snapshots instead of a dedicated summary table.
 - External alert destination is not selected yet.
 - Deployed Railway API and dashboard smoke evidence is captured.
-- Dedicated Railway worker service is pending.
+- Dedicated Railway worker service and cron proof are pending.
 
 ## Final Position
 

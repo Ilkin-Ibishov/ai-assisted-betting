@@ -117,6 +117,14 @@ https://dashboard-production-0a69.up.railway.app
 
 The system remains paper-only and advisory. A dedicated Railway scheduled worker service is still required before calling it fully production-proven.
 
+The worker service image is defined in:
+
+```text
+Dockerfile.worker
+```
+
+It runs `run-scheduled-paper-worker` with `LIVE_COLLECTION_ENABLED=true` on the worker service only.
+
 ## Live Paper Phase
 
 The paper-only live loop roadmap starts at:
