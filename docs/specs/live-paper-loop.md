@@ -396,7 +396,9 @@ Task 58 added dashboard inspection for the live recommendation loop. The React d
 
 Task 59 added historical recommendation backtesting for the live recommendation loop. `backtest-recommendations` evaluates settled persisted recommendations and combinations, exports singles-versus-combination performance with calibration and drawdown metrics, and writes a dashboard-compatible report companion. `analyze-recommendation-backtest` records an AI-assisted advisory summary for the backtest.
 
-Task 67 added fresh snapshot consumption for scheduled workers. The worker can now consume an HTTPS JSON snapshot URL and refresh recommendations, combinations, and AI review after successful collection. It still needs a separate safe browser-enabled snapshot producer before the Railway system is fully self-refreshing from Misli public pages.
+Task 67 added fresh snapshot consumption for scheduled workers. The worker can now consume an HTTPS JSON snapshot URL and refresh recommendations, combinations, and AI review after successful collection.
+
+Task 68 added the next source step: a token-protected API latest-snapshot store plus a browser-enabled Misli producer that can POST public snapshot JSON into the API. The intended production flow is `Misli public page -> snapshot producer -> API latest snapshot endpoint -> worker WORKER_SNAPSHOT_URL -> recommendations/combinations/AI review -> dashboard`. The remaining production step is Railway scheduling and end-to-end proof of that flow.
 
 ## Non-Goals
 

@@ -20,8 +20,14 @@ const args = parseArgs(process.argv.slice(2));
 const url = args.url ?? DEFAULT_URL;
 const sport = args.sport ?? DEFAULT_SPORT;
 const outPath = args.out ? path.resolve(process.cwd(), args.out) : null;
+const postUrl = args.postUrl ?? null;
+const token = args.token ?? process.env.SNAPSHOT_INGEST_TOKEN ?? null;
 
 assertAllowedPublicMisliUrl(url);
+if (postUrl) assertAllowedSnapshotPostUrl(postUrl);
+if (postUrl && !token) {
+  throw new Error("--token or SNAPSHOT_INGEST_TOKEN is required with --post-url.");
+}
 
 const browser = await chromium.launch({ headless: true });
 
@@ -167,6 +173,9 @@ try {
   } else {
     process.stdout.write(json);
   }
+  if (postUrl) {
+    await postSnapshot(postUrl, token, snapshot);
+  }
 } finally {
   await browser.close();
 }
@@ -178,18 +187,37 @@ function parseArgs(argv) {
     if (arg === "--url") parsed.url = argv[++index];
     else if (arg === "--sport") parsed.sport = argv[++index];
     else if (arg === "--out") parsed.out = argv[++index];
+    else if (arg === "--post-url") parsed.postUrl = argv[++index];
+    else if (arg === "--token") parsed.token = argv[++index];
     else if (arg === "--help" || arg === "-h") {
       process.stdout.write(
         [
-          "Usage: node tools/misli-public-snapshot.mjs [--url URL] [--sport NAME] [--out PATH]",
+          "Usage: node tools/misli-public-snapshot.mjs [--url URL] [--sport NAME] [--out PATH] [--post-url URL] [--token TOKEN]",
           "",
           "Collects a read-only JSON snapshot from public unauthenticated Misli.az sports pages.",
+          "When --post-url is provided, posts the snapshot JSON to the API snapshot ingest endpoint.",
         ].join("\n"),
       );
       process.exit(0);
     }
   }
   return parsed;
+}
+
+async function postSnapshot(postUrl, bearerToken, snapshot) {
+  const response = await fetch(postUrl, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${bearerToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(snapshot),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Snapshot POST failed: ${response.status} ${response.statusText} ${body}`);
+  }
+  process.stderr.write(`snapshot_posted=${postUrl}\n`);
 }
 
 function assertAllowedPublicMisliUrl(candidateUrl) {
@@ -208,5 +236,19 @@ function assertAllowedPublicMisliUrl(candidateUrl) {
   }
   if (blockedPathPatterns.some((pattern) => pattern.test(parsed.pathname))) {
     throw new Error(`Blocked Misli.az path for public snapshot: ${parsed.pathname}`);
+  }
+}
+
+function assertAllowedSnapshotPostUrl(candidateUrl) {
+  const parsed = new URL(candidateUrl);
+  if (
+    parsed.protocol !== "https:"
+    && parsed.hostname !== "127.0.0.1"
+    && parsed.hostname !== "localhost"
+  ) {
+    throw new Error("Snapshot post URL must be HTTPS, localhost, or 127.0.0.1.");
+  }
+  if (!/^\/api\/live\/snapshots\/latest\//.test(parsed.pathname)) {
+    throw new Error("Snapshot post URL must target /api/live/snapshots/latest/<provider>.");
   }
 }

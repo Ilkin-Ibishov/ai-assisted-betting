@@ -23,6 +23,7 @@ class Settings:
     live_collection_enabled: bool
     ai_analysis_mode: str = "deterministic"
     ai_analysis_model_name: str = "deterministic_ai_fallback"
+    snapshot_ingest_token: str = ""
     cors_allowed_origins: tuple[str, ...] = (
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -68,6 +69,7 @@ def load_settings() -> Settings:
         live_collection_enabled=_get_bool("LIVE_COLLECTION_ENABLED", "false"),
         ai_analysis_mode=getenv("AI_ANALYSIS_MODE", "deterministic"),
         ai_analysis_model_name=getenv("AI_ANALYSIS_MODEL_NAME", "deterministic_ai_fallback"),
+        snapshot_ingest_token=getenv("SNAPSHOT_INGEST_TOKEN", ""),
         cors_allowed_origins=_get_csv(
             "CORS_ALLOWED_ORIGINS",
             "http://localhost:5173,http://127.0.0.1:5173",

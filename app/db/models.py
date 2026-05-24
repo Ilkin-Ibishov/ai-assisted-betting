@@ -285,6 +285,22 @@ class LiveRun(Base):
     created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
 
 
+class LiveSnapshot(Base):
+    __tablename__ = "live_snapshots"
+    __table_args__ = (
+        UniqueConstraint("provider", "snapshot_hash", name="uq_live_snapshots_provider_hash"),
+        Index("idx_live_snapshots_provider_created", "provider", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String, nullable=False)
+    snapshot_hash: Mapped[str] = mapped_column(String, nullable=False)
+    source_url: Mapped[str | None] = mapped_column(String)
+    event_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
+
+
 class AIAnalysisRun(Base):
     __tablename__ = "ai_analysis_runs"
     __table_args__ = (

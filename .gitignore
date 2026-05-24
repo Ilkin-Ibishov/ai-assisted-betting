@@ -14,6 +14,7 @@ data/*.sqlite-*
 data/**/*.sqlite
 data/**/*.sqlite-*
 data/comparisons/
+data/live-snapshots/
 data/misli-public-snapshot*.json
 reports/*.json
 reports/*.csv

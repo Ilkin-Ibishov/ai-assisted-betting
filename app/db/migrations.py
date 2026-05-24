@@ -8,6 +8,7 @@ MIGRATION_NAMES = [
     "004_create_ai_analysis_runs",
     "005_create_paper_recommendations",
     "006_create_paper_combinations",
+    "007_create_live_snapshots",
 ]
 
 
@@ -55,6 +56,11 @@ def run_migrations(engine) -> None:
             connection,
             "006_create_paper_combinations",
             _create_paper_combinations,
+        )
+        _run_migration(
+            connection,
+            "007_create_live_snapshots",
+            _create_live_snapshots,
         )
 
 
@@ -351,5 +357,33 @@ def _create_paper_combinations(connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_paper_combinations_rank
         ON paper_combinations (rank)
+        """
+    )
+
+
+def _create_live_snapshots(connection) -> None:
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE IF NOT EXISTS live_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            snapshot_hash TEXT NOT NULL,
+            source_url TEXT,
+            event_count INTEGER NOT NULL DEFAULT 0,
+            payload_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_live_snapshots_provider_hash
+        ON live_snapshots (provider, snapshot_hash)
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS idx_live_snapshots_provider_created
+        ON live_snapshots (provider, created_at)
         """
     )

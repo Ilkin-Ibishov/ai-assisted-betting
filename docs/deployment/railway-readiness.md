@@ -428,12 +428,35 @@ Production smoke passed against `https://ai-assisted-betting-production.up.railw
 The dedicated Railway `worker` service was created, deployed with `Dockerfile.worker`, and configured with cron schedule `*/30 * * * *`.
 The cron-triggered worker run at `2026-05-24T14:01:20Z` completed and refreshed `/api/live/worker-status`.
 Task 67 commit `b1faa48` deployed successfully to the API service through GitHub. The updated worker image was deployed through Railway upload deployment `95a519c2-3c27-4d33-b6f5-755b866bd77a` after recreating the worker upload `railway.json` without a UTF-8 BOM. Production smoke passed after the deploy.
+Task 68 adds the API latest-snapshot endpoints and `Dockerfile.snapshot` for a dedicated Playwright producer service. Production still needs the API `SNAPSHOT_INGEST_TOKEN`, worker `WORKER_SNAPSHOT_URL`, and a scheduled producer service wired to `SNAPSHOT_POST_URL`.
 ```
 
 Next operational checks:
 
-1. Build the browser-enabled snapshot producer that publishes fresh Misli JSON for `WORKER_SNAPSHOT_URL`.
-2. Add richer current league, team, player, injury, lineup, and schedule sources for recommendation quality.
+1. Deploy and schedule the browser-enabled snapshot producer service.
+2. Confirm producer -> API latest snapshot -> worker -> dashboard end-to-end freshness.
+3. Add richer current league, team, player, injury, lineup, and schedule sources for recommendation quality.
+
+Snapshot producer service variables:
+
+```env
+SNAPSHOT_SOURCE_URL=https://www.misli.az/idman-novleri/futbol
+SNAPSHOT_SPORT=football
+SNAPSHOT_POST_URL=https://ai-assisted-betting-production.up.railway.app/api/live/snapshots/latest/misli-public
+SNAPSHOT_INGEST_TOKEN=<same-secret-as-api>
+```
+
+API service variable:
+
+```env
+SNAPSHOT_INGEST_TOKEN=<secret>
+```
+
+Worker service variable:
+
+```env
+WORKER_SNAPSHOT_URL=https://ai-assisted-betting-production.up.railway.app/api/live/snapshots/latest/misli-public
+```
 
 Current API URL:
 

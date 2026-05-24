@@ -85,6 +85,7 @@ Build in this order:
 - Task 65 - Railway Scheduled Worker Service
 - Task 66 - Daily Decision Dashboard Simplification
 - Task 67 - Fresh Snapshot Worker Input
+- Task 68 - Fresh Misli Snapshot Producer
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -92,10 +93,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Build a browser-enabled Misli snapshot producer that creates fresh public snapshot JSON and publishes it for the scheduled worker's `WORKER_SNAPSHOT_URL`.
+Deploy and schedule the browser-enabled Misli snapshot producer on Railway, then prove the full fresh-data loop from producer to API to worker to dashboard.
 ```
 
-Task 67 lets the worker consume fresh HTTPS snapshot JSON and refresh recommendations/combinations/AI review after each successful run. It does not yet create the Misli snapshot itself on Railway. New product work should prioritize a safe browser-enabled snapshot producer, then richer club/player/stat sources. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.
+Task 68 added the API latest-snapshot store, producer POST support, and a browser-enabled `Dockerfile.snapshot`. It is not production-complete until Railway has a scheduled producer service with `SNAPSHOT_INGEST_TOKEN`, `SNAPSHOT_POST_URL`, and the worker `WORKER_SNAPSHOT_URL` wired to the API snapshot endpoint. New product work should prioritize this end-to-end proof, then richer club/player/stat sources. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.
 
 Required verification commands after implementation:
 
@@ -104,6 +105,7 @@ Required verification commands after implementation:
 cd dashboard
 npm run dev -- --host 127.0.0.1 --port 5173
 npm run test
+npm run snapshot:test
 npm run lint
 npm run build
 npm run smoke

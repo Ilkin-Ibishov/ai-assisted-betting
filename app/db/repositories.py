@@ -6,6 +6,7 @@ from app.db.models import (
     EvaluationRun,
     Feature,
     LiveRun,
+    LiveSnapshot,
     Match,
     OddsSnapshot,
     PaperBet,
@@ -375,6 +376,48 @@ class LiveRunRepository:
         if live_run is None:
             raise ValueError(f"Live run not found: {run_id}")
         return live_run
+
+
+class LiveSnapshotRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(
+        self,
+        *,
+        provider: str,
+        snapshot_hash: str,
+        payload_json: str,
+        source_url: str | None,
+        event_count: int,
+    ) -> LiveSnapshot:
+        existing = self.session.scalar(
+            select(LiveSnapshot).where(
+                LiveSnapshot.provider == provider,
+                LiveSnapshot.snapshot_hash == snapshot_hash,
+            )
+        )
+        if existing is not None:
+            return existing
+
+        snapshot = LiveSnapshot(
+            provider=provider,
+            snapshot_hash=snapshot_hash,
+            source_url=source_url,
+            event_count=event_count,
+            payload_json=payload_json,
+        )
+        self.session.add(snapshot)
+        self.session.flush()
+        return snapshot
+
+    def latest(self, provider: str) -> LiveSnapshot | None:
+        return self.session.scalar(
+            select(LiveSnapshot)
+            .where(LiveSnapshot.provider == provider)
+            .order_by(LiveSnapshot.created_at.desc(), LiveSnapshot.id.desc())
+            .limit(1)
+        )
 
 
 def _utc_now_iso() -> str:

@@ -1,0 +1,14 @@
+FROM node:24-bookworm
+
+ENV NODE_ENV=production
+
+WORKDIR /app
+
+COPY dashboard/package.json dashboard/package-lock.json ./dashboard/
+RUN cd dashboard \
+    && npm install \
+    && npx playwright install --with-deps chromium
+
+COPY tools ./tools
+
+CMD ["sh", "-c", "node tools/misli-public-snapshot.mjs --url ${SNAPSHOT_SOURCE_URL:-https://www.misli.az/idman-novleri/futbol} --sport ${SNAPSHOT_SPORT:-football} --post-url ${SNAPSHOT_POST_URL:?SNAPSHOT_POST_URL is required}"]

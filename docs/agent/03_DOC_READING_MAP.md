@@ -211,6 +211,8 @@ Only after the offline sample pipeline works:
 - `docs/specs/live-paper-loop.md`
 - `docs/specs/data-providers.md`
 - `docs/research/misli-public-discovery.md`
+- `docs/tasks/task-67-fresh-snapshot-worker-input.md`
+- `docs/tasks/task-68-fresh-misli-snapshot-producer.md`
 - `docs/specs/pipeline-flow.md`
 - `docs/specs/logging-and-evaluation.md`
 - `docs/specs/database-schema.md`

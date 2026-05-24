@@ -311,3 +311,25 @@ Area: live orchestration
 
 Resolution:
 Task 46 added scoped prediction service helpers and made `run-live-paper-cycle` resolve match ids from the requested snapshot before generating features, predictions, and paper bets. Mixed databases now leave unrelated scheduled matches untouched.
+
+### P1 - Fresh Misli Snapshot Producer Needs Railway Scheduling Proof
+
+Status: open
+Introduced: Task 68 - Fresh Misli Snapshot Producer
+Area: live ingestion and Railway operations
+
+Task 68 added the API latest-snapshot store, token-protected snapshot ingest, producer POST support, and `Dockerfile.snapshot`. The code path is ready for local verification, but production still needs a scheduled Railway snapshot producer service wired with `SNAPSHOT_INGEST_TOKEN`, `SNAPSHOT_POST_URL`, and the worker `WORKER_SNAPSHOT_URL`.
+
+Resolution target:
+Create/schedule the Railway producer service, run a fresh Misli producer cycle, verify the API snapshot endpoint returns new data, run the worker against that endpoint, and confirm the daily dashboard reflects the fresh run.
+
+### P2 - Recommendation Inputs Are Still Odds-First
+
+Status: open
+Introduced: Task 68 - Fresh Misli Snapshot Producer
+Area: recommendation quality
+
+The fresh Misli producer captures public list-page odds and match metadata. It does not yet enrich recommendations with current league table position, club form, player stats, injuries, lineups, rest days, travel, or schedule congestion.
+
+Resolution target:
+Add vetted public/statistical football data sources and incorporate them into recommendation scoring and AI review before calling the system product-complete for daily decision support.

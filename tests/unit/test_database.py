@@ -63,7 +63,7 @@ def test_postgres_model_managed_migrations_are_recorded_as_noops() -> None:
 
     _record_noop_migrations_for_model_managed_database(connection)
 
-    assert len(connection.statements) == 6
+    assert len(connection.statements) == 7
     assert all("ON CONFLICT" in statement for statement, _params in connection.statements)
     assert connection.statements[0][1] == {"migration_name": "001_add_feature_elo_columns"}
 
@@ -131,6 +131,7 @@ def test_init_db_upgrades_old_database_with_missing_elo_feature_columns(tmp_path
         ("004_create_ai_analysis_runs",),
         ("005_create_paper_recommendations",),
         ("006_create_paper_combinations",),
+        ("007_create_live_snapshots",),
     ]
 
 
@@ -218,6 +219,7 @@ def test_init_db_upgrades_old_database_with_identity_uniqueness_indexes(tmp_path
         ("004_create_ai_analysis_runs",),
         ("005_create_paper_recommendations",),
         ("006_create_paper_combinations",),
+        ("007_create_live_snapshots",),
     ]
 
 
@@ -281,6 +283,7 @@ def test_init_db_upgrades_old_database_with_live_run_registry(tmp_path) -> None:
         ("004_create_ai_analysis_runs",),
         ("005_create_paper_recommendations",),
         ("006_create_paper_combinations",),
+        ("007_create_live_snapshots",),
     ]
 
 
@@ -341,6 +344,7 @@ def test_init_db_upgrades_old_database_with_ai_analysis_runs(tmp_path) -> None:
         ("004_create_ai_analysis_runs",),
         ("005_create_paper_recommendations",),
         ("006_create_paper_combinations",),
+        ("007_create_live_snapshots",),
     ]
 
 

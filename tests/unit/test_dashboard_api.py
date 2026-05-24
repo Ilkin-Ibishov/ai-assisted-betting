@@ -464,6 +464,55 @@ def test_live_combinations_endpoint_lists_ranked_paper_combinations(tmp_path: Pa
     assert payload[0]["combined_expected_value"] == 0.19
 
 
+def test_live_snapshot_endpoint_stores_and_serves_latest_payload(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SNAPSHOT_INGEST_TOKEN", "test-token")
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+    snapshot = _valid_snapshot_payload()
+
+    post_response = client.post(
+        "/api/live/snapshots/latest/misli-public",
+        headers={"Authorization": "Bearer test-token"},
+        json=snapshot,
+    )
+    get_response = client.get("/api/live/snapshots/latest/misli-public")
+
+    assert post_response.status_code == 200
+    assert post_response.json()["provider"] == "misli_public"
+    assert post_response.json()["event_count"] == 1
+    assert get_response.status_code == 200
+    assert get_response.json() == snapshot
+
+
+def test_live_snapshot_post_requires_configured_bearer_token(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("SNAPSHOT_INGEST_TOKEN", raising=False)
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    disabled_response = client.post(
+        "/api/live/snapshots/latest/misli-public",
+        headers={"Authorization": "Bearer test-token"},
+        json=_valid_snapshot_payload(),
+    )
+
+    monkeypatch.setenv("SNAPSHOT_INGEST_TOKEN", "test-token")
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+    invalid_response = client.post(
+        "/api/live/snapshots/latest/misli-public",
+        headers={"Authorization": "Bearer wrong-token"},
+        json=_valid_snapshot_payload(),
+    )
+
+    assert disabled_response.status_code == 403
+    assert invalid_response.status_code == 401
+
+
 def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_live_status_database(database_url)
@@ -764,3 +813,30 @@ def _seed_combination_database(database_url: str) -> None:
             )
         )
     engine.dispose()
+
+
+def _valid_snapshot_payload() -> dict:
+    return {
+        "source": "misli_public",
+        "page_url": "https://www.misli.az/idman-novleri/futbol",
+        "scraped_at": "2026-05-24T17:30:00.000Z",
+        "event_count": 1,
+        "events": [
+            {
+                "source": "misli_public",
+                "sport": "football",
+                "event_id": "2816300",
+                "source_match_id": "misli:football:2816300",
+                "home_team": "Forest City",
+                "away_team": "Eastport Athletic",
+                "kickoff_date": "24.05.2026",
+                "kickoff_time": "20:30",
+                "league": "Sample Premier",
+                "odds": [
+                    {"market": "1X2", "selection": "HOME", "odds_decimal": 2.16},
+                    {"market": "1X2", "selection": "DRAW", "odds_decimal": 3.18},
+                    {"market": "1X2", "selection": "AWAY", "odds_decimal": 2.94},
+                ],
+            }
+        ],
+    }
