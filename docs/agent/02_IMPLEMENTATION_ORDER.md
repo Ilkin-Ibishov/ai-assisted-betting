@@ -81,6 +81,9 @@ Build in this order:
 - Task 62 - Final Production Readiness Review
 - Task 52 - Provider Health AI Analysis
 - Task 63 - Railway API Config As Code
+- Task 64 - Railway Dashboard Service
+- Task 65 - Railway Scheduled Worker Service
+- Task 66 - Daily Decision Dashboard Simplification
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -88,10 +91,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Confirm the GitHub-triggered Railway API deployment is healthy, connect Railway Postgres if missing, then run deployed production smoke.
+Replace deterministic worker fixture input with a safe fresh public/user-provided Misli snapshot workflow, then run recommendation/combinations/AI review generation in the scheduled daily pipeline.
 ```
 
-Task 62 recorded conditional production readiness for monitored paper-only Railway staging. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML until deployed Railway smoke evidence exists and the user explicitly chooses the next advanced phase.
+Task 66 reframed the dashboard as a daily paper-betting decision card. Historical comparison analytics remain available in diagnostics, but new product work should prioritize daily Misli game analysis, research-source freshness, paper recommendations, combinations, and AI review. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.
 
 Required verification commands after implementation:
 
@@ -160,6 +163,7 @@ Build the paper-only live loop in this order:
 23. Task 60 - Railway Worker Deployment And Monitoring, completed
 24. Task 61 - Operational Guardrails And Alerting, completed
 25. Task 62 - Final Production Readiness Review, completed
+26. Task 66 - Daily Decision Dashboard Simplification, completed
 
 ## AI-Assisted Product Phase Order
 
@@ -196,6 +200,7 @@ Build Railway readiness in this order:
 7. Task 63 - Railway API Config As Code, completed
 8. Task 64 - Railway Dashboard Service, completed
 9. Task 65 - Railway Scheduled Worker Service, completed
+10. Task 66 - Daily Decision Dashboard Simplification, completed
 
 ## Recommendation Phase Order
 
@@ -208,6 +213,7 @@ Build live recommendation work in this order:
 5. Task 57 - AI Recommendation Review Layer, completed
 6. Task 58 - Recommendation Dashboard, completed
 7. Task 59 - Historical Recommendation Backtesting, completed
+8. Task 66 - Daily Decision Dashboard Simplification, completed
 
 ## Do Not Jump Ahead
 

@@ -60,7 +60,26 @@ try {
   })
 
   await desktop.goto(dashboardUrl, { waitUntil: 'networkidle' })
-  await expectVisibleText(desktop, 'Comparison workspace')
+  await expectVisibleText(desktop, 'What should I consider today?')
+  await expectVisibleText(desktop, 'Daily betting card')
+  await expectVisibleText(desktop, 'Data freshness')
+  await expectVisibleText(desktop, 'Research guardrails')
+  await expectVisibleText(desktop, 'Historical diagnostics')
+  await expectMetric(desktop, 'daily-decision-summary', expectedRecommendations.approvalState)
+  await expectMetric(desktop, 'ai-analyst-panel', 'AI-assisted advisory analysis')
+  await expectMetric(desktop, 'recommendation-dashboard', expectedRecommendations.approvalLabel)
+  await expectMetric(desktop, 'recommendation-ai-review', expectedRecommendations.reviewLabel)
+  if (recommendations.length > 0) {
+    await expectMetric(desktop, 'recommendation-table', recommendations[0].selection)
+  }
+  await expectMetric(desktop, 'live-process-monitor', expectedLive.statusLabel)
+  await expectMetric(desktop, 'live-latest-run', expectedLive.latestRunLabel)
+  await expectMetric(desktop, 'live-provider', expectedLive.providerLabel)
+  await expectMetric(desktop, 'live-paper-bets', expectedLive.openBetsLabel)
+  await expectMetric(desktop, 'live-errors', expectedLive.errorsCount)
+  await expectMetric(desktop, 'operational-guardrails', guardrails.overall_status)
+  await expectMetric(desktop, 'guardrail-worker_freshness', 'worker freshness')
+  await desktop.getByTestId('diagnostics-section').locator('summary').click()
   await expectVisibleText(desktop, 'Report catalog')
   const catalogSearch = desktop.getByTestId('catalog-search')
   await catalogSearch.fill(firstComparison.name)
@@ -85,23 +104,7 @@ try {
     )
   }
   await expectVisibleText(desktop, 'Metadata summary')
-  await expectVisibleText(desktop, 'Live process monitor')
-  await expectVisibleText(desktop, 'Operational guardrails')
   await expectVisibleText(desktop, 'AI analyst')
-  await expectVisibleText(desktop, 'Recommendation dashboard')
-  await expectMetric(desktop, 'ai-analyst-panel', 'AI-assisted advisory analysis')
-  await expectMetric(desktop, 'recommendation-dashboard', expectedRecommendations.approvalLabel)
-  await expectMetric(desktop, 'recommendation-ai-review', expectedRecommendations.reviewLabel)
-  if (recommendations.length > 0) {
-    await expectMetric(desktop, 'recommendation-table', recommendations[0].selection)
-  }
-  await expectMetric(desktop, 'live-process-monitor', expectedLive.statusLabel)
-  await expectMetric(desktop, 'live-latest-run', expectedLive.latestRunLabel)
-  await expectMetric(desktop, 'live-provider', expectedLive.providerLabel)
-  await expectMetric(desktop, 'live-paper-bets', expectedLive.openBetsLabel)
-  await expectMetric(desktop, 'live-errors', expectedLive.errorsCount)
-  await expectMetric(desktop, 'operational-guardrails', guardrails.overall_status)
-  await expectMetric(desktop, 'guardrail-worker_freshness', 'worker freshness')
   await expectMetric(desktop, 'metric-reports-indexed', String(expected.reportCount))
   await expectMetric(desktop, 'metric-selected-runs', String(expected.runCount))
   await expectMetric(desktop, 'metric-best-roi', expected.bestRoi)
@@ -156,11 +159,13 @@ try {
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 1000 } })
   await mobile.goto(dashboardUrl, { waitUntil: 'networkidle' })
-  await expectVisibleText(mobile, 'Comparison workspace')
-  await expectVisibleText(mobile, 'Live process monitor')
-  await expectVisibleText(mobile, 'Operational guardrails')
+  await expectVisibleText(mobile, 'What should I consider today?')
+  await expectVisibleText(mobile, 'Daily betting card')
+  await expectVisibleText(mobile, 'Data freshness')
+  await expectVisibleText(mobile, 'Research guardrails')
   await expectVisibleText(mobile, 'AI analyst')
-  await expectVisibleText(mobile, 'Recommendation dashboard')
+  await expectVisibleText(mobile, 'Historical diagnostics')
+  await mobile.getByTestId('diagnostics-section').locator('summary').click()
   await expectVisibleText(mobile, 'Run detail')
   await expectMetric(mobile, 'metric-best-roi', expected.bestRoi)
   await expectMetric(mobile, 'sample-size-warning', expected.sampleSize)
@@ -293,6 +298,7 @@ function buildExpectedLiveValues(status) {
 
 function buildExpectedRecommendationValues(recommendations, review) {
   return {
+    approvalState: review?.output?.approval_state ?? 'missing',
     approvalLabel: `AI ${review?.output?.approval_state ?? 'missing'}`,
     reviewLabel:
       review?.output?.short_summary ??

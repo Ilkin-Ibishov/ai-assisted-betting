@@ -170,17 +170,17 @@ function App() {
               Paper Odds Lab
             </div>
             <h1 className="mt-3 text-2xl font-semibold tracking-normal text-slate-950">
-              Analytical Dashboard
+              Daily Betting Card
             </h1>
           </div>
           <div className="grid gap-2 text-sm">
-            <NavItem icon={Database} label="Comparison reports" active />
-            <NavItem icon={Activity} label="Process metrics" />
-            <NavItem icon={ShieldCheck} label="Read-only mode" />
+            <NavItem icon={Target} label="Today's card" active />
+            <NavItem icon={Activity} label="Research inputs" />
+            <NavItem icon={ShieldCheck} label="Paper-only mode" />
           </div>
           <div className="mt-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-            <div className="font-medium text-slate-900">Local API</div>
-            <div className="mt-1">FastAPI proxy: /api to 127.0.0.1:8000</div>
+            <div className="font-medium text-slate-900">Daily workflow</div>
+            <div className="mt-1">Review paper picks, source freshness, and AI risk notes.</div>
           </div>
         </aside>
 
@@ -188,12 +188,16 @@ function App() {
           <header className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge>Local reports</Badge>
-                <Badge variant="secondary">Read only</Badge>
+                <Badge>Misli.az research</Badge>
+                <Badge variant="secondary">Paper only</Badge>
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-normal">
-                Comparison workspace
+                What should I consider today?
               </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                Daily paper-betting recommendations, combinations, AI review, and data health in
+                one focused view.
+              </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <select
@@ -202,6 +206,7 @@ function App() {
                 onChange={(event) => setSelectedName(event.target.value)}
                 className="h-10 min-w-64 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none ring-offset-white focus:ring-2 focus:ring-slate-400"
                 aria-label="Comparison report"
+                title="Diagnostics report"
               >
                 {comparisons.data?.map((comparison) => (
                   <option key={comparison.name} value={comparison.name}>
@@ -213,10 +218,10 @@ function App() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  void comparisons.refetch()
-                  void detail.refetch()
-                }}
-                title="Refresh reports"
+                void comparisons.refetch()
+                void detail.refetch()
+              }}
+                title="Refresh dashboard data"
               >
                 <RefreshCcw className="h-4 w-4" />
                 Refresh
@@ -368,31 +373,6 @@ function DashboardContent({
 
   return (
     <>
-      <ReportCatalog
-        comparisons={comparisons}
-        loading={comparisonLoading}
-        onSelectReport={onSelectReport}
-        selectedName={selectedSummary?.name ?? ''}
-      />
-
-      <LiveProcessMonitor
-        error={liveError}
-        loading={liveLoading}
-        status={liveStatus}
-      />
-
-      <OperationalGuardrailsPanel
-        error={guardrailError}
-        loading={guardrailLoading}
-        status={guardrailStatus}
-      />
-
-      <AIAnalystPanel
-        analysis={aiAnalysis}
-        error={aiError}
-        loading={aiLoading}
-      />
-
       <RecommendationDashboardPanel
         combinations={combinations}
         error={recommendationError}
@@ -402,208 +382,251 @@ function DashboardContent({
         review={recommendationReview}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Reports indexed"
-          testId="metric-reports-indexed"
-          value={comparisonLoading ? undefined : String(comparisons.length)}
-          helper="Local comparison JSON files"
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.55fr)]">
+        <LiveProcessMonitor
+          error={liveError}
+          loading={liveLoading}
+          status={liveStatus}
         />
-        <MetricCard
-          label="Selected runs"
-          testId="metric-selected-runs"
-          value={detailLoading ? undefined : String(runs.length || selectedSummary?.runs || 0)}
-          helper={selectedSummary?.filename ?? 'Waiting for report'}
-        />
-        <MetricCard
-          label="Best ROI"
-          testId="metric-best-roi"
-          value={bestRoi ? percent.format(bestRoi.roi) : undefined}
-          helper={bestRoi ? `${bestRoi.model} / ${bestRoi.bookmaker}` : 'No run selected'}
-          icon={Trophy}
-        />
-        <MetricCard
-          label="Best Brier"
-          testId="metric-best-brier"
-          value={bestBrier ? decimal.format(bestBrier.brier_score) : undefined}
-          helper={bestBrier ? `${bestBrier.model} / ${bestBrier.bookmaker}` : 'No run selected'}
-          icon={Target}
+
+        <OperationalGuardrailsPanel
+          error={guardrailError}
+          loading={guardrailLoading}
+          status={guardrailStatus}
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Metadata summary</CardTitle>
-            <CardDescription>Replay context from the selected comparison report.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {detailLoading ? (
-              <RunTableSkeleton />
-            ) : metadataRows.length ? (
-              <div className="grid gap-2">
-                {metadataRows.map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                  >
-                    <span className="text-slate-500">{label}</span>
-                    <span className="truncate font-medium text-slate-900" title={value}>
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState text="No metadata available for this report." />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Sample-size warning</CardTitle>
-            <CardDescription>Use ROI carefully when settled samples are still small.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {detailLoading ? (
-              <Skeleton className="h-24 w-full" />
-            ) : detail?.analysis?.sample_size ? (
-              <div
-                className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
-                data-testid="sample-size-warning"
-              >
-                <div className="flex items-center gap-2 font-semibold">
-                  <AlertCircle className="h-4 w-4" />
-                  {detail.analysis.sample_size.smallest}-{detail.analysis.sample_size.largest}{' '}
-                  settled bets
-                </div>
-                <p className="mt-2 leading-6">{detail.analysis.sample_size.warning}</p>
-              </div>
-            ) : (
-              <EmptyState text="Analysis sample-size payload is not available." />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <MetricCard
-          label="Best log loss"
-          testId="metric-best-log-loss"
-          value={bestLogLoss ? decimal.format(bestLogLoss.log_loss) : undefined}
-          helper={
-            bestLogLoss ? `${bestLogLoss.model} / ${bestLogLoss.bookmaker}` : 'No run selected'
-          }
-          icon={Target}
-        />
-        <MetricCard
-          label="Total settled bets"
-          testId="metric-total-settled"
-          value={detailLoading ? undefined : String(totalSettledBets(runs))}
-          helper="Across visible model/bookmaker runs"
-          icon={Database}
-        />
-        <MetricCard
-          label="Analysis status"
-          testId="metric-analysis-status"
-          value={detail?.analysis ? 'Ready' : undefined}
-          helper={detail?.analysis?.interpretation ?? 'Waiting for analysis'}
-          icon={SlidersHorizontal}
-        />
-      </div>
-
-      <Suspense fallback={<ChartGridSkeleton />}>
-        <div className="grid gap-4 xl:grid-cols-2">
-          <MetricChart
-            data={chartData}
-            dataKey="roi"
-            description="ROI in percentage points."
-            loading={detailLoading}
-            title="ROI by model and bookmaker"
-          />
-          <MetricChart
-            data={chartData}
-            dataKey="brier"
-            description="Lower values indicate better calibration."
-            loading={detailLoading}
-            title="Brier score by model and bookmaker"
-          />
-          <MetricChart
-            data={chartData}
-            dataKey="logLoss"
-            description="Lower values indicate better probability quality."
-            loading={detailLoading}
-            title="Log loss by model and bookmaker"
-          />
-          <MetricChart
-            data={chartData}
-            dataKey="settledBets"
-            description="Settled sample size for each run."
-            loading={detailLoading}
-            title="Settled bets by model and bookmaker"
-          />
-        </div>
-      </Suspense>
-
-      <CrossReportPanel
-        loading={crossReportLoading}
-        rows={crossReportRows}
-        selectedRun={selectedRun}
-        selectedRunInsight={selectedRunInsight}
-        trendRows={crossReportTrendRows}
+      <AIAnalystPanel
+        analysis={aiAnalysis}
+        error={aiError}
+        loading={aiLoading}
       />
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Analysis guidance</CardTitle>
-            <CardDescription>Current interpretation and next experiment note.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {detailLoading ? (
-              <div className="grid gap-3">
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : detail?.analysis ? (
-              <div className="grid gap-4 text-sm text-slate-700">
-                <InfoBlock label="Interpretation" value={detail.analysis.interpretation} />
-                <InfoBlock label="Next experiment" value={detail.analysis.next_experiment} />
-              </div>
-            ) : (
-              <EmptyState text="Select a report to load analysis." />
-            )}
-          </CardContent>
-        </Card>
+      <details
+        className="rounded-md border border-slate-200 bg-white shadow-sm"
+        data-testid="diagnostics-section"
+      >
+        <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-slate-900">
+          <span className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Historical diagnostics
+          </span>
+          <span className="text-xs font-medium text-slate-500">
+            Model reports, charts, and run details
+          </span>
+        </summary>
+        <div className="grid gap-4 border-t border-slate-200 p-4">
+          <ReportCatalog
+            comparisons={comparisons}
+            loading={comparisonLoading}
+            onSelectReport={onSelectReport}
+            selectedName={selectedSummary?.name ?? ''}
+          />
 
-        <RunDetailCard
-          comparison={selectedRun ? buildRunComparison(selectedRun, runs) : undefined}
-          loading={detailLoading}
-          run={selectedRun}
-        />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Run ranking preview</CardTitle>
-          <CardDescription>
-            Model and bookmaker metrics from the selected report.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {detailLoading ? (
-            <RunTableSkeleton />
-          ) : (
-            <RunTable
-              runs={runs}
-              selectedRunKey={selectedRun ? runKey(selectedRun) : ''}
-              onSelectRun={setSelectedRunKey}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Reports indexed"
+              testId="metric-reports-indexed"
+              value={comparisonLoading ? undefined : String(comparisons.length)}
+              helper="Local comparison JSON files"
             />
-          )}
-        </CardContent>
-      </Card>
+            <MetricCard
+              label="Selected runs"
+              testId="metric-selected-runs"
+              value={detailLoading ? undefined : String(runs.length || selectedSummary?.runs || 0)}
+              helper={selectedSummary?.filename ?? 'Waiting for report'}
+            />
+            <MetricCard
+              label="Best ROI"
+              testId="metric-best-roi"
+              value={bestRoi ? percent.format(bestRoi.roi) : undefined}
+              helper={bestRoi ? `${bestRoi.model} / ${bestRoi.bookmaker}` : 'No run selected'}
+              icon={Trophy}
+            />
+            <MetricCard
+              label="Best Brier"
+              testId="metric-best-brier"
+              value={bestBrier ? decimal.format(bestBrier.brier_score) : undefined}
+              helper={bestBrier ? `${bestBrier.model} / ${bestBrier.bookmaker}` : 'No run selected'}
+              icon={Target}
+            />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
+            <Card>
+              <CardHeader>
+                <CardTitle>Metadata summary</CardTitle>
+                <CardDescription>Replay context from the selected comparison report.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {detailLoading ? (
+                  <RunTableSkeleton />
+                ) : metadataRows.length ? (
+                  <div className="grid gap-2">
+                    {metadataRows.map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                      >
+                        <span className="text-slate-500">{label}</span>
+                        <span className="truncate font-medium text-slate-900" title={value}>
+                          {value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState text="No metadata available for this report." />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Sample-size warning</CardTitle>
+                <CardDescription>Use ROI carefully when settled samples are still small.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {detailLoading ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : detail?.analysis?.sample_size ? (
+                  <div
+                    className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
+                    data-testid="sample-size-warning"
+                  >
+                    <div className="flex items-center gap-2 font-semibold">
+                      <AlertCircle className="h-4 w-4" />
+                      {detail.analysis.sample_size.smallest}-{detail.analysis.sample_size.largest}{' '}
+                      settled bets
+                    </div>
+                    <p className="mt-2 leading-6">{detail.analysis.sample_size.warning}</p>
+                  </div>
+                ) : (
+                  <EmptyState text="Analysis sample-size payload is not available." />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <MetricCard
+              label="Best log loss"
+              testId="metric-best-log-loss"
+              value={bestLogLoss ? decimal.format(bestLogLoss.log_loss) : undefined}
+              helper={
+                bestLogLoss ? `${bestLogLoss.model} / ${bestLogLoss.bookmaker}` : 'No run selected'
+              }
+              icon={Target}
+            />
+            <MetricCard
+              label="Total settled bets"
+              testId="metric-total-settled"
+              value={detailLoading ? undefined : String(totalSettledBets(runs))}
+              helper="Across visible model/bookmaker runs"
+              icon={Database}
+            />
+            <MetricCard
+              label="Analysis status"
+              testId="metric-analysis-status"
+              value={detail?.analysis ? 'Ready' : undefined}
+              helper={detail?.analysis?.interpretation ?? 'Waiting for analysis'}
+              icon={SlidersHorizontal}
+            />
+          </div>
+
+          <Suspense fallback={<ChartGridSkeleton />}>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <MetricChart
+                data={chartData}
+                dataKey="roi"
+                description="ROI in percentage points."
+                loading={detailLoading}
+                title="ROI by model and bookmaker"
+              />
+              <MetricChart
+                data={chartData}
+                dataKey="brier"
+                description="Lower values indicate better calibration."
+                loading={detailLoading}
+                title="Brier score by model and bookmaker"
+              />
+              <MetricChart
+                data={chartData}
+                dataKey="logLoss"
+                description="Lower values indicate better probability quality."
+                loading={detailLoading}
+                title="Log loss by model and bookmaker"
+              />
+              <MetricChart
+                data={chartData}
+                dataKey="settledBets"
+                description="Settled sample size for each run."
+                loading={detailLoading}
+                title="Settled bets by model and bookmaker"
+              />
+            </div>
+          </Suspense>
+
+          <CrossReportPanel
+            loading={crossReportLoading}
+            rows={crossReportRows}
+            selectedRun={selectedRun}
+            selectedRunInsight={selectedRunInsight}
+            trendRows={crossReportTrendRows}
+          />
+
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+            <Card>
+              <CardHeader>
+                <CardTitle>Analysis guidance</CardTitle>
+                <CardDescription>Current interpretation and next experiment note.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {detailLoading ? (
+                  <div className="grid gap-3">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ) : detail?.analysis ? (
+                  <div className="grid gap-4 text-sm text-slate-700">
+                    <InfoBlock label="Interpretation" value={detail.analysis.interpretation} />
+                    <InfoBlock label="Next experiment" value={detail.analysis.next_experiment} />
+                  </div>
+                ) : (
+                  <EmptyState text="Select a report to load analysis." />
+                )}
+              </CardContent>
+            </Card>
+
+            <RunDetailCard
+              comparison={selectedRun ? buildRunComparison(selectedRun, runs) : undefined}
+              loading={detailLoading}
+              run={selectedRun}
+            />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Run ranking preview</CardTitle>
+              <CardDescription>
+                Model and bookmaker metrics from the selected report.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {detailLoading ? (
+                <RunTableSkeleton />
+              ) : (
+                <RunTable
+                  runs={runs}
+                  selectedRunKey={selectedRun ? runKey(selectedRun) : ''}
+                  onSelectRun={setSelectedRunKey}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </details>
     </>
   )
 }
@@ -624,9 +647,9 @@ function LiveProcessMonitor({
       <CardHeader>
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <CardTitle>Live process monitor</CardTitle>
+            <CardTitle>Data freshness</CardTitle>
             <CardDescription>
-              Paper-only collection and settlement status from the local run registry.
+              Daily collection and paper-settlement status from the run registry.
             </CardDescription>
           </div>
           <Badge className={liveStatusClass(summary.statusTone)} variant="secondary">
@@ -719,11 +742,11 @@ function OperationalGuardrailsPanel({
             <CardTitle>
               <span className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" />
-                Operational guardrails
+              Research guardrails
               </span>
             </CardTitle>
             <CardDescription>
-              Warning and critical states before paper recommendations become misleading.
+              Warning and critical states before daily paper recommendations become misleading.
             </CardDescription>
           </div>
           <Badge className={guardrailBadgeClass(status?.overall_status)} variant="secondary">
@@ -733,7 +756,7 @@ function OperationalGuardrailsPanel({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-24 w-full" />
@@ -745,7 +768,7 @@ function OperationalGuardrailsPanel({
             Operational guardrails API is not reachable.
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
             {visibleGuardrails.map((guardrail) => (
               <div
                 className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm"
@@ -864,11 +887,11 @@ function RecommendationDashboardPanel({
             <CardTitle>
               <span className="flex items-center gap-2">
                 <Target className="h-4 w-4" />
-                Recommendation dashboard
+                Daily betting card
               </span>
             </CardTitle>
             <CardDescription>
-              Live paper recommendations, combinations, risk flags, odds movement, and AI review.
+              Best paper singles, ranked combinations, risk flags, odds movement, and AI review.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -890,6 +913,11 @@ function RecommendationDashboardPanel({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
+            <DailyDecisionSummary
+              combinationCount={summary.combinations.length}
+              recommendations={summary.rows}
+              review={review}
+            />
             <RecommendationFiltersBar
               filters={filters}
               gradeOptions={summary.gradeOptions}
@@ -919,6 +947,45 @@ function RecommendationDashboardPanel({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function DailyDecisionSummary({
+  combinationCount,
+  recommendations,
+  review,
+}: {
+  combinationCount: number
+  recommendations: ReturnType<typeof buildRecommendationDashboardSummary>['rows']
+  review?: AIAnalysisRun | null
+}) {
+  const topRecommendation = recommendations[0]
+
+  return (
+    <div className="grid gap-3 text-sm md:grid-cols-3" data-testid="daily-decision-summary">
+      <InfoBlock
+        label="Best single"
+        value={
+          topRecommendation
+            ? `${topRecommendation.selection} / ${topRecommendation.market} / EV ${formatOptionalPercent(
+                topRecommendation.expected_value,
+              )}`
+            : 'No active paper singles yet.'
+        }
+      />
+      <InfoBlock
+        label="Bet combinations"
+        value={
+          combinationCount
+            ? `${combinationCount} ranked paper combinations ready for review.`
+            : 'No ranked combinations yet.'
+        }
+      />
+      <InfoBlock
+        label="AI position"
+        value={review?.output.approval_state ?? 'missing'}
+      />
+    </div>
   )
 }
 

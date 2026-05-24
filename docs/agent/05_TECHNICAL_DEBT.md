@@ -166,6 +166,8 @@ Task 64 added Railway dashboard service packaging and configurable API CORS for 
 
 Task 65 added `Dockerfile.worker` and a Railway scheduled worker deployment path. It did not introduce code debt. The dedicated `worker` Railway service is deployed and cron-triggered runs work. The worker currently uses the deterministic Task 45 fixture snapshot, which is operationally acceptable for scheduler/database proof but not a substitute for fresh Misli public snapshot collection. Replace the fixture with a safe public/user-provided snapshot generation workflow before treating the worker as live provider coverage.
 
+Task 66 simplified the dashboard into a daily decision card and moved historical model analytics into collapsed diagnostics. It did not introduce new code debt. Existing product debt remains: the scheduled worker still uses deterministic fixture input, and recommendations do not yet consume richer current league, club, player, injury, lineup, or schedule context from external research sources.
+
 Task 36 added selected-run insight classification and did not introduce new documented technical debt.
 
 Task 37 made dashboard report ordering prefer generated comparison timestamps and did not introduce new documented technical debt.

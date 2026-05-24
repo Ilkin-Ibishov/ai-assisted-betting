@@ -516,6 +516,17 @@ Only after the offline sample pipeline works:
 - `tests/unit/test_scheduled_paper_worker_service.py`
 - `tests/unit/test_worker_monitoring_service.py`
 
+## Task 66 - Daily Decision Dashboard Simplification
+
+- `docs/tasks/task-66-daily-decision-dashboard-simplification.md`
+- `docs/superpowers/plans/2026-05-24-daily-decision-dashboard.md`
+- `docs/specs/dashboard.md`
+- `docs/decisions/ADR-0003-dashboard-stack.md`
+- `dashboard/src/App.tsx`
+- `dashboard/src/lib/recommendations.ts`
+- `dashboard/scripts/dashboard-smoke.mjs`
+- `docs/agent/05_TECHNICAL_DEBT.md`
+
 ## Task 22 - Dashboard Data API
 
 - `docs/tasks/task-22-dashboard-data-api.md`
