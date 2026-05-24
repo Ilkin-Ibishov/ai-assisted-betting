@@ -58,6 +58,7 @@ def test_live_paper_cycle_records_failed_run_when_collection_validation_fails(
 ) -> None:
     snapshot = _valid_snapshot()
     snapshot["events"][0]["kickoff_date"] = ""
+    snapshot["events"][0]["kickoff_time"] = ""
     snapshot_path = tmp_path / "misli-invalid.json"
     snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
     db_path = tmp_path / "test.sqlite"

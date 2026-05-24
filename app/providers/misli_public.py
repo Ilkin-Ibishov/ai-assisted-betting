@@ -147,15 +147,19 @@ def resolve_misli_public_event_date(raw_event: Any, scraped_at: str) -> Any:
 
 
 def _resolve_relative_kickoff(kickoff_time: str, scraped_at: str) -> tuple[str, str] | None:
+    scraped_local = _scraped_at_local(scraped_at)
+    if scraped_local is None:
+        return None
+    bare_time = re.match(r"^(?P<time>\d{1,2}:\d{2})$", kickoff_time)
+    if bare_time is not None:
+        return scraped_local.date().strftime("%d.%m.%Y"), bare_time.group("time")
+
     match = re.match(
         r"^(?P<label>bu\s+gün|bu\s+gun|bu\s+gã¼n|sabah)\s+(?P<time>\d{1,2}:\d{2})$",
         kickoff_time,
         re.IGNORECASE,
     )
     if match is None:
-        return None
-    scraped_local = _scraped_at_local(scraped_at)
-    if scraped_local is None:
         return None
     label = match.group("label").casefold()
     day_offset = 1 if label == "sabah" else 0

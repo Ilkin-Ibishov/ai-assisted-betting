@@ -554,7 +554,8 @@ def _provider_health_output(input_payload: dict[str, Any]) -> dict[str, Any]:
             risk_flags.append("provider_datetime_missing")
             recommended_actions.insert(
                 0,
-                "Continue resolving only high-confidence Misli date labels and reject bare times.",
+                "Continue resolving Misli date labels and bare times only against trusted "
+                "snapshot scraped_at timestamps.",
             )
         if not risk_flags:
             risk_flags.append("provider_validation_failure")

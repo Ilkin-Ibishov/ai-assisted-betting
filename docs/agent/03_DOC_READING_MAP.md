@@ -213,6 +213,7 @@ Only after the offline sample pipeline works:
 - `docs/research/misli-public-discovery.md`
 - `docs/tasks/task-67-fresh-snapshot-worker-input.md`
 - `docs/tasks/task-68-fresh-misli-snapshot-producer.md`
+- `docs/tasks/task-69-misli-bare-time-resolution.md`
 - `docs/specs/pipeline-flow.md`
 - `docs/specs/logging-and-evaluation.md`
 - `docs/specs/database-schema.md`

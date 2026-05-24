@@ -91,21 +91,21 @@ Misli frontend class or column-order changes can break collection or mislabel od
 Next:
 Task 38 added typed snapshot validation and fail-closed complete 1X2 validation. Task 53 added comma-odds normalization, non-empty identity validation, skipped-row extraction metadata, parser-drift errors for empty snapshots, and low-confidence errors when public rows do not become usable events. Continue to treat DOM-order mapping as provider risk until Task 54+ can validate odds movement against repeated snapshots.
 
-### P2 - Misli Bare Time-Only Kickoff Rows Remain Ambiguous
+### P2 - Misli Bare Time-Only Kickoff Rows Need Stronger Date Context
 
-Status: open  
-Introduced: Misli.az public Playwright snapshot prototype  
+Status: accepted
+Introduced: Misli.az public Playwright snapshot prototype
+Updated by: Task 69 - Misli Bare-Time Resolution
 Area: live provider discovery
 Owner: future Misli provider reliability task
 
-Task 47 resolves high-confidence relative public labels such as `Bu Gün HH:MM` and `Sabah HH:MM` against snapshot `scraped_at` in the `Asia/Baku` timezone. Some public rows still expose only bare `HH:MM` labels with no full date context.
+Task 47 resolves high-confidence relative public labels such as `Bu Gun HH:MM` and `Sabah HH:MM` against snapshot `scraped_at` in the `Asia/Baku` timezone. The first Task 68 production worker proof showed current Misli public pages can also expose bare `HH:MM` rows in the upcoming-event list.
 
 Impact:
-Bare time-only rows cannot be safely scheduled because the date is ambiguous. They are rejected and recorded as live-run errors.
+Task 69 resolves bare `HH:MM` rows to the snapshot `scraped_at` local date. This is accepted for the upcoming public football list because it unblocks real fresh snapshots while still requiring a trusted scrape timestamp.
 
 Next:
-Keep the fail-closed behavior. If these rows are needed later, derive the date only from a validated public page grouping, allowed detail-page context, or another explicit user-provided snapshot field.
-
+The stronger long-term source of truth remains date group/header extraction from the rendered page, allowed detail-page context, or another explicit user-provided snapshot field.
 ## Recent No-Debt Implementation Notes
 
 Task 22 added a read-only dashboard API without introducing new documented technical debt.
@@ -314,15 +314,15 @@ Task 46 added scoped prediction service helpers and made `run-live-paper-cycle` 
 
 ### P1 - Fresh Misli Snapshot Producer Needs Railway Scheduling Proof
 
-Status: open
+Status: resolved
 Introduced: Task 68 - Fresh Misli Snapshot Producer
+Resolved by: Task 68 Railway wiring
 Area: live ingestion and Railway operations
 
-Task 68 added the API latest-snapshot store, token-protected snapshot ingest, producer POST support, and `Dockerfile.snapshot`. The code path is ready for local verification, but production still needs a scheduled Railway snapshot producer service wired with `SNAPSHOT_INGEST_TOKEN`, `SNAPSHOT_POST_URL`, and the worker `WORKER_SNAPSHOT_URL`.
+Task 68 added the API latest-snapshot store, token-protected snapshot ingest, producer POST support, and `Dockerfile.snapshot`. Railway now has a scheduled `snapshot-producer` service, API `SNAPSHOT_INGEST_TOKEN`, producer `SNAPSHOT_POST_URL`, and worker `WORKER_SNAPSHOT_URL`.
 
-Resolution target:
-Create/schedule the Railway producer service, run a fresh Misli producer cycle, verify the API snapshot endpoint returns new data, run the worker against that endpoint, and confirm the daily dashboard reflects the fresh run.
-
+Resolution:
+Created and deployed the `snapshot-producer` Railway service. A one-off producer run posted a fresh 21-event Misli snapshot to `/api/live/snapshots/latest/misli-public`. The remaining production proof shifted to Task 69 because the first worker run consumed the fresh snapshot but failed on a bare `HH:MM` kickoff row.
 ### P2 - Recommendation Inputs Are Still Odds-First
 
 Status: open

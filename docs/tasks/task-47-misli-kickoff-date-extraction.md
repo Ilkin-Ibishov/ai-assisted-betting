@@ -26,7 +26,7 @@ Task 47 added a guarded date resolver in `app/providers/misli_public.py`:
 ```text
 Bu Gün HH:MM -> scraped_at date in Asia/Baku
 Sabah HH:MM -> scraped_at date + 1 day in Asia/Baku
-bare HH:MM -> rejected unless a full kickoff_date is present
+bare HH:MM -> resolved to snapshot scraped_at local date by Task 69
 ```
 
 The resolver runs before Pydantic event validation and is also used by `LiveCollectionService` for per-event validation. The public snapshot tool still records raw page output; the provider layer owns the confidence decision.
@@ -41,7 +41,7 @@ collect-matches errors: 1
 collect-odds created: 60
 ```
 
-The skipped row had a bare time label without date context and correctly failed closed.
+Task 69 changed this behavior after live Railway proof showed bare time rows are common on the upcoming-event list. Bare `HH:MM` now resolves to the snapshot `scraped_at` local date while still requiring a valid scrape timestamp.
 
 ## Verification
 
@@ -61,4 +61,4 @@ No blocker for high-confidence relative-date Misli rows. Bare time-only rows rem
 
 ## Technical Debt
 
-Narrowed the existing P2 Misli kickoff-date extraction debt. Relative date labels are resolved; bare time-only rows still fail closed.
+Narrowed the existing P2 Misli kickoff-date extraction debt. Relative date labels are resolved; Task 69 also resolves bare time-only rows against trusted snapshot `scraped_at`. Rendered date-group extraction remains a stronger future improvement.

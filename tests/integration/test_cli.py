@@ -321,6 +321,7 @@ def test_manual_live_collection_command_records_misli_validation_errors(tmp_path
     db_path = tmp_path / "live-invalid.sqlite"
     snapshot = _valid_misli_snapshot()
     snapshot["events"][0]["kickoff_date"] = ""
+    snapshot["events"][0]["kickoff_time"] = ""
     snapshot_path = tmp_path / "misli-invalid.json"
     snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
     env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}

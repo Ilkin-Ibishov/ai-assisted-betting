@@ -61,7 +61,7 @@ def test_misli_public_snapshot_accepts_complete_public_1x2_event() -> None:
     assert snapshot.events[0].odds[0].selection == "HOME"
 
 
-def test_misli_public_snapshot_fails_closed_for_missing_full_kickoff_date() -> None:
+def test_misli_public_snapshot_fails_closed_for_missing_kickoff_datetime() -> None:
     with pytest.raises(ValidationError, match="full kickoff date"):
         MisliPublicSnapshot.model_validate(
             {
@@ -78,7 +78,7 @@ def test_misli_public_snapshot_fails_closed_for_missing_full_kickoff_date() -> N
                         "home_team": "Rid",
                         "away_team": "Volfsberq",
                         "kickoff_date": "",
-                        "kickoff_time": "20:30",
+                        "kickoff_time": "",
                         "league": "Bundesliqa, Avropa Liqasi Pley-Off",
                         "odds": [
                             {"market": "1X2", "selection": "HOME", "odds_decimal": 2.16},
@@ -160,35 +160,38 @@ def test_misli_public_snapshot_derives_tomorrow_date_from_kickoff_time_label() -
     assert event.kickoff_time == "02:00"
 
 
-def test_misli_public_snapshot_fails_closed_for_ambiguous_time_without_date() -> None:
-    with pytest.raises(ValidationError, match="full kickoff date"):
-        MisliPublicSnapshot.model_validate(
-            {
-                "source": "misli_public",
-                "page_url": "https://www.misli.az/idman-novleri/futbol",
-                "scraped_at": "2026-05-20T14:58:36.426Z",
-                "event_count": 1,
-                "events": [
-                    {
-                        "source": "misli_public",
-                        "sport": "football",
-                        "event_id": "2818394",
-                        "source_match_id": "misli:football:2818394",
-                        "home_team": "Home",
-                        "away_team": "Away",
-                        "kickoff_date": "",
-                        "kickoff_time": "20:30",
-                        "league": "Premyer Liqa",
-                        "odds": [
-                            {"market": "1X2", "selection": "HOME", "odds_decimal": 2.43},
-                            {"market": "1X2", "selection": "DRAW", "odds_decimal": 2.33},
-                            {"market": "1X2", "selection": "AWAY", "odds_decimal": 3.13},
-                        ],
-                        "raw_text": "20:30 Home - Away",
-                    }
-                ],
-            }
-        )
+def test_misli_public_snapshot_derives_today_date_from_bare_time() -> None:
+    snapshot = MisliPublicSnapshot.model_validate(
+        {
+            "source": "misli_public",
+            "page_url": "https://www.misli.az/idman-novleri/futbol",
+            "scraped_at": "2026-05-20T14:58:36.426Z",
+            "event_count": 1,
+            "events": [
+                {
+                    "source": "misli_public",
+                    "sport": "football",
+                    "event_id": "2818394",
+                    "source_match_id": "misli:football:2818394",
+                    "home_team": "Home",
+                    "away_team": "Away",
+                    "kickoff_date": "",
+                    "kickoff_time": "20:30",
+                    "league": "Premyer Liqa",
+                    "odds": [
+                        {"market": "1X2", "selection": "HOME", "odds_decimal": 2.43},
+                        {"market": "1X2", "selection": "DRAW", "odds_decimal": 2.33},
+                        {"market": "1X2", "selection": "AWAY", "odds_decimal": 3.13},
+                    ],
+                    "raw_text": "20:30 Home - Away",
+                }
+            ],
+        }
+    )
+
+    event = snapshot.events[0]
+    assert event.kickoff_date == "20.05.2026"
+    assert event.kickoff_time == "20:30"
 
 
 def test_misli_public_snapshot_fails_closed_for_incomplete_1x2_odds() -> None:

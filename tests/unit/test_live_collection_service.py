@@ -43,6 +43,7 @@ def test_live_collection_imports_valid_misli_snapshot_idempotently(tmp_path) -> 
 def test_live_collection_refuses_misli_match_without_full_kickoff_date(tmp_path) -> None:
     snapshot = _valid_snapshot()
     snapshot["events"][0]["kickoff_date"] = ""
+    snapshot["events"][0]["kickoff_time"] = ""
     snapshot_path = tmp_path / "misli-missing-date.json"
     snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
     engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'test.sqlite').as_posix()}")

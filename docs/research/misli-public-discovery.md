@@ -102,7 +102,7 @@ The provider now resolves only high-confidence relative labels against `scraped_
 ```text
 Bu Gün HH:MM -> scraped_at local date
 Sabah HH:MM -> scraped_at local date + 1 day
-bare HH:MM -> reject unless kickoff_date is already present
+bare HH:MM -> resolve to snapshot scraped_at local date
 ```
 
 Task 47 scratch import evidence:
@@ -115,13 +115,13 @@ match errors: 1
 odds created: 60
 ```
 
-The skipped row had only a bare time label and no full date context, so the provider correctly failed closed.
+Task 69 changed this after production proof showed current upcoming-event pages can include bare time rows. The provider now resolves bare `HH:MM` to the snapshot `scraped_at` local date.
 
 ## Limitations
 
 - The snapshot uses rendered DOM selectors, so frontend class churn can break collection.
 - In headless Playwright, 1X2 labels may be hidden while values remain visible; the prototype maps the first three odds columns to HOME, DRAW, AWAY.
-- Public rows can now resolve `Bu Gün` and `Sabah` relative date labels, but bare time-only rows remain ambiguous and are rejected.
+- Public rows can now resolve `Bu Gün`, `Sabah`, and bare `HH:MM` labels against trusted snapshot `scraped_at`; rendered date-group extraction remains a stronger future improvement.
 - The current tool collects a snapshot only; it does not import into SQLite or join against results.
 - Event detail pages were not scraped during discovery.
 

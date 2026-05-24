@@ -398,7 +398,9 @@ Task 59 added historical recommendation backtesting for the live recommendation 
 
 Task 67 added fresh snapshot consumption for scheduled workers. The worker can now consume an HTTPS JSON snapshot URL and refresh recommendations, combinations, and AI review after successful collection.
 
-Task 68 added the next source step: a token-protected API latest-snapshot store plus a browser-enabled Misli producer that can POST public snapshot JSON into the API. The intended production flow is `Misli public page -> snapshot producer -> API latest snapshot endpoint -> worker WORKER_SNAPSHOT_URL -> recommendations/combinations/AI review -> dashboard`. The remaining production step is Railway scheduling and end-to-end proof of that flow.
+Task 68 added the next source step: a token-protected API latest-snapshot store plus a browser-enabled Misli producer that can POST public snapshot JSON into the API. The intended production flow is `Misli public page -> snapshot producer -> API latest snapshot endpoint -> worker WORKER_SNAPSHOT_URL -> recommendations/combinations/AI review -> dashboard`.
+
+Task 69 resolves bare Misli `HH:MM` rows to the snapshot `scraped_at` local date. Rows still fail closed when the scrape timestamp is missing or invalid. This policy came from the first production fresh-snapshot proof, where the producer posted 21 events but the worker failed on one bare-time row.
 
 ## Non-Goals
 

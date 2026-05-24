@@ -86,6 +86,7 @@ Build in this order:
 - Task 66 - Daily Decision Dashboard Simplification
 - Task 67 - Fresh Snapshot Worker Input
 - Task 68 - Fresh Misli Snapshot Producer
+- Task 69 - Misli Bare-Time Resolution
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -93,10 +94,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Deploy and schedule the browser-enabled Misli snapshot producer on Railway, then prove the full fresh-data loop from producer to API to worker to dashboard.
+Deploy the Misli bare-time parser fix to Railway, then prove the full fresh-data loop from producer to API to worker to dashboard.
 ```
 
-Task 68 added the API latest-snapshot store, producer POST support, and a browser-enabled `Dockerfile.snapshot`. It is not production-complete until Railway has a scheduled producer service with `SNAPSHOT_INGEST_TOKEN`, `SNAPSHOT_POST_URL`, and the worker `WORKER_SNAPSHOT_URL` wired to the API snapshot endpoint. New product work should prioritize this end-to-end proof, then richer club/player/stat sources. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.
+Task 68 added and deployed the API latest-snapshot store, producer POST support, a browser-enabled `Dockerfile.snapshot`, and a scheduled `snapshot-producer` Railway service. The first fresh proof stored a 21-event Misli snapshot, but the worker failed on a bare `HH:MM` kickoff row. Task 69 fixes that parser gap locally. New product work should prioritize deployment and end-to-end proof, then richer club/player/stat sources. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.
 
 Required verification commands after implementation:
 

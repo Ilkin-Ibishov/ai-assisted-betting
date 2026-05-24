@@ -79,7 +79,7 @@ Resolved direction: Misli.az is the first localized provider candidate for Tasks
 
 Resolved direction: Task 38 must model Misli as a public snapshot source with typed DTOs and fail-closed validation. Task 40 may import Misli only after full kickoff datetime and complete 1X2 odds validation pass; otherwise it should keep a deterministic fake/manual provider path.
 
-Open: decide the safest full kickoff datetime strategy for Misli public rows. Options include extracting date group context from the rendered page, deriving only from validated public route/date controls, or refusing imports until a complete datetime appears in the snapshot. Task 45 confirmed the 2026-05-20 public snapshot still had 1X2 odds but no full kickoff dates.
+Resolved direction: Task 69 resolves bare Misli `HH:MM` rows to the snapshot `scraped_at` local date while still failing closed when the scrape timestamp is missing or invalid. Stronger date group extraction from rendered page headers remains technical debt, not an open product decision.
 
 Resolved direction: live run registry uses a single SQLite `live_runs` table for MVP. Split detailed errors into a child table only if Task 40 or dashboard monitoring needs more than `errors_count` and `error_summary`.
 

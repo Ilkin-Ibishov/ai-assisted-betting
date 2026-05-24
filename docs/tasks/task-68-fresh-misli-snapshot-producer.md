@@ -1,6 +1,6 @@
 # Task 68 - Fresh Misli Snapshot Producer
 
-Status: completed locally, pending Railway service wiring
+Status: completed and deployed
 
 ## Goal
 
@@ -75,6 +75,22 @@ Worker service:
 WORKER_SNAPSHOT_URL=https://ai-assisted-betting-production.up.railway.app/api/live/snapshots/latest/misli-public
 ```
 
+## Railway Proof
+
+- Created Railway service `snapshot-producer`.
+- Deployed `Dockerfile.snapshot` with cron schedule `*/30 * * * *`.
+- Configured API `SNAPSHOT_INGEST_TOKEN`, producer `SNAPSHOT_POST_URL`, and worker `WORKER_SNAPSHOT_URL`.
+- Ran one producer cycle with Railway environment variables.
+- Verified `GET /api/live/snapshots/latest/misli-public` returned:
+
+```text
+status=200
+event_count=21
+source=misli_public
+```
+
+The first worker proof consumed that snapshot URL but failed on one bare `HH:MM` kickoff row. Task 69 resolves that parser gap.
+
 Snapshot producer service:
 
 ```env
@@ -86,8 +102,7 @@ SNAPSHOT_INGEST_TOKEN=<same-secret-as-api>
 
 ## What's Next
 
-- Deploy and schedule the dedicated snapshot producer on Railway.
-- Run an end-to-end proof where the producer posts a fresh snapshot, the worker consumes the API snapshot URL, and the dashboard shows fresh daily recommendations.
+- Deploy Task 69 and run an end-to-end proof where the worker consumes the fresh API snapshot URL and the dashboard shows fresh daily recommendations.
 - Add richer team, league, player, injury, lineup, and schedule research sources after the fresh odds loop is proven.
 
 ## Blockers

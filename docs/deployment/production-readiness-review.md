@@ -77,7 +77,7 @@ API, dashboard, and scheduled-worker deployment proof is complete for the curren
 | Offline sample pipeline | Pass | CLI import, feature, prediction, paper-bet, settlement, evaluation flow exists and is tested. |
 | Historical replay and comparison | Pass | Football-Data import, replay, multi-bookmaker comparison, ranking, analysis, and dashboard reports are implemented. |
 | Dashboard | Pass | React/Vite dashboard includes report catalog, charts, process monitor, AI analyst, recommendations, and guardrails. |
-| Public Misli ingestion | Conditional | Public snapshot parser is validated and fail-closed, but rendered DOM dependency and bare time-only rows remain risks. |
+| Public Misli ingestion | Conditional | Public snapshot parser is validated and fail-closed, but rendered DOM dependency and inferred bare time-only rows remain risks. |
 | Live paper worker | Pass for staging setup | One-shot worker exists, refuses unsafe config, skips overlaps, and is monitored through worker status. |
 | Recommendations | Conditional | Deterministic recommendations and combinations exist, but risk model remains simplified and requires larger paper backtests. |
 | AI assistance | Pass for deterministic advisory mode | AI analysis records, prompt versions, eval gates, recommendation review, and backtest summaries exist. Optional LLM provider is not implemented. |

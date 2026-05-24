@@ -428,12 +428,13 @@ Production smoke passed against `https://ai-assisted-betting-production.up.railw
 The dedicated Railway `worker` service was created, deployed with `Dockerfile.worker`, and configured with cron schedule `*/30 * * * *`.
 The cron-triggered worker run at `2026-05-24T14:01:20Z` completed and refreshed `/api/live/worker-status`.
 Task 67 commit `b1faa48` deployed successfully to the API service through GitHub. The updated worker image was deployed through Railway upload deployment `95a519c2-3c27-4d33-b6f5-755b866bd77a` after recreating the worker upload `railway.json` without a UTF-8 BOM. Production smoke passed after the deploy.
-Task 68 adds the API latest-snapshot endpoints and `Dockerfile.snapshot` for a dedicated Playwright producer service. Production still needs the API `SNAPSHOT_INGEST_TOKEN`, worker `WORKER_SNAPSHOT_URL`, and a scheduled producer service wired to `SNAPSHOT_POST_URL`.
+Task 68 added the API latest-snapshot endpoints and `Dockerfile.snapshot` for a dedicated Playwright producer service.
+Task 68 Railway wiring created `snapshot-producer`, deployed it with `Dockerfile.snapshot`, configured a `*/30 * * * *` schedule, and posted a fresh 21-event Misli snapshot through the API latest-snapshot endpoint. The first worker proof consumed that URL but failed on a bare `HH:MM` row; Task 69 resolves that parser gap locally and needs deploy proof.
 ```
 
 Next operational checks:
 
-1. Deploy and schedule the browser-enabled snapshot producer service.
+1. Deploy Task 69 to the API/worker code.
 2. Confirm producer -> API latest snapshot -> worker -> dashboard end-to-end freshness.
 3. Add richer current league, team, player, injury, lineup, and schedule sources for recommendation quality.
 
