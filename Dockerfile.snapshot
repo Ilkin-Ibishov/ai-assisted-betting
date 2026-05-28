@@ -1,4 +1,4 @@
-FROM node:24-bookworm
+FROM mcr.microsoft.com/playwright:v1.60.0-noble
 
 ENV NODE_ENV=production
 
@@ -6,8 +6,7 @@ WORKDIR /app
 
 COPY dashboard/package.json dashboard/package-lock.json ./dashboard/
 RUN cd dashboard \
-    && npm install \
-    && npx playwright install --with-deps chromium
+    && npm install
 
 COPY tools ./tools
 

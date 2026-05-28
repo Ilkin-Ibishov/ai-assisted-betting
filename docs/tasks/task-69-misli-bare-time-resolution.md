@@ -1,6 +1,6 @@
 # Task 69 - Misli Bare-Time Resolution
 
-Status: completed locally, pending deploy proof
+Status: completed and deployed; end-to-end fresh loop proof still pending
 
 ## Goal
 
@@ -64,13 +64,12 @@ Dashboard smoke: passed
 
 ## What's Next
 
-- Run the full verification suite.
-- Deploy the parser fix to Railway.
-- Trigger or wait for the worker to consume the already-published fresh snapshot and verify the live cycle completes.
+- Trigger or wait for the worker to consume a fresh Task 70 snapshot and verify the live cycle completes.
 
 ## Blockers
 
-- No local parser blocker remains for bare `HH:MM` Misli rows.
+- No parser blocker remains for bare `HH:MM` Misli rows.
+- The current operational blocker is waiting for the next Railway worker run to consume the fresh Task 70 snapshot.
 
 ## Technical Debt
 

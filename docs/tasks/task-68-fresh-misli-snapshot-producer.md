@@ -18,7 +18,7 @@ Create the missing source step between Misli.az public football pages and the sc
   - `--token`
   - `SNAPSHOT_INGEST_TOKEN` fallback
   - strict post URL validation for the API latest-snapshot endpoint
-- Added `Dockerfile.snapshot`, a browser-enabled Node/Playwright image for a dedicated snapshot producer service.
+- Added `Dockerfile.snapshot`, a browser-enabled Playwright image for a dedicated snapshot producer service. Task 70 later switched it to the official Playwright base image for more reliable Railway builds.
 - Updated `.env.example` so API, worker, and producer variables show the intended Railway flow.
 - Added snapshot producer tests for unsafe post URLs and missing tokens.
 
@@ -107,7 +107,7 @@ SNAPSHOT_INGEST_TOKEN=<same-secret-as-api>
 
 ## Blockers
 
-- The producer service still needs Railway service creation/scheduling and secret configuration.
+- The producer service exists on Railway and has scheduling/secret configuration. Task 70 completed the latest producer image redeploy proof.
 - Recommendation quality remains odds-first until richer football context sources are integrated.
 
 ## Technical Debt

@@ -333,3 +333,18 @@ The fresh Misli producer captures public list-page odds and match metadata. It d
 
 Resolution target:
 Add vetted public/statistical football data sources and incorporate them into recommendation scoring and AI review before calling the system product-complete for daily decision support.
+
+### P1 - Snapshot Producer Railway Upload Stuck In Building
+
+Status: resolved
+Introduced: Task 70 - Snapshot Producer Railway Image
+Resolved by: Task 70 - Snapshot Producer Railway Image
+Area: Railway operations
+
+The latest `snapshot-producer` Railway upload used `Dockerfile.snapshot`, installed Playwright browsers during build, exported an image, but remained as a stopped `BUILDING` deployment without becoming the active successful cron image.
+
+Resolution:
+Task 70 switched `Dockerfile.snapshot` to `mcr.microsoft.com/playwright:v1.60.0-noble` so browser dependencies are supplied by the base image. Railway deployment `df944e43-9e2c-4bad-9b1f-0c582f4e5e37` reports `SUCCESS`, the old stopped `BUILDING` deployment was removed, and an immediate producer run posted a fresh 21-event snapshot with `scraped_at=2026-05-28T00:05:28.437Z`.
+
+Follow-up:
+The producer image debt is closed. The next operational proof is the scheduled worker consuming that fresh snapshot and refreshing dashboard recommendations.

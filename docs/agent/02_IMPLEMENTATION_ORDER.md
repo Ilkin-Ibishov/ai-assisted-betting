@@ -87,6 +87,7 @@ Build in this order:
 - Task 67 - Fresh Snapshot Worker Input
 - Task 68 - Fresh Misli Snapshot Producer
 - Task 69 - Misli Bare-Time Resolution
+- Task 70 - Snapshot Producer Railway Image
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -94,10 +95,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Deploy the Misli bare-time parser fix to Railway, then prove the full fresh-data loop from producer to API to worker to dashboard.
+Wait for or trigger the Railway worker to consume the fresh Misli snapshot, then prove the full fresh-data loop from producer to API to worker to dashboard.
 ```
 
-Task 68 added and deployed the API latest-snapshot store, producer POST support, a browser-enabled `Dockerfile.snapshot`, and a scheduled `snapshot-producer` Railway service. The first fresh proof stored a 21-event Misli snapshot, but the worker failed on a bare `HH:MM` kickoff row. Task 69 fixes that parser gap locally. New product work should prioritize deployment and end-to-end proof, then richer club/player/stat sources. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.
+Task 68 added and deployed the API latest-snapshot store, producer POST support, a browser-enabled `Dockerfile.snapshot`, and a scheduled `snapshot-producer` Railway service. The first fresh proof stored a 21-event Misli snapshot, but the worker failed on a bare `HH:MM` kickoff row. Task 69 fixes that parser gap and the API/worker deployment is healthy. Task 70 switched the producer to the official Playwright image because the previous Railway upload exported an image but stayed as a stopped `BUILDING` deployment; deployment `df944e43-9e2c-4bad-9b1f-0c582f4e5e37` is successful and a fresh snapshot was posted at `2026-05-28T00:05:28Z`. New product work should prioritize the next scheduled worker proof, then richer club/player/stat sources. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.
 
 Required verification commands after implementation:
 
