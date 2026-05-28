@@ -9,6 +9,7 @@ Make the Railway `snapshot-producer` deployment repeatable after the previous up
 ## What Changed
 
 - Switched `Dockerfile.snapshot` from `node:24-bookworm` plus `npx playwright install --with-deps chromium` to the official `mcr.microsoft.com/playwright:v1.60.0-noble` base image.
+- Added `railway.snapshot.json` and `railway.worker.json` so GitHub auto-deploys can use service-specific config-as-code files instead of applying the API `railway.json` to cron services.
 - Kept the producer command unchanged:
   - read the public Misli football page
   - create snapshot JSON
@@ -51,6 +52,14 @@ latest_snapshot.scraped_at=2026-05-28T00:05:28.437Z
 latest_snapshot.event_count=21
 ```
 
+Railway config-as-code follow-up:
+
+```text
+api config file: /railway.json
+worker config file: /railway.worker.json
+snapshot-producer config file: /railway.snapshot.json
+```
+
 Full verification remains required before declaring the implementation complete:
 
 ```powershell
@@ -67,7 +76,7 @@ $env:PLAYWRIGHT_CHANNEL='chrome'; npm run smoke
 ## What's Next
 
 - Confirm the scheduled worker consumes the fresh snapshot and refreshes the dashboard data.
-- Run the full local verification suite after docs and image updates.
+- Confirm the service-specific config files are honored on the next GitHub auto-deploy.
 
 ## Blockers
 
