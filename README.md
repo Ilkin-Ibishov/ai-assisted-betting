@@ -97,7 +97,7 @@ Railway setup, smoke checks, rollback, and guardrail triage are documented in:
 docs/deployment/railway-readiness.md
 ```
 
-The API service includes repo-level Railway config in `railway.json` and `Dockerfile` for dependency installation, API start, healthcheck, and restart policy.
+Railway service settings store the active service-specific build configuration. The repo keeps `railway.api.json`, `railway.worker.json`, and `railway.snapshot.json` as references; do not restore a root `railway.json`, because Railway applies a root config-as-code file to every repo-linked service.
 
 The dashboard service is packaged from `dashboard/` with:
 

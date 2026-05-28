@@ -9,7 +9,8 @@ Make the Railway `snapshot-producer` deployment repeatable after the previous up
 ## What Changed
 
 - Switched `Dockerfile.snapshot` from `node:24-bookworm` plus `npx playwright install --with-deps chromium` to the official `mcr.microsoft.com/playwright:v1.60.0-noble` base image.
-- Added `railway.snapshot.json` and `railway.worker.json` so GitHub auto-deploys can use service-specific config-as-code files instead of applying the API `railway.json` to cron services.
+- Added `railway.api.json`, `railway.snapshot.json`, and `railway.worker.json` as service-specific config references.
+- Removed the root `railway.json` because Railway applies a root config-as-code file to every repo-linked service; that caused worker and producer GitHub auto-deploys to inherit the API image.
 - Kept the producer command unchanged:
   - read the public Misli football page
   - create snapshot JSON
@@ -55,9 +56,10 @@ latest_snapshot.event_count=21
 Railway config-as-code follow-up:
 
 ```text
-api config file: /railway.json
+api config reference: /railway.api.json
 worker config file: /railway.worker.json
 snapshot-producer config file: /railway.snapshot.json
+active Railway service settings now store the service-specific Dockerfile paths
 ```
 
 Full verification remains required before declaring the implementation complete:
@@ -76,11 +78,12 @@ $env:PLAYWRIGHT_CHANNEL='chrome'; npm run smoke
 ## What's Next
 
 - Confirm the scheduled worker consumes the fresh snapshot and refreshes the dashboard data.
-- Confirm the service-specific config files are honored on the next GitHub auto-deploy.
+- Confirm the next GitHub auto-deploy uses Railway service settings now that root `railway.json` no longer overrides every service.
 
 ## Blockers
 
 - No producer-image blocker remains. The previous stopped `BUILDING` deployment was removed after the clean deploy.
+- Root config-as-code override was removed locally and must be verified after the next push.
 - End-to-end proof is waiting for the next scheduled worker run after the fresh snapshot.
 
 ## Technical Debt

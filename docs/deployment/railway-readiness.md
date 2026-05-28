@@ -430,9 +430,9 @@ The cron-triggered worker run at `2026-05-24T14:01:20Z` completed and refreshed 
 Task 67 commit `b1faa48` deployed successfully to the API service through GitHub. The updated worker image was deployed through Railway upload deployment `95a519c2-3c27-4d33-b6f5-755b866bd77a` after recreating the worker upload `railway.json` without a UTF-8 BOM. Production smoke passed after the deploy.
 Task 68 added the API latest-snapshot endpoints and `Dockerfile.snapshot` for a dedicated Playwright producer service.
 Task 68 Railway wiring created `snapshot-producer`, deployed it with `Dockerfile.snapshot`, configured a `*/30 * * * *` schedule, and posted a fresh 21-event Misli snapshot through the API latest-snapshot endpoint. The first worker proof consumed that URL but failed on a bare `HH:MM` row; Task 69 resolves that parser gap and the API/worker images were redeployed. A later producer upload using the browser-installing image exported successfully but stayed as a stopped `BUILDING` deployment, so Task 70 switched the producer to the official Playwright base image. Deployment `df944e43-9e2c-4bad-9b1f-0c582f4e5e37` is successful and an immediate producer run posted a fresh 21-event snapshot with `scraped_at=2026-05-28T00:05:28.437Z`.
-Task 70 also added service-specific Railway config files for repo-linked auto-deploys:
+Task 70 also removed the root `railway.json` after confirming Railway applies a root config-as-code file to every repo-linked service. Active Railway service settings now store the service-specific Dockerfile paths, and the repo keeps service-specific config references:
 
-- API service: `/railway.json`
+- API service: `/railway.api.json`
 - Worker service: `/railway.worker.json`
 - Snapshot producer service: `/railway.snapshot.json`
 ```
@@ -481,6 +481,8 @@ production-smoke with dashboard URL: passed against https://dashboard-production
 Railway cron worker: completed run started at 2026-05-24T14:01:20Z
 Task 67 worker image deploy: SUCCESS
 Task 70 snapshot producer image deploy: SUCCESS
+Task 70 worker image restore deploy: SUCCESS
+Root railway.json removed to prevent API config overriding cron service auto-deploys
 latest Misli snapshot scraped_at: 2026-05-28T00:05:28.437Z
 latest API logs redact the database password
 ```
