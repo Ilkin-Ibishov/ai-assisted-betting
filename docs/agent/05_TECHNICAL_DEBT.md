@@ -351,11 +351,24 @@ The producer image debt is closed. The next operational proof is the scheduled w
 
 ### P1 - Fresh Misli Snapshot Contains Non-Actionable 1.00 Odds
 
-Status: in progress
+Status: resolved
 Introduced: Task 70 - Snapshot Producer Railway Image
+Resolved by: Task 70 - Snapshot Producer Railway Image
 Area: live ingestion and provider validation
 
 The first scheduled worker run after the fresh snapshot proof consumed the latest Misli snapshot but failed provider validation on two rows where a primary 1X2 odd was exactly `1.00`. The provider correctly rejects odds at or below 1, but the producer should not post rows that cannot become valid advisory paper-bet inputs.
 
-Resolution target:
-Task 70 filters producer rows unless HOME, DRAW, and AWAY 1X2 selections are all present and all primary 1X2 odds are greater than 1. Close this debt after a Railway worker run completes on a filtered fresh snapshot.
+Resolution:
+Task 70 filters producer rows unless HOME, DRAW, and AWAY 1X2 selections are all present and all primary 1X2 odds are greater than 1. The Railway worker run started at `2026-05-28T01:00:33Z` completed with zero errors on the filtered fresh snapshot.
+
+### P2 - Snapshot Producer Logs Full Snapshot Payloads
+
+Status: resolved
+Introduced: Task 70 - Snapshot Producer Railway Image
+Resolved by: Task 70 - Snapshot Producer Railway Image
+Area: Railway operations
+
+The first successful scheduled producer run emitted the full snapshot JSON to Railway logs and hit the Railway per-replica log rate limit.
+
+Resolution:
+The producer now writes JSON to stdout only when it is not posting to the API and no `--out` path is provided. Cron producer runs still emit the concise `snapshot_posted=<url>` stderr line.

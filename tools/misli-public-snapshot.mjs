@@ -182,7 +182,7 @@ try {
   if (outPath) {
     await mkdir(path.dirname(outPath), { recursive: true });
     await writeFile(outPath, json, "utf8");
-  } else {
+  } else if (!postUrl) {
     process.stdout.write(json);
   }
   if (postUrl) {
