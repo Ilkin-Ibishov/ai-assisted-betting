@@ -130,6 +130,18 @@ try {
             };
           })
           .filter(Boolean);
+        const primaryOdds = odds.filter((odd) => odd.market === "1X2");
+        const primarySelections = new Set(primaryOdds.map((odd) => odd.selection));
+        if (
+          !["HOME", "DRAW", "AWAY"].every((selection) => primarySelections.has(selection))
+          || primaryOdds.some((odd) => odd.odds_decimal <= 1)
+        ) {
+          skippedRows.push({
+            reason: "missing or non-actionable 1X2 odds",
+            raw_text: clean(node.textContent),
+          });
+          continue;
+        }
 
         events.push({
           source: "misli_public",

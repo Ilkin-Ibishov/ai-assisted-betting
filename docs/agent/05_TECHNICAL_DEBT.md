@@ -348,3 +348,14 @@ Task 70 switched `Dockerfile.snapshot` to `mcr.microsoft.com/playwright:v1.60.0-
 
 Follow-up:
 The producer image debt is closed. The next operational proof is the scheduled worker consuming that fresh snapshot and refreshing dashboard recommendations.
+
+### P1 - Fresh Misli Snapshot Contains Non-Actionable 1.00 Odds
+
+Status: in progress
+Introduced: Task 70 - Snapshot Producer Railway Image
+Area: live ingestion and provider validation
+
+The first scheduled worker run after the fresh snapshot proof consumed the latest Misli snapshot but failed provider validation on two rows where a primary 1X2 odd was exactly `1.00`. The provider correctly rejects odds at or below 1, but the producer should not post rows that cannot become valid advisory paper-bet inputs.
+
+Resolution target:
+Task 70 filters producer rows unless HOME, DRAW, and AWAY 1X2 selections are all present and all primary 1X2 odds are greater than 1. Close this debt after a Railway worker run completes on a filtered fresh snapshot.

@@ -11,6 +11,8 @@ Make the Railway `snapshot-producer` deployment repeatable after the previous up
 - Switched `Dockerfile.snapshot` from `node:24-bookworm` plus `npx playwright install --with-deps chromium` to the official `mcr.microsoft.com/playwright:v1.60.0-noble` base image.
 - Added `railway.api.json`, `railway.snapshot.json`, and `railway.worker.json` as service-specific config references.
 - Removed the root `railway.json` because Railway applies a root config-as-code file to every repo-linked service; that caused worker and producer GitHub auto-deploys to inherit the API image.
+- Changed `Dockerfile.snapshot` to install dashboard dev dependencies in the producer image because the snapshot script imports Playwright from `dashboard/package.json`.
+- Hardened the producer to skip public Misli rows where the primary 1X2 market is incomplete or includes non-actionable odds at or below `1.00`.
 - Kept the producer command unchanged:
   - read the public Misli football page
   - create snapshot JSON
@@ -79,11 +81,13 @@ $env:PLAYWRIGHT_CHANNEL='chrome'; npm run smoke
 
 - Confirm the scheduled worker consumes the fresh snapshot and refreshes the dashboard data.
 - Confirm the next GitHub auto-deploy uses Railway service settings now that root `railway.json` no longer overrides every service.
+- Confirm the next producer snapshot excludes invalid `1.00` 1X2 rows and the worker does not fail provider validation.
 
 ## Blockers
 
-- No producer-image blocker remains. The previous stopped `BUILDING` deployment was removed after the clean deploy.
-- Root config-as-code override was removed locally and must be verified after the next push.
+- The first scheduled producer proof exposed a missing Playwright dependency in the image; `npm install --include=dev` addresses it.
+- The first scheduled worker proof consumed the fresh snapshot but failed on two Misli rows with `1.00` odds; producer row filtering addresses it.
+- Root config-as-code override was removed and must remain absent.
 - End-to-end proof is waiting for the next scheduled worker run after the fresh snapshot.
 
 ## Technical Debt

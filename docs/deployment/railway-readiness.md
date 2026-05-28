@@ -483,6 +483,8 @@ Task 67 worker image deploy: SUCCESS
 Task 70 snapshot producer image deploy: SUCCESS
 Task 70 worker image restore deploy: SUCCESS
 Root railway.json removed to prevent API config overriding cron service auto-deploys
+Task 70 follow-up: scheduled producer initially missed Playwright because dev dependencies were omitted; producer install now includes dev dependencies.
+Task 70 follow-up: scheduled worker consumed a fresh snapshot but rejected two rows with 1.00 primary 1X2 odds; producer now filters non-actionable 1X2 rows.
 latest Misli snapshot scraped_at: 2026-05-28T00:05:28.437Z
 latest API logs redact the database password
 ```

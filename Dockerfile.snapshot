@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY dashboard/package.json dashboard/package-lock.json ./dashboard/
 RUN cd dashboard \
-    && npm install
+    && npm install --include=dev
 
 COPY tools ./tools
 
