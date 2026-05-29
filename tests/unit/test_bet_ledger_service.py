@@ -6,6 +6,7 @@ from sqlalchemy import text
 from app.db.engine import create_engine_from_url, session_scope
 from app.db.models import Base, PaperRecommendation
 from app.db.repositories import MatchRepository, PaperBetRepository, PredictionRepository
+from app.services import bet_ledger_service as ledger_module
 from app.services.bet_ledger_service import BetLedgerService
 
 
@@ -348,6 +349,10 @@ def test_tomorrow_ledger_uses_kickoff_local_calendar_day(tmp_path: Path) -> None
 
     assert today_payload["rows"] == []
     assert [row["source_match_id"] for row in tomorrow_payload["rows"]] == ["local-tomorrow"]
+
+
+def test_default_reference_time_uses_provider_local_timezone() -> None:
+    assert ledger_module._default_reference_time().utcoffset() == timedelta(hours=4)
 
 
 def test_summary_counts_date_filtered_rows_before_status_filtering(tmp_path: Path) -> None:

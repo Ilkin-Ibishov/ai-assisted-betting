@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any, Literal
 
 from sqlalchemy import select
@@ -20,6 +20,8 @@ DateRange = Literal[
     "custom",
     "all",
 ]
+
+PROVIDER_TIMEZONE = timezone(timedelta(hours=4))
 
 
 @dataclass(frozen=True)
@@ -43,7 +45,7 @@ class BetLedgerService:
         limit: int = 500,
         now: datetime | None = None,
     ) -> dict[str, Any]:
-        reference_time = now or datetime.now(UTC)
+        reference_time = now or _default_reference_time()
         window = _date_window(date_range, from_date=from_date, to_date=to_date, now=reference_time)
         engine = create_engine_from_url(self.database_url)
         try:
@@ -315,6 +317,10 @@ def _date_window(
     if date_range == "custom":
         return DateWindow(_parse_date_start(from_date), _parse_date_end(to_date))
     return DateWindow(today, today + timedelta(days=8))
+
+
+def _default_reference_time() -> datetime:
+    return datetime.now(PROVIDER_TIMEZONE)
 
 
 def _day_window(day: date) -> DateWindow:
