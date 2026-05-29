@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone, timedelta
 from pathlib import Path
 
 from sqlalchemy import text
@@ -273,3 +273,115 @@ def test_ledger_deduplicates_candidate_when_matching_paper_bet_exists(
     assert len(payload["rows"]) == 1
     assert payload["rows"][0]["row_type"] == "tracked"
     assert payload["rows"][0]["paper_bet_id"] is not None
+
+
+def test_fresh_ledger_excludes_future_paper_bet_with_risk_flags(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="future-negative-ev",
+        kickoff_time="2026-05-30T20:30:00+04:00",
+        selection="HOME",
+        expected_value=-0.01,
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="future-low-confidence",
+        kickoff_time="2026-05-31T20:30:00+04:00",
+        selection="AWAY",
+        confidence_score=0.4,
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="fresh",
+        date_range="next_7_days",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=UTC),
+    )
+
+    assert payload["rows"] == []
+    assert payload["summary"]["fresh_count"] == 0
+
+
+def test_fresh_ledger_excludes_risky_or_non_recommended_candidates(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_recommendation(
+        database_url,
+        source_match_id="risky-candidate",
+        kickoff_time="2026-05-30T20:30:00+04:00",
+        risk_flags='["low_confidence"]',
+    )
+    seed_recommendation(
+        database_url,
+        source_match_id="lean-candidate",
+        kickoff_time="2026-05-31T20:30:00+04:00",
+        grade="lean",
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="fresh",
+        date_range="next_7_days",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=UTC),
+    )
+
+    assert payload["rows"] == []
+    assert payload["summary"]["fresh_count"] == 0
+
+
+def test_tomorrow_ledger_uses_kickoff_local_calendar_day(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_recommendation(
+        database_url,
+        source_match_id="local-tomorrow",
+        kickoff_time="2026-05-30T01:00:00+04:00",
+    )
+
+    today_payload = BetLedgerService(database_url).ledger(
+        status="fresh",
+        date_range="today",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=timezone(timedelta(hours=4))),
+    )
+    tomorrow_payload = BetLedgerService(database_url).ledger(
+        status="fresh",
+        date_range="tomorrow",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=timezone(timedelta(hours=4))),
+    )
+
+    assert today_payload["rows"] == []
+    assert [row["source_match_id"] for row in tomorrow_payload["rows"]] == ["local-tomorrow"]
+
+
+def test_summary_counts_date_filtered_rows_before_status_filtering(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_recommendation(
+        database_url,
+        source_match_id="summary-fresh",
+        kickoff_time="2026-05-30T20:30:00+04:00",
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="summary-needs-result",
+        kickoff_time="2026-05-28T20:30:00+04:00",
+        selection="HOME",
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="summary-won",
+        kickoff_time="2026-05-27T20:30:00+04:00",
+        selection="AWAY",
+        status="won",
+        profit_loss_units=1.4,
+        settled_at="2026-05-27T23:00:00+00:00",
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="fresh",
+        date_range="all",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=UTC),
+    )
+
+    assert [row["source_match_id"] for row in payload["rows"]] == ["summary-fresh"]
+    assert payload["summary"]["fresh_count"] == 1
+    assert payload["summary"]["needs_result_count"] == 1
+    assert payload["summary"]["resulted_count"] == 1
+    assert payload["summary"]["paper_profit_loss"] == 1.4
+    assert payload["summary"]["win_rate"] == 1.0
