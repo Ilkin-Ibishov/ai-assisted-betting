@@ -448,6 +448,52 @@ def test_live_recommendations_endpoint_lists_persisted_recommendations(tmp_path:
     assert payload[0]["source_match_id"] == "misli:football:2816300"
 
 
+def test_live_bet_ledger_endpoint_returns_default_fresh_rows(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_recommendation_database(database_url)
+    _seed_live_status_database(database_url)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get(
+        "/api/live/bet-ledger",
+        params={
+            "status": "fresh",
+            "date_range": "next_7_days",
+            "now": "2026-05-18T08:00:00+00:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "summary" in payload
+    assert "rows" in payload
+    assert payload["summary"]["fresh_count"] >= 1
+    assert {row["state"] for row in payload["rows"]} == {"fresh"}
+    assert {"model_probability", "implied_probability", "edge", "paper_profit_loss"}.issubset(
+        payload["rows"][0].keys()
+    )
+
+
+def test_live_bet_ledger_endpoint_can_show_resulted_rows(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_live_status_database(database_url)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get(
+        "/api/live/bet-ledger",
+        params={
+            "status": "resulted",
+            "date_range": "all",
+            "now": "2026-06-20T08:00:00+00:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["resulted_count"] == 1
+    assert payload["rows"][0]["outcome"] == "won"
+
+
 def test_live_combinations_endpoint_lists_ranked_paper_combinations(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_combination_database(database_url)

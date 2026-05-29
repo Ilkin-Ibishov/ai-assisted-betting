@@ -11,6 +11,7 @@ from app.config import load_settings
 from app.db.engine import create_engine_from_url, session_scope
 from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
+from app.services.bet_ledger_service import BetLedgerService
 from app.services.live_snapshot_service import LiveSnapshotService
 from app.services.live_status_service import LiveStatusService
 from app.services.odds_movement_service import OddsMovementService
@@ -120,6 +121,27 @@ def create_api(
     @api.get("/api/live/recommendations")
     def list_live_recommendations(limit: int = 100) -> list[dict[str, Any]]:
         return _paper_recommendation_payloads(live_database_url, limit=limit)
+
+    @api.get("/api/live/bet-ledger")
+    def get_live_bet_ledger(
+        status: str = "fresh",
+        date_range: str = "next_7_days",
+        from_date: str | None = None,
+        to_date: str | None = None,
+        include_voided: bool = False,
+        limit: int = 500,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        reference_time = _parse_iso_datetime(now) if now else None
+        return BetLedgerService(live_database_url).ledger(
+            status=status,  # type: ignore[arg-type]
+            date_range=date_range,  # type: ignore[arg-type]
+            from_date=from_date,
+            to_date=to_date,
+            include_voided=include_voided,
+            limit=limit,
+            now=reference_time,
+        )
 
     @api.get("/api/live/combinations")
     def list_live_combinations(limit: int = 100) -> list[dict[str, Any]]:
@@ -464,6 +486,18 @@ def _paper_recommendation_payload(recommendation: PaperRecommendation) -> dict[s
         "rationale": recommendation.rationale,
         "created_at": recommendation.created_at,
     }
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _paper_combination_payloads(database_url: str, *, limit: int) -> list[dict[str, Any]]:
