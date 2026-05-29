@@ -114,6 +114,48 @@ def seed_recommendation(
     engine.dispose()
 
 
+def seed_recommendation_for_existing_match(
+    database_url: str,
+    *,
+    source_match_id: str,
+    selection: str = "HOME",
+    prediction_id: int | None = None,
+) -> None:
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        match_id = session.execute(
+            text(
+                "SELECT id FROM matches "
+                "WHERE source = :source AND source_match_id = :source_match_id"
+            ),
+            {"source": "misli_public", "source_match_id": source_match_id},
+        ).scalar_one()
+        session.add(
+            PaperRecommendation(
+                match_id=match_id,
+                prediction_id=prediction_id,
+                source_match_id=source_match_id,
+                bookmaker="Misli.az",
+                market="1X2",
+                selection=selection,
+                latest_snapshot_time="2026-05-29T08:00:00+00:00",
+                model_name="baseline_heuristic",
+                model_version="v0",
+                grade="recommended",
+                status="active",
+                model_probability=0.61,
+                implied_probability=0.45,
+                edge=0.16,
+                confidence_score=0.73,
+                current_odds=2.22,
+                expected_value=0.35,
+                risk_flags_json='["no_current_risk_flags"]',
+                rationale="Positive edge is above the recommendation gate.",
+            )
+        )
+    engine.dispose()
+
+
 def test_ledger_classifies_fresh_candidate_and_tracked_bet(tmp_path: Path) -> None:
     database_url = create_database(tmp_path)
     seed_recommendation(
@@ -215,10 +257,9 @@ def test_ledger_deduplicates_candidate_when_matching_paper_bet_exists(
     with session_scope(engine) as session:
         prediction_id = session.execute(text("SELECT id FROM predictions LIMIT 1")).scalar_one()
     engine.dispose()
-    seed_recommendation(
+    seed_recommendation_for_existing_match(
         database_url,
         source_match_id="same-match",
-        kickoff_time="2026-05-30T20:30:00+04:00",
         selection="HOME",
         prediction_id=prediction_id,
     )
