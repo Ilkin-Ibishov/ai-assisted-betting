@@ -494,6 +494,33 @@ def test_live_bet_ledger_endpoint_can_show_resulted_rows(tmp_path: Path) -> None
     assert payload["rows"][0]["outcome"] == "won"
 
 
+def test_live_bet_ledger_endpoint_rejects_invalid_status(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/bet-ledger", params={"status": "bogus"})
+
+    assert 400 <= response.status_code < 500
+
+
+def test_live_bet_ledger_endpoint_rejects_invalid_date_range(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/bet-ledger", params={"date_range": "someday"})
+
+    assert 400 <= response.status_code < 500
+
+
+def test_live_bet_ledger_endpoint_rejects_invalid_now(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/bet-ledger", params={"now": "not-a-date"})
+
+    assert 400 <= response.status_code < 500
+
+
 def test_live_combinations_endpoint_lists_ranked_paper_combinations(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_combination_database(database_url)

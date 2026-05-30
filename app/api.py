@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast, get_args
 
 from fastapi import Body, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +11,7 @@ from app.config import load_settings
 from app.db.engine import create_engine_from_url, session_scope
 from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
-from app.services.bet_ledger_service import BetLedgerService
+from app.services.bet_ledger_service import BetLedgerService, DateRange, LedgerStatus
 from app.services.live_snapshot_service import LiveSnapshotService
 from app.services.live_status_service import LiveStatusService
 from app.services.odds_movement_service import OddsMovementService
@@ -20,6 +20,8 @@ from app.services.worker_monitoring_service import WorkerMonitoringService
 
 SNAPSHOT_BODY = Body(...)
 AUTHORIZATION_HEADER = Header(default=None)
+BET_LEDGER_STATUSES = set(get_args(LedgerStatus))
+BET_LEDGER_DATE_RANGES = set(get_args(DateRange))
 
 
 def create_api(
@@ -132,10 +134,12 @@ def create_api(
         limit: int = 500,
         now: str | None = None,
     ) -> dict[str, Any]:
-        reference_time = _parse_iso_datetime(now) if now else None
+        ledger_status = _validate_bet_ledger_status(status)
+        ledger_date_range = _validate_bet_ledger_date_range(date_range)
+        reference_time = _parse_optional_query_datetime(now, parameter="now")
         return BetLedgerService(live_database_url).ledger(
-            status=status,  # type: ignore[arg-type]
-            date_range=date_range,  # type: ignore[arg-type]
+            status=ledger_status,
+            date_range=ledger_date_range,
             from_date=from_date,
             to_date=to_date,
             include_voided=include_voided,
@@ -498,6 +502,36 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
+
+
+def _parse_optional_query_datetime(value: str | None, *, parameter: str) -> datetime | None:
+    if value is None:
+        return None
+    parsed = _parse_iso_datetime(value)
+    if parsed is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid {parameter}: expected ISO 8601 datetime",
+        )
+    return parsed
+
+
+def _validate_bet_ledger_status(value: str) -> LedgerStatus:
+    if value not in BET_LEDGER_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status: expected one of {sorted(BET_LEDGER_STATUSES)}",
+        )
+    return cast(LedgerStatus, value)
+
+
+def _validate_bet_ledger_date_range(value: str) -> DateRange:
+    if value not in BET_LEDGER_DATE_RANGES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid date_range: expected one of {sorted(BET_LEDGER_DATE_RANGES)}",
+        )
+    return cast(DateRange, value)
 
 
 def _paper_combination_payloads(database_url: str, *, limit: int) -> list[dict[str, Any]]:
