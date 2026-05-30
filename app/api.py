@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, cast, get_args
 
@@ -136,7 +136,12 @@ def create_api(
     ) -> dict[str, Any]:
         ledger_status = _validate_bet_ledger_status(status)
         ledger_date_range = _validate_bet_ledger_date_range(date_range)
-        reference_time = _parse_optional_query_datetime(now, parameter="now")
+        _validate_bet_ledger_custom_dates(
+            ledger_date_range,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        reference_time = _parse_optional_bet_ledger_now(now)
         return BetLedgerService(live_database_url).ledger(
             status=ledger_status,
             date_range=ledger_date_range,
@@ -516,6 +521,21 @@ def _parse_optional_query_datetime(value: str | None, *, parameter: str) -> date
     return parsed
 
 
+def _parse_optional_bet_ledger_now(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid now: expected ISO 8601 datetime",
+        ) from None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
+
+
 def _validate_bet_ledger_status(value: str) -> LedgerStatus:
     if value not in BET_LEDGER_STATUSES:
         raise HTTPException(
@@ -532,6 +552,30 @@ def _validate_bet_ledger_date_range(value: str) -> DateRange:
             detail=f"Invalid date_range: expected one of {sorted(BET_LEDGER_DATE_RANGES)}",
         )
     return cast(DateRange, value)
+
+
+def _validate_bet_ledger_custom_dates(
+    date_range: DateRange,
+    *,
+    from_date: str | None,
+    to_date: str | None,
+) -> None:
+    if date_range != "custom":
+        return
+    _validate_optional_query_date(from_date, parameter="from_date")
+    _validate_optional_query_date(to_date, parameter="to_date")
+
+
+def _validate_optional_query_date(value: str | None, *, parameter: str) -> None:
+    if value is None:
+        return
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid {parameter}: expected ISO 8601 date",
+        ) from None
 
 
 def _paper_combination_payloads(database_url: str, *, limit: int) -> list[dict[str, Any]]:

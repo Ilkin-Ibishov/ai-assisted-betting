@@ -494,13 +494,67 @@ def test_live_bet_ledger_endpoint_can_show_resulted_rows(tmp_path: Path) -> None
     assert payload["rows"][0]["outcome"] == "won"
 
 
+def test_live_bet_ledger_endpoint_preserves_supplied_timezone_date_for_today(
+    tmp_path: Path,
+) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        match = MatchRepository(session).add(
+            source="sample",
+            source_match_id="match-local-today",
+            league="Sample Premier",
+            home_team="Local Morning",
+            away_team="UTC Evening",
+            kickoff_time="2026-05-29T20:30:00+04:00",
+        )
+        prediction = PredictionRepository(session).add(
+            match_id=match.id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=0.55,
+            bookmaker_probability=0.50,
+            edge=0.05,
+            confidence_score=None,
+            decision="BET",
+            reason="seed local-date paper bet",
+        )
+        PaperBetRepository(session).add(
+            prediction_id=prediction.id,
+            match_id=match.id,
+            market="1X2",
+            selection="HOME",
+            odds_taken=2.0,
+            stake_units=1.0,
+            expected_value=0.1,
+            status="open",
+        )
+    engine.dispose()
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get(
+        "/api/live/bet-ledger",
+        params={
+            "status": "fresh",
+            "date_range": "today",
+            "now": "2026-05-29T00:30:00+04:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [row["source_match_id"] for row in payload["rows"]] == ["match-local-today"]
+
+
 def test_live_bet_ledger_endpoint_rejects_invalid_status(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
 
     response = client.get("/api/live/bet-ledger", params={"status": "bogus"})
 
-    assert 400 <= response.status_code < 500
+    assert response.status_code == 422
 
 
 def test_live_bet_ledger_endpoint_rejects_invalid_date_range(tmp_path: Path) -> None:
@@ -509,7 +563,7 @@ def test_live_bet_ledger_endpoint_rejects_invalid_date_range(tmp_path: Path) -> 
 
     response = client.get("/api/live/bet-ledger", params={"date_range": "someday"})
 
-    assert 400 <= response.status_code < 500
+    assert response.status_code == 422
 
 
 def test_live_bet_ledger_endpoint_rejects_invalid_now(tmp_path: Path) -> None:
@@ -518,7 +572,41 @@ def test_live_bet_ledger_endpoint_rejects_invalid_now(tmp_path: Path) -> None:
 
     response = client.get("/api/live/bet-ledger", params={"now": "not-a-date"})
 
-    assert 400 <= response.status_code < 500
+    assert response.status_code == 422
+
+
+def test_live_bet_ledger_endpoint_rejects_invalid_custom_from_date(
+    tmp_path: Path,
+) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(
+        create_api(reports_dir=tmp_path / "reports", database_url=database_url),
+        raise_server_exceptions=False,
+    )
+
+    response = client.get(
+        "/api/live/bet-ledger",
+        params={"date_range": "custom", "from_date": "bad"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_live_bet_ledger_endpoint_rejects_invalid_custom_to_date(
+    tmp_path: Path,
+) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(
+        create_api(reports_dir=tmp_path / "reports", database_url=database_url),
+        raise_server_exceptions=False,
+    )
+
+    response = client.get(
+        "/api/live/bet-ledger",
+        params={"date_range": "custom", "to_date": "bad"},
+    )
+
+    assert response.status_code == 422
 
 
 def test_live_combinations_endpoint_lists_ranked_paper_combinations(tmp_path: Path) -> None:
