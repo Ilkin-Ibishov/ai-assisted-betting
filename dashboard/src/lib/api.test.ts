@@ -182,10 +182,14 @@ describe('fetchBetLedger', () => {
       }),
     } as Response)
 
-    await fetchBetLedger({ status: 'fresh', dateRange: 'next_7_days' })
+    try {
+      await fetchBetLedger({ status: 'fresh', dateRange: 'next_7_days' })
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      buildApiUrl('/api/live/bet-ledger?status=fresh&date_range=next_7_days'),
-    )
+      expect(fetchMock).toHaveBeenCalledWith(
+        buildApiUrl('/api/live/bet-ledger?status=fresh&date_range=next_7_days'),
+      )
+    } finally {
+      fetchMock.mockRestore()
+    }
   })
 })

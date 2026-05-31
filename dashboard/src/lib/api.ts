@@ -150,7 +150,9 @@ export type PaperRecommendation = {
   created_at: string
 }
 
-export type BetLedgerStatus = 'fresh' | 'needs_result' | 'resulted' | 'voided' | 'all'
+export type BetLedgerRowState = 'fresh' | 'needs_result' | 'resulted' | 'voided'
+
+export type BetLedgerStatus = BetLedgerRowState | 'all'
 
 export type BetLedgerDateRange =
   | 'today'
@@ -195,7 +197,8 @@ export type BetLedgerRow = {
   confidence_score: number | null
   model_name: string | null
   model_version: string | null
-  state: BetLedgerStatus
+  grade?: string | null
+  state: BetLedgerRowState
   status: string
   is_valid_open: boolean
   risk_flags: string[]
