@@ -41,6 +41,7 @@ describe('bet ledger helpers', () => {
   it('labels row states for compact UI display', () => {
     expect(betLedgerStateLabel('needs_result')).toBe('Needs result')
     expect(betLedgerStateTone('needs_result')).toBe('warning')
+    expect(betLedgerStateLabel('voided')).toBe('Voided')
     expect(betLedgerStateTone('voided')).toBe('muted')
   })
 })
