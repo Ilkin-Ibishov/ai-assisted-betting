@@ -1,9 +1,11 @@
-import type { BetLedgerResponse, BetLedgerStatus } from '@/lib/api'
+import type { BetLedgerQuery, BetLedgerResponse, BetLedgerRowState } from '@/lib/api'
 
-export const betLedgerDefaultQuery = {
+export type BetLedgerDefaultQuery = Required<Pick<BetLedgerQuery, 'status' | 'dateRange'>>
+
+export const betLedgerDefaultQuery: BetLedgerDefaultQuery = {
   status: 'fresh',
   dateRange: 'next_7_days',
-} as const
+}
 
 export type BetLedgerTone = 'success' | 'warning' | 'info' | 'muted'
 
@@ -26,15 +28,14 @@ export function buildBetLedgerDisplaySummary(response: BetLedgerResponse) {
   }
 }
 
-export function betLedgerStateLabel(state: BetLedgerStatus): string {
+export function betLedgerStateLabel(state: BetLedgerRowState): string {
   if (state === 'needs_result') return 'Needs result'
   if (state === 'resulted') return 'Resulted'
   if (state === 'voided') return 'Voided'
-  if (state === 'all') return 'All'
   return 'Fresh'
 }
 
-export function betLedgerStateTone(state: BetLedgerStatus): BetLedgerTone {
+export function betLedgerStateTone(state: BetLedgerRowState): BetLedgerTone {
   if (state === 'fresh') return 'success'
   if (state === 'needs_result') return 'warning'
   if (state === 'voided') return 'muted'

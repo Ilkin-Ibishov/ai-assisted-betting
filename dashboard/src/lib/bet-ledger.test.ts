@@ -12,7 +12,7 @@ describe('bet ledger helpers', () => {
     expect(betLedgerDefaultQuery).toEqual({ status: 'fresh', dateRange: 'next_7_days' })
   })
 
-  it('builds display summary from backend summary and rows', () => {
+  it('builds display summary from backend summary', () => {
     const summary = buildBetLedgerDisplaySummary({
       summary: {
         fresh_count: 2,
