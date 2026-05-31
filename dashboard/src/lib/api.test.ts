@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   buildApiUrl,
+  fetchBetLedger,
   fetchOperationalGuardrails,
   fetchLatestRecommendationReview,
   fetchOddsMovement,
@@ -160,5 +161,31 @@ describe('fetchOperationalGuardrails', () => {
     } finally {
       globalThis.fetch = originalFetch
     }
+  })
+})
+
+describe('fetchBetLedger', () => {
+  it('fetches bet ledger with status and date filters', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        summary: {
+          fresh_count: 1,
+          tracked_count: 0,
+          needs_result_count: 0,
+          resulted_count: 0,
+          voided_count: 0,
+          paper_profit_loss: 0,
+          win_rate: null,
+        },
+        rows: [],
+      }),
+    } as Response)
+
+    await fetchBetLedger({ status: 'fresh', dateRange: 'next_7_days' })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      buildApiUrl('/api/live/bet-ledger?status=fresh&date_range=next_7_days'),
+    )
   })
 })

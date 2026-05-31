@@ -150,6 +150,79 @@ export type PaperRecommendation = {
   created_at: string
 }
 
+export type BetLedgerStatus = 'fresh' | 'needs_result' | 'resulted' | 'voided' | 'all'
+
+export type BetLedgerDateRange =
+  | 'today'
+  | 'tomorrow'
+  | 'next_7_days'
+  | 'last_7_days'
+  | 'last_30_days'
+  | 'custom'
+  | 'all'
+
+export type BetLedgerSummary = {
+  fresh_count: number
+  tracked_count: number
+  needs_result_count: number
+  resulted_count: number
+  voided_count: number
+  paper_profit_loss: number
+  win_rate: number | null
+}
+
+export type BetLedgerRow = {
+  id: string
+  row_type: 'candidate' | 'tracked' | 'resulted' | 'voided'
+  paper_bet_id: number | null
+  recommendation_id: number | null
+  prediction_id: number | null
+  provider: string | null
+  run_id: string | null
+  source_match_id: string
+  league: string
+  home_team: string
+  away_team: string
+  match_label: string
+  kickoff_at: string
+  market: string
+  selection: string
+  odds: number | null
+  implied_probability: number | null
+  model_probability: number | null
+  edge: number | null
+  expected_value: number | null
+  confidence_score: number | null
+  model_name: string | null
+  model_version: string | null
+  state: BetLedgerStatus
+  status: string
+  is_valid_open: boolean
+  risk_flags: string[]
+  outcome: string | null
+  settled_at: string | null
+  paper_profit_loss: number | null
+  closing_odds: number | null
+  clv: number | null
+  created_at: string
+  updated_at: string | null
+  source_snapshot_at: string | null
+  rationale: string | null
+}
+
+export type BetLedgerResponse = {
+  summary: BetLedgerSummary
+  rows: BetLedgerRow[]
+}
+
+export type BetLedgerQuery = {
+  status?: BetLedgerStatus
+  dateRange?: BetLedgerDateRange
+  from?: string
+  to?: string
+  includeVoided?: boolean
+}
+
 export type AIAnalysisOutput = {
   label: string
   short_summary: string
@@ -219,6 +292,17 @@ export async function fetchOddsMovement(): Promise<OddsMovementSummary[]> {
 
 export async function fetchPaperRecommendations(): Promise<PaperRecommendation[]> {
   return getJson('/api/live/recommendations')
+}
+
+export async function fetchBetLedger(query: BetLedgerQuery = {}): Promise<BetLedgerResponse> {
+  const params = new URLSearchParams()
+  params.set('status', query.status ?? 'fresh')
+  params.set('date_range', query.dateRange ?? 'next_7_days')
+  if (query.from) params.set('from_date', query.from)
+  if (query.to) params.set('to_date', query.to)
+  if (query.includeVoided) params.set('include_voided', 'true')
+
+  return getJson(`/api/live/bet-ledger?${params.toString()}`)
 }
 
 export async function fetchPaperCombinations(): Promise<PaperCombination[]> {
