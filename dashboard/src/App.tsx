@@ -24,6 +24,7 @@ import {
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
+import { BetLedgerPanel } from '@/components/dashboard/bet-ledger-panel'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -40,12 +41,16 @@ import {
   fetchLatestRecommendationReview,
   fetchLiveStatus,
   fetchOddsMovement,
+  fetchBetLedger,
   fetchOperationalGuardrails,
   fetchPaperCombinations,
   fetchPaperRecommendations,
 } from '@/lib/api'
 import type {
   AIAnalysisRun,
+  BetLedgerDateRange,
+  BetLedgerResponse,
+  BetLedgerStatus,
   ComparisonReport,
   ComparisonRun,
   ComparisonSummary,
@@ -56,6 +61,7 @@ import type {
   PaperRecommendation,
 } from '@/lib/api'
 import { buildAIAdvisorySummary } from '@/lib/ai'
+import { betLedgerDefaultQuery } from '@/lib/bet-ledger'
 import { getVisibleCatalogReports } from '@/lib/catalog'
 import { buildLiveProcessSummary } from '@/lib/live'
 import {
@@ -102,6 +108,7 @@ const emptyRuns: ComparisonRun[] = []
 
 function App() {
   const [selectedName, setSelectedName] = useState<string>('')
+  const [betLedgerQuery, setBetLedgerQuery] = useState(betLedgerDefaultQuery)
 
   const comparisons = useQuery({
     queryKey: ['comparisons'],
@@ -134,6 +141,11 @@ function App() {
   const recommendations = useQuery({
     queryKey: ['paper-recommendations'],
     queryFn: fetchPaperRecommendations,
+  })
+
+  const betLedger = useQuery({
+    queryKey: ['bet-ledger', betLedgerQuery],
+    queryFn: () => fetchBetLedger(betLedgerQuery),
   })
 
   const combinations = useQuery({
@@ -253,6 +265,11 @@ function App() {
               aiAnalysis={aiAnalysis.data}
               aiError={aiAnalysis.isError}
               aiLoading={aiAnalysis.isLoading}
+              betLedger={betLedger.data}
+              betLedgerDateRange={betLedgerQuery.dateRange}
+              betLedgerError={betLedger.isError}
+              betLedgerLoading={betLedger.isLoading}
+              betLedgerStatus={betLedgerQuery.status}
               combinations={combinations.data ?? []}
               oddsMovement={oddsMovement.data ?? []}
               recommendationError={
@@ -270,6 +287,12 @@ function App() {
               recommendationReview={recommendationReview.data}
               recommendations={recommendations.data ?? []}
               runs={rankedRuns}
+              onBetLedgerDateRangeChange={(dateRange) =>
+                setBetLedgerQuery((current) => ({ ...current, dateRange }))
+              }
+              onBetLedgerStatusChange={(status) =>
+                setBetLedgerQuery((current) => ({ ...current, status }))
+              }
             />
           )}
         </section>
@@ -299,6 +322,11 @@ type DashboardContentProps = {
   aiAnalysis?: AIAnalysisRun | null
   aiError: boolean
   aiLoading: boolean
+  betLedger?: BetLedgerResponse
+  betLedgerDateRange: BetLedgerDateRange
+  betLedgerError: boolean
+  betLedgerLoading: boolean
+  betLedgerStatus: BetLedgerStatus
   combinations: PaperCombination[]
   oddsMovement: OddsMovementSummary[]
   recommendationError: boolean
@@ -306,6 +334,8 @@ type DashboardContentProps = {
   recommendationReview?: AIAnalysisRun | null
   recommendations: PaperRecommendation[]
   runs: RankedComparisonRun[]
+  onBetLedgerDateRangeChange: (dateRange: BetLedgerDateRange) => void
+  onBetLedgerStatusChange: (status: BetLedgerStatus) => void
 }
 
 function DashboardContent({
@@ -329,6 +359,11 @@ function DashboardContent({
   aiAnalysis,
   aiError,
   aiLoading,
+  betLedger,
+  betLedgerDateRange,
+  betLedgerError,
+  betLedgerLoading,
+  betLedgerStatus,
   combinations,
   oddsMovement,
   recommendationError,
@@ -336,6 +371,8 @@ function DashboardContent({
   recommendationReview,
   recommendations,
   runs,
+  onBetLedgerDateRangeChange,
+  onBetLedgerStatusChange,
 }: DashboardContentProps) {
   const [selectedRunKey, setSelectedRunKey] = useState('')
   const selectedRun = runs.find((run) => runKey(run) === selectedRunKey) ?? runs[0]
@@ -382,6 +419,15 @@ function DashboardContent({
         review={recommendationReview}
       />
 
+      <BetLedgerPanel
+        dateRange={betLedgerDateRange}
+        error={betLedgerError}
+        ledger={betLedger}
+        loading={betLedgerLoading}
+        onDateRangeChange={onBetLedgerDateRangeChange}
+        onStatusChange={onBetLedgerStatusChange}
+        status={betLedgerStatus}
+      />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.55fr)]">
         <LiveProcessMonitor
           error={liveError}
