@@ -232,6 +232,7 @@ function App() {
                 onClick={() => {
                 void comparisons.refetch()
                 void detail.refetch()
+                void betLedger.refetch()
               }}
                 title="Refresh dashboard data"
               >

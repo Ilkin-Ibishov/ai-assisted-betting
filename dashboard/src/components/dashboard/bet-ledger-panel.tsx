@@ -28,8 +28,8 @@ const statusOptions: Array<{ label: string; value: BetLedgerStatus }> = [
 const dateOptions: Array<{ label: string; value: BetLedgerDateRange }> = [
   { label: 'Today', value: 'today' },
   { label: 'Tomorrow', value: 'tomorrow' },
-  { label: '7 days', value: 'next_7_days' },
-  { label: '30 days', value: 'last_30_days' },
+  { label: 'Next 7 days', value: 'next_7_days' },
+  { label: 'Last 30 days', value: 'last_30_days' },
   { label: 'All', value: 'all' },
 ]
 
@@ -136,6 +136,7 @@ function SegmentedControl<T extends string>({
       <div className="flex flex-wrap gap-1 rounded-md border border-slate-200 bg-slate-50 p-1">
         {options.map((option) => (
           <Button
+            aria-pressed={value === option.value}
             className="h-8 px-2 text-xs"
             key={option.value}
             onClick={() => onChange(option.value)}
@@ -166,6 +167,7 @@ function LedgerTable({
           <tr>
             {[
               'Kickoff',
+              'Type',
               'Match',
               'Pick',
               'Model %',
@@ -211,6 +213,11 @@ function LedgerRow({
     <>
       <tr className="border-b border-slate-100 last:border-0">
         <td className="px-3 py-3 text-slate-700">{formatDate(row.kickoff_at)}</td>
+        <td className="px-3 py-3">
+          <Badge className="border border-slate-200 bg-white text-slate-700" variant="secondary">
+            {rowTypeLabel(row.row_type)}
+          </Badge>
+        </td>
         <td className="max-w-72 px-3 py-3">
           <div className="truncate font-semibold text-slate-950" title={row.match_label}>
             {row.match_label}
@@ -235,6 +242,7 @@ function LedgerRow({
         <td className="px-3 py-3 text-slate-900">{formatUnits(row.paper_profit_loss)}</td>
         <td className="px-3 py-3 text-right">
           <Button
+            aria-expanded={expanded}
             className="h-8 w-8 p-0"
             onClick={onToggle}
             title="Show row details"
@@ -247,10 +255,18 @@ function LedgerRow({
       </tr>
       {expanded ? (
         <tr className="border-b border-slate-100 bg-slate-50">
-          <td className="px-3 py-3 text-sm text-slate-700" colSpan={11}>
+          <td className="px-3 py-3 text-sm text-slate-700" colSpan={12}>
             <div className="grid gap-2 md:grid-cols-3">
+              <Detail label="Row type" value={rowTypeLabel(row.row_type)} />
+              <Detail label="Raw status" value={row.status} />
+              <Detail label="Paper bet ID" value={formatId(row.paper_bet_id)} />
+              <Detail label="Recommendation ID" value={formatId(row.recommendation_id)} />
+              <Detail label="Source match ID" value={row.source_match_id} />
+              <Detail label="Settled" value={row.settled_at ? formatDate(row.settled_at) : '--'} />
+              <Detail label="Closing odds" value={formatDecimal(row.closing_odds)} />
+              <Detail label="CLV" value={formatSignedDecimal(row.clv)} />
               <Detail label="Rationale" value={row.rationale ?? '--'} />
-              <Detail label="Risk flags" value={row.risk_flags.join(', ')} />
+              <Detail label="Risk flags" value={row.risk_flags.join(', ') || '--'} />
               <Detail
                 label="Snapshot"
                 value={row.source_snapshot_at ? formatDate(row.source_snapshot_at) : '--'}
@@ -260,7 +276,6 @@ function LedgerRow({
                 value={`${row.model_name ?? '--'} / ${row.model_version ?? '--'}`}
               />
               <Detail label="Created" value={formatDate(row.created_at)} />
-              <Detail label="CLV" value={formatSignedDecimal(row.clv)} />
             </div>
           </td>
         </tr>
@@ -324,4 +339,15 @@ function formatSignedDecimal(value: number | null) {
 
 function formatUnits(value: number | null) {
   return value === null ? '--' : `${value >= 0 ? '+' : ''}${value.toFixed(1)}u`
+}
+
+function formatId(value: number | null) {
+  return value === null ? '--' : String(value)
+}
+
+function rowTypeLabel(rowType: BetLedgerRow['row_type']) {
+  if (rowType === 'candidate') return 'Candidate'
+  if (rowType === 'tracked') return 'Paper bet'
+  if (rowType === 'resulted') return 'Resulted'
+  return 'Voided'
 }
