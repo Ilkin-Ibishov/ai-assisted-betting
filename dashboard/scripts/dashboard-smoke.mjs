@@ -8,8 +8,8 @@ const apiUrl = process.env.API_URL ?? 'http://127.0.0.1:8000'
 const channel = process.env.PLAYWRIGHT_CHANNEL ?? 'msedge'
 
 const comparisons = await getJson(`${apiUrl}/api/reports/comparisons`)
-if (!Array.isArray(comparisons) || comparisons.length === 0) {
-  throw new Error('No comparison reports returned by API')
+if (!Array.isArray(comparisons)) {
+  throw new Error('Comparison reports API did not return a list')
 }
 if (comparisons.some((comparison) => comparison.name.startsWith('pytest_'))) {
   throw new Error('Default comparison list should not include pytest reports')
@@ -19,13 +19,15 @@ const visibleCatalogComparisons = comparisons
   .toSorted((a, b) => Date.parse(b.modified_at) - Date.parse(a.modified_at))
   .slice(0, 6)
 const firstComparison = visibleCatalogComparisons[0]
-const detail = await getJson(`${apiUrl}/api/reports/comparisons/${firstComparison.name}`)
-  const liveStatus = await getJson(`${apiUrl}/api/live/status`)
-  const guardrails = await getJson(`${apiUrl}/api/operations/guardrails`)
-  const recommendations = await getJson(`${apiUrl}/api/live/recommendations`)
-  const recommendationReview = await getOptionalJson(
-    `${apiUrl}/api/ai/recommendation-review/latest`,
-  )
+const detail = firstComparison
+  ? await getJson(`${apiUrl}/api/reports/comparisons/${firstComparison.name}`)
+  : { runs: [] }
+const liveStatus = await getJson(`${apiUrl}/api/live/status`)
+const guardrails = await getJson(`${apiUrl}/api/operations/guardrails`)
+const recommendations = await getJson(`${apiUrl}/api/live/recommendations`)
+const recommendationReview = await getOptionalJson(
+  `${apiUrl}/api/ai/recommendation-review/latest`,
+)
 const recentComparisons = comparisons
   .toSorted((a, b) => Date.parse(b.modified_at) - Date.parse(a.modified_at))
   .slice(0, 6)
@@ -34,12 +36,12 @@ const recentDetails = await Promise.all(
     getJson(`${apiUrl}/api/reports/comparisons/${comparison.name}`),
   ),
 )
-  const expected = buildExpectedValues(comparisons, detail, recentComparisons, recentDetails)
-  const expectedLive = buildExpectedLiveValues(liveStatus)
-  const expectedRecommendations = buildExpectedRecommendationValues(
-    recommendations,
-    recommendationReview,
-  )
+const expected = buildExpectedValues(comparisons, detail, recentComparisons, recentDetails)
+const expectedLive = buildExpectedLiveValues(liveStatus)
+const expectedRecommendations = buildExpectedRecommendationValues(
+  recommendations,
+  recommendationReview,
+)
 
 const browser = await launchBrowser()
 const screenshotDir = await mkdtemp(join(tmpdir(), 'paper-odds-dashboard-'))
@@ -69,8 +71,11 @@ try {
   await expectMetric(desktop, 'ai-analyst-panel', 'AI-assisted advisory analysis')
   await expectMetric(desktop, 'recommendation-dashboard', expectedRecommendations.approvalLabel)
   await expectMetric(desktop, 'recommendation-ai-review', expectedRecommendations.reviewLabel)
-  if (recommendations.length > 0) {
-    await expectMetric(desktop, 'recommendation-table', recommendations[0].selection)
+  const visibleRecommendation = recommendations.find((recommendation) =>
+    ['active', 'watch', 'recommended'].includes(recommendation.status),
+  )
+  if (visibleRecommendation) {
+    await expectMetric(desktop, 'recommendation-table', visibleRecommendation.selection)
   }
   await expectMetric(desktop, 'live-process-monitor', expectedLive.statusLabel)
   await expectMetric(desktop, 'live-latest-run', expectedLive.latestRunLabel)
@@ -81,73 +86,81 @@ try {
   await expectMetric(desktop, 'guardrail-worker_freshness', 'worker freshness')
   await desktop.getByTestId('diagnostics-section').locator('summary').click()
   await expectVisibleText(desktop, 'Report catalog')
-  const catalogSearch = desktop.getByTestId('catalog-search')
-  await catalogSearch.fill(firstComparison.name)
-  await expectMetric(desktop, `catalog-report-${firstComparison.name}`, expected.bestRoi)
-  await expectMetric(desktop, `catalog-report-${firstComparison.name}`, String(expected.totalSettled))
-  await catalogSearch.fill('no-matching-report-for-smoke')
-  await expectVisibleText(desktop, 'No comparison reports found.')
-  await catalogSearch.fill('')
-  const alternateComparison = visibleCatalogComparisons.find(
-    (comparison) => comparison.name !== firstComparison.name,
-  )
-  if (alternateComparison) {
-    await desktop.getByTestId(`catalog-report-${alternateComparison.name}`).click()
-    await desktop.waitForFunction(
-      (name) => document.querySelector('[data-testid="report-select"]')?.value === name,
-      alternateComparison.name,
-    )
-    await desktop.getByTestId(`catalog-report-${firstComparison.name}`).click()
-    await desktop.waitForFunction(
-      (name) => document.querySelector('[data-testid="report-select"]')?.value === name,
-      firstComparison.name,
-    )
-  }
-  await expectVisibleText(desktop, 'Metadata summary')
-  await expectVisibleText(desktop, 'AI analyst')
-  await expectMetric(desktop, 'metric-reports-indexed', String(expected.reportCount))
-  await expectMetric(desktop, 'metric-selected-runs', String(expected.runCount))
-  await expectMetric(desktop, 'metric-best-roi', expected.bestRoi)
-  await expectMetric(desktop, 'metric-best-brier', expected.bestBrier)
-  await expectMetric(desktop, 'metric-best-log-loss', expected.bestLogLoss)
-  await expectMetric(desktop, 'metric-total-settled', String(expected.totalSettled))
-  await expectMetric(desktop, 'metric-analysis-status', 'Ready')
-  await expectMetric(desktop, 'sample-size-warning', expected.sampleSize)
-  await expectVisibleText(desktop, 'ROI by model and bookmaker')
-  await expectVisibleText(desktop, 'Brier score by model and bookmaker')
-  await expectVisibleText(desktop, 'Log loss by model and bookmaker')
-  await expectVisibleText(desktop, 'Settled bets by model and bookmaker')
-  await expectVisibleText(desktop, 'Cross-report comparison')
-
-  const selectedRunBefore = await desktop.getByTestId('selected-run-label').textContent()
-  await desktop.getByTestId('run-row-elo::Avg').click()
-  await expectMetric(desktop, 'selected-run-label', 'elo / Avg')
-  await expectMetric(desktop, 'cross-report-panel', 'elo / Avg')
-  await expectMetric(desktop, 'selected-run-insight', 'Selected-run insight')
-  await expectMetric(desktop, 'selected-run-insight', expected.selectedRunInsight.label)
-  await expectMetric(desktop, 'cross-report-panel', 'ROI and calibration trend')
-  await expectVisibleTestId(desktop, 'cross-report-trend-chart')
-  await expectPressed(desktop, 'trend-toggle-brierScore', 'true')
-  await desktop.getByTestId('trend-toggle-brierScore').click()
-  await expectPressed(desktop, 'trend-toggle-brierScore', 'false')
-  await desktop.getByTestId('trend-toggle-brierScore').click()
-  await expectPressed(desktop, 'trend-toggle-brierScore', 'true')
-  if (expected.crossReportRows.length > 0) {
-    const firstCrossReportRow = expected.crossReportRows[0]
+  if (firstComparison) {
+    const catalogSearch = desktop.getByTestId('catalog-search')
+    await catalogSearch.fill(firstComparison.name)
+    await expectMetric(desktop, `catalog-report-${firstComparison.name}`, expected.bestRoi)
     await expectMetric(
       desktop,
-      `cross-report-row-${firstCrossReportRow.reportName}`,
-      percent(firstCrossReportRow.roi),
+      `catalog-report-${firstComparison.name}`,
+      String(expected.totalSettled),
     )
-  }
-  await expectMetric(desktop, 'run-comparison', 'Against report average')
-  await expectMetric(desktop, 'run-comparison', expected.selectedRunComparison.roiDelta)
-  await expectMetric(desktop, 'run-comparison', expected.selectedRunComparison.brierDelta)
-  await expectMetric(desktop, 'run-comparison', expected.selectedRunComparison.logLossDelta)
-  await expectMetric(desktop, 'run-comparison', expected.selectedRunComparison.settledDelta)
-  const selectedRunAfter = await desktop.getByTestId('selected-run-label').textContent()
-  if (selectedRunBefore === selectedRunAfter) {
-    throw new Error('Run-detail selection did not change after clicking elo / Avg')
+    await catalogSearch.fill('no-matching-report-for-smoke')
+    await expectVisibleText(desktop, 'No comparison reports found.')
+    await catalogSearch.fill('')
+    const alternateComparison = visibleCatalogComparisons.find(
+      (comparison) => comparison.name !== firstComparison.name,
+    )
+    if (alternateComparison) {
+      await desktop.getByTestId(`catalog-report-${alternateComparison.name}`).click()
+      await desktop.waitForFunction(
+        (name) => document.querySelector('[data-testid="report-select"]')?.value === name,
+        alternateComparison.name,
+      )
+      await desktop.getByTestId(`catalog-report-${firstComparison.name}`).click()
+      await desktop.waitForFunction(
+        (name) => document.querySelector('[data-testid="report-select"]')?.value === name,
+        firstComparison.name,
+      )
+    }
+    await expectVisibleText(desktop, 'Metadata summary')
+    await expectVisibleText(desktop, 'AI analyst')
+    await expectMetric(desktop, 'metric-reports-indexed', String(expected.reportCount))
+    await expectMetric(desktop, 'metric-selected-runs', String(expected.runCount))
+    await expectMetric(desktop, 'metric-best-roi', expected.bestRoi)
+    await expectMetric(desktop, 'metric-best-brier', expected.bestBrier)
+    await expectMetric(desktop, 'metric-best-log-loss', expected.bestLogLoss)
+    await expectMetric(desktop, 'metric-total-settled', String(expected.totalSettled))
+    await expectMetric(desktop, 'metric-analysis-status', 'Ready')
+    await expectMetric(desktop, 'sample-size-warning', expected.sampleSize)
+    await expectVisibleText(desktop, 'ROI by model and bookmaker')
+    await expectVisibleText(desktop, 'Brier score by model and bookmaker')
+    await expectVisibleText(desktop, 'Log loss by model and bookmaker')
+    await expectVisibleText(desktop, 'Settled bets by model and bookmaker')
+    await expectVisibleText(desktop, 'Cross-report comparison')
+
+    const selectedRunBefore = await desktop.getByTestId('selected-run-label').textContent()
+    await desktop.getByTestId('run-row-elo::Avg').click()
+    await expectMetric(desktop, 'selected-run-label', 'elo / Avg')
+    await expectMetric(desktop, 'cross-report-panel', 'elo / Avg')
+    await expectMetric(desktop, 'selected-run-insight', 'Selected-run insight')
+    await expectMetric(desktop, 'selected-run-insight', expected.selectedRunInsight.label)
+    await expectMetric(desktop, 'cross-report-panel', 'ROI and calibration trend')
+    await expectVisibleTestId(desktop, 'cross-report-trend-chart')
+    await expectPressed(desktop, 'trend-toggle-brierScore', 'true')
+    await desktop.getByTestId('trend-toggle-brierScore').click()
+    await expectPressed(desktop, 'trend-toggle-brierScore', 'false')
+    await desktop.getByTestId('trend-toggle-brierScore').click()
+    await expectPressed(desktop, 'trend-toggle-brierScore', 'true')
+    if (expected.crossReportRows.length > 0) {
+      const firstCrossReportRow = expected.crossReportRows[0]
+      await expectMetric(
+        desktop,
+        `cross-report-row-${firstCrossReportRow.reportName}`,
+        percent(firstCrossReportRow.roi),
+      )
+    }
+    await expectMetric(desktop, 'run-comparison', 'Against report average')
+    await expectMetric(desktop, 'run-comparison', expected.selectedRunComparison.roiDelta)
+    await expectMetric(desktop, 'run-comparison', expected.selectedRunComparison.brierDelta)
+    await expectMetric(desktop, 'run-comparison', expected.selectedRunComparison.logLossDelta)
+    await expectMetric(desktop, 'run-comparison', expected.selectedRunComparison.settledDelta)
+    const selectedRunAfter = await desktop.getByTestId('selected-run-label').textContent()
+    if (selectedRunBefore === selectedRunAfter) {
+      throw new Error('Run-detail selection did not change after clicking elo / Avg')
+    }
+  } else {
+    await expectVisibleText(desktop, 'No comparison reports found.')
   }
 
   if (consoleMessages.length > 0) {
@@ -166,9 +179,13 @@ try {
   await expectVisibleText(mobile, 'AI analyst')
   await expectVisibleText(mobile, 'Historical diagnostics')
   await mobile.getByTestId('diagnostics-section').locator('summary').click()
-  await expectVisibleText(mobile, 'Run detail')
-  await expectMetric(mobile, 'metric-best-roi', expected.bestRoi)
-  await expectMetric(mobile, 'sample-size-warning', expected.sampleSize)
+  if (firstComparison) {
+    await expectVisibleText(mobile, 'Run detail')
+    await expectMetric(mobile, 'metric-best-roi', expected.bestRoi)
+    await expectMetric(mobile, 'sample-size-warning', expected.sampleSize)
+  } else {
+    await expectVisibleText(mobile, 'No comparison reports found.')
+  }
   const mobileScreenshot = join(screenshotDir, 'mobile.png')
   await mobile.screenshot({ path: mobileScreenshot, fullPage: true })
 
@@ -176,7 +193,7 @@ try {
     JSON.stringify(
       {
         ok: true,
-        checkedReport: firstComparison.name,
+        checkedReport: firstComparison?.name ?? null,
         screenshots: {
           desktop: desktopScreenshot,
           mobile: mobileScreenshot,
@@ -265,9 +282,18 @@ function buildExpectedValues(comparisons, detail, recentComparisons, recentDetai
     bestBrier: decimal(bestBrier?.brier_score ?? 0),
     bestLogLoss: decimal(bestLogLoss?.log_loss ?? 0),
     totalSettled: runs.reduce((total, run) => total + run.settled_bets, 0),
-    crossReportRows: buildCrossReportRows(selectedRun, recentReports),
-    selectedRunInsight: buildSelectedRunInsight(buildCrossReportRows(selectedRun, recentReports)),
-    selectedRunComparison: buildRunComparison(selectedRun, runs),
+    crossReportRows: selectedRun ? buildCrossReportRows(selectedRun, recentReports) : [],
+    selectedRunInsight: selectedRun
+      ? buildSelectedRunInsight(buildCrossReportRows(selectedRun, recentReports))
+      : { label: 'Noisy sample' },
+    selectedRunComparison: selectedRun
+      ? buildRunComparison(selectedRun, runs)
+      : {
+          roiDelta: signedPercent(0),
+          brierDelta: signedDecimal(0),
+          logLossDelta: signedDecimal(0),
+          settledDelta: signedDecimal(0),
+        },
     sampleSize: sampleSize ? `${sampleSize.smallest}-${sampleSize.largest}` : '',
   }
 }
@@ -287,12 +313,12 @@ function buildExpectedLiveValues(status) {
 
   return {
     statusLabel: statusLabel(latestRun.status),
-    latestRunLabel: `${latestRun.run_type} / ${latestRun.run_id}`,
-    providerLabel: [latestRun.provider, latestRun.league, latestRun.season]
+    latestRunLabel: latestRun.run_type.replaceAll('_', ' '),
+    providerLabel: [latestRun.provider, latestRun.model_name ?? latestRun.league, latestRun.season]
       .filter(Boolean)
       .join(' / '),
     openBetsLabel: `${status.open_paper_bets} open`,
-    errorsCount: String(status.errors_count),
+    errorsCount: `${status.errors_count} historical`,
   }
 }
 

@@ -69,6 +69,125 @@ describe('recommendation dashboard helpers', () => {
     expect(summary.marketOptions).toEqual(['1X2', 'TOTALS'])
   })
 
+  it('defaults actionable rows to active positive-EV candidates only', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({ id: 1, expected_value: 0.12, grade: 'lean', status: 'active' }),
+        recommendation({
+          id: 2,
+          expected_value: -0.04,
+          grade: 'watch',
+          status: 'active',
+          risk_flags: ['negative_expected_value'],
+        }),
+        recommendation({ id: 3, expected_value: 0.18, grade: 'reject', status: 'rejected' }),
+      ],
+      combinations: [
+        combination({ id: 1, leg_recommendation_ids: [1], rank: 2 }),
+        combination({ id: 2, leg_recommendation_ids: [1, 2], rank: 1 }),
+      ],
+      movements: [],
+      review: review({ approval_state: 'caution' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'actionable',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows.map((row) => row.id)).toEqual([1])
+    expect(summary.combinations.map((item) => item.id)).toEqual([1])
+    expect(summary.actionableCount).toBe(1)
+    expect(summary.blockedCount).toBe(2)
+    expect(summary.decisionState).toBe('candidate_ready')
+  })
+
+  it('does not mark watch or low-confidence rows as actionable candidates', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          confidence_score: 0.35,
+          expected_value: 0.18,
+          grade: 'watch',
+          risk_flags: ['low_confidence'],
+          status: 'active',
+        }),
+      ],
+      combinations: [],
+      movements: [],
+      review: review({ approval_state: 'caution' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'actionable',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows).toEqual([])
+    expect(summary.actionableCount).toBe(0)
+    expect(summary.blockedCount).toBe(1)
+    expect(summary.decisionState).toBe('blocked_by_risk')
+  })
+
+  it('does not mark candidates ready when the AI review rejects them', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          expected_value: 0.18,
+          grade: 'recommended',
+          risk_flags: ['no_current_risk_flags'],
+          status: 'active',
+        }),
+      ],
+      combinations: [],
+      movements: [],
+      review: review({ approval_state: 'reject' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'actionable',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows.map((row) => row.id)).toEqual([1])
+    expect(summary.actionableCount).toBe(1)
+    expect(summary.blockedCount).toBe(0)
+    expect(summary.decisionState).toBe('blocked_by_risk')
+  })
+
+  it('marks the daily card blocked when all recommendations are unsafe', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          expected_value: -0.08,
+          grade: 'watch',
+          status: 'active',
+          risk_flags: ['negative_expected_value'],
+        }),
+      ],
+      combinations: [],
+      movements: [],
+      review: review({ approval_state: 'reject' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'actionable',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows).toEqual([])
+    expect(summary.actionableCount).toBe(0)
+    expect(summary.blockedCount).toBe(1)
+    expect(summary.decisionState).toBe('blocked_by_risk')
+  })
+
   it('returns empty rows when the AI approval filter does not match', () => {
     const summary = buildRecommendationDashboardSummary({
       recommendations: [recommendation({ id: 1 })],

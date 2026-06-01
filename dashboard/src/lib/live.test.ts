@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LiveRun, LiveStatus } from '@/lib/api'
-import { buildLiveProcessSummary } from '@/lib/live'
+import { buildLiveProcessSummary, buildResultPipelineSummary } from '@/lib/live'
 
 describe('buildLiveProcessSummary', () => {
   it('summarizes an empty live state', () => {
@@ -10,6 +10,7 @@ describe('buildLiveProcessSummary', () => {
       latestRunLabel: 'Waiting for first collection',
       providerLabel: 'Provider unavailable',
       countersLabel: '0 read / 0 created / 0 skipped',
+      totalErrorsLabel: '0 historical',
       errorLabel: 'No recorded live errors',
       openBetsLabel: '0 open',
       settledBetsLabel: '0 settled',
@@ -35,11 +36,30 @@ describe('buildLiveProcessSummary', () => {
     ).toMatchObject({
       statusLabel: 'Latest run completed',
       statusTone: 'positive',
+      latestRunLabel: 'collect odds',
       providerLabel: 'misli_public / football',
       countersLabel: '12 read / 8 created / 4 skipped',
-      errorLabel: 'No errors in latest run',
+      totalErrorsLabel: '0 historical',
+      errorLabel: 'No recorded live errors',
       openBetsLabel: '3 open',
       settledBetsLabel: '9 settled',
+    })
+  })
+
+  it('separates historical error count from latest-run error health', () => {
+    expect(
+      buildLiveProcessSummary(
+        status({
+          latest_run: run({
+            status: 'completed',
+            errors_count: 0,
+          }),
+          errors_count: 24,
+        }),
+      ),
+    ).toMatchObject({
+      totalErrorsLabel: '24 historical',
+      errorLabel: 'Latest run clean',
     })
   })
 
@@ -58,7 +78,77 @@ describe('buildLiveProcessSummary', () => {
     ).toMatchObject({
       statusLabel: 'Latest run failed',
       statusTone: 'negative',
+      totalErrorsLabel: '4 historical',
       errorLabel: '2 errors: Missing kickoff datetime',
+    })
+  })
+
+  it('keeps scheduled worker labels short enough for dashboard tiles', () => {
+    expect(
+      buildLiveProcessSummary(
+        status({
+          latest_run: run({
+            run_type: 'scheduled_paper_worker',
+            provider: 'misli_public',
+            model_name: 'baseline_heuristic',
+            run_id:
+              'scheduled_paper_worker:misli-public:baseline_heuristic:url:ai-assisted-betting-production.up.railway.app/api/live/snapshots/latest/misli-public:2026-05-28T14:02:25.604604+00:00',
+          }),
+        }),
+      ),
+    ).toMatchObject({
+      latestRunLabel: 'scheduled paper worker',
+      providerLabel: 'misli_public / baseline_heuristic',
+    })
+  })
+})
+
+describe('buildResultPipelineSummary', () => {
+  it('summarizes an empty result queue', () => {
+    expect(buildResultPipelineSummary()).toMatchObject({
+      statusLabel: 'No result jobs',
+      statusTone: 'neutral',
+      dueLabel: '0 due',
+      latestJobLabel: 'Waiting for tracked matches',
+    })
+  })
+
+  it('surfaces due and failed Misli result jobs', () => {
+    expect(
+      buildResultPipelineSummary({
+        summary: {
+          total: 3,
+          due: 2,
+          completed: 1,
+          postponed: 1,
+          failed: 1,
+          pending: 0,
+        },
+        jobs: [
+          {
+            id: 1,
+            match_id: 10,
+            source_match_id: 'misli:football:2816300',
+            misli_event_id: '2816300',
+            detail_url: null,
+            status: 'failed',
+            next_attempt_at: '2026-05-20T01:00:00+04:00',
+            attempt_count: 3,
+            last_error: 'parser drift',
+            is_due: true,
+            match_label: 'Forest City vs Eastport Athletic',
+            kickoff_time: '2026-05-19T20:30:00+04:00',
+          },
+        ],
+      }),
+    ).toMatchObject({
+      statusLabel: 'Result fetch needs review',
+      statusTone: 'negative',
+      dueLabel: '2 due',
+      completedLabel: '1 completed',
+      pendingLabel: '1 waiting',
+      failureLabel: '1 failed',
+      latestJobLabel: 'Forest City vs Eastport Athletic',
     })
   })
 })

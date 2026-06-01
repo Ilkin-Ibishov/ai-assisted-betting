@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BetLedgerRow } from '@/lib/api'
 import {
+  betLedgerDateRangeOptions,
   betLedgerDefaultQuery,
   betLedgerStateLabel,
   betLedgerStateTone,
@@ -12,10 +13,25 @@ describe('bet ledger helpers', () => {
     expect(betLedgerDefaultQuery).toEqual({ status: 'fresh', dateRange: 'next_7_days' })
   })
 
+  it('exposes fixed and custom kickoff date filters', () => {
+    expect(betLedgerDateRangeOptions.map((option) => option.value)).toEqual([
+      'today',
+      'tomorrow',
+      'next_7_days',
+      'last_7_days',
+      'last_30_days',
+      'custom',
+      'all',
+    ])
+  })
+
   it('builds display summary from backend summary', () => {
     const summary = buildBetLedgerDisplaySummary({
       summary: {
         fresh_count: 2,
+        valid_open_count: 2,
+        unsafe_open_count: 4,
+        candidate_count: 1,
         tracked_count: 1,
         needs_result_count: 1,
         resulted_count: 3,
@@ -27,15 +43,19 @@ describe('bet ledger helpers', () => {
     })
 
     expect(summary.cards.map((card) => card.label)).toEqual([
-      'Fresh',
+      'Actionable',
+      'Unsafe open',
+      'Candidates',
       'Tracked',
       'Needs result',
       'Resulted',
       'Paper P/L',
       'Win rate',
     ])
-    expect(summary.cards[4].value).toBe('+2.4u')
-    expect(summary.cards[5].value).toBe('66.7%')
+    expect(summary.cards[0].value).toBe('2')
+    expect(summary.cards[1].value).toBe('4')
+    expect(summary.cards[6].value).toBe('+2.4u')
+    expect(summary.cards[7].value).toBe('66.7%')
   })
 
   it('labels row states for compact UI display', () => {

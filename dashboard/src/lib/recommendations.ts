@@ -26,6 +26,10 @@ export type RecommendationDashboardSummary = {
   reviewLabel: string
   approvalState: 'approve' | 'caution' | 'reject' | 'missing'
   topRiskFlags: string[]
+  actionableCount: number
+  blockedCount: number
+  decisionState: 'candidate_ready' | 'blocked_by_risk' | 'empty'
+  latestRecommendationAt?: string
 }
 
 export function buildRecommendationDashboardSummary({
@@ -47,20 +51,26 @@ export function buildRecommendationDashboardSummary({
   const marketOptions = uniqueSorted(recommendations.map((item) => item.market))
   const approvalMatches =
     filters.approvalState === 'all' || filters.approvalState === approvalState
+  const enrichedRows = recommendations.map((recommendation) => {
+    const movement = movementByKey.get(recommendationKey(recommendation))
+    return {
+      ...recommendation,
+      league: movement?.league,
+      match_label: movement
+        ? `${movement.home_team} vs ${movement.away_team}`
+        : recommendation.source_match_id,
+      movement_direction: movement?.movement_direction,
+    }
+  })
+  const actionableRows = enrichedRows.filter(isActionableRecommendation)
+  const actionableIds = new Set(actionableRows.map((row) => row.id))
+  const approvalAllowsCandidate = approvalState === 'approve' || approvalState === 'caution'
+  const latestRecommendationAt = recommendations
+    .map((recommendation) => recommendation.created_at)
+    .toSorted((a, b) => b.localeCompare(a))[0]
 
   const rows = approvalMatches
-    ? recommendations
-        .map((recommendation) => {
-          const movement = movementByKey.get(recommendationKey(recommendation))
-          return {
-            ...recommendation,
-            league: movement?.league,
-            match_label: movement
-              ? `${movement.home_team} vs ${movement.away_team}`
-              : recommendation.source_match_id,
-            movement_direction: movement?.movement_direction,
-          }
-        })
+    ? enrichedRows
         .filter((row) => rowMatchesFilters(row, filters))
         .toSorted((a, b) => {
           const bValue = b.expected_value ?? Number.NEGATIVE_INFINITY
@@ -71,13 +81,45 @@ export function buildRecommendationDashboardSummary({
 
   return {
     rows,
-    combinations: approvalMatches ? combinations.toSorted((a, b) => a.rank - b.rank) : [],
+    combinations: approvalMatches
+      ? combinations
+          .filter((combination) => combinationMatchesFilters(combination, filters, actionableIds))
+          .toSorted((a, b) => a.rank - b.rank)
+      : [],
     gradeOptions,
     marketOptions,
     reviewLabel: review?.output.short_summary ?? 'No AI recommendation review yet',
     approvalState,
     topRiskFlags: review?.output.risk_flags ?? ['recommendation_review_missing'],
+    actionableCount: actionableRows.length,
+    blockedCount: recommendations.length - actionableRows.length,
+    decisionState: approvalAllowsCandidate && actionableRows.length
+      ? 'candidate_ready'
+      : recommendations.length
+        ? 'blocked_by_risk'
+        : 'empty',
+    latestRecommendationAt,
   }
+}
+
+function combinationMatchesFilters(
+  combination: PaperCombination,
+  filters: RecommendationFilters,
+  actionableIds: Set<number>,
+) {
+  if (filters.grade === 'actionable') {
+    return (
+      combination.status === 'active' &&
+      combination.leg_recommendation_ids.length > 0 &&
+      combination.leg_recommendation_ids.every((id) => actionableIds.has(id)) &&
+      combination.combined_expected_value > 0 &&
+      !combination.risk_flags.some(isBlockingRiskFlag)
+    )
+  }
+  if (filters.grade !== 'all' && combination.grade !== filters.grade) {
+    return false
+  }
+  return true
 }
 
 export function riskBadgeTone(flag: string): 'neutral' | 'positive' | 'warning' | 'danger' {
@@ -99,13 +141,38 @@ export function riskBadgeTone(flag: string): 'neutral' | 'positive' | 'warning' 
 }
 
 function rowMatchesFilters(row: RecommendationRow, filters: RecommendationFilters) {
-  if (filters.grade !== 'all' && row.grade !== filters.grade) {
+  if (filters.grade === 'actionable') {
+    if (!isActionableRecommendation(row)) {
+      return false
+    }
+  } else if (filters.grade !== 'all' && row.grade !== filters.grade) {
     return false
   }
   if (filters.market !== 'all' && row.market !== filters.market) {
     return false
   }
   return confidenceMatches(row.confidence_score, filters.confidence)
+}
+
+function isActionableRecommendation(row: RecommendationRow) {
+  return (
+    row.status === 'active' &&
+    (row.grade === 'recommended' || row.grade === 'lean') &&
+    (row.expected_value ?? Number.NEGATIVE_INFINITY) > 0 &&
+    !row.risk_flags.some(isBlockingRiskFlag)
+  )
+}
+
+function isBlockingRiskFlag(flag: string) {
+  return [
+    'negative_expected_value',
+    'missing_prediction',
+    'stale_odds',
+    'missing_outcome',
+    'provider_health_warning',
+    'edge_below_threshold',
+    'low_confidence',
+  ].includes(flag)
 }
 
 function confidenceMatches(value: number | null, filter: RecommendationFilters['confidence']) {

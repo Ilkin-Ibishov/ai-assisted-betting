@@ -1,11 +1,30 @@
-import type { BetLedgerQuery, BetLedgerResponse, BetLedgerRowState } from '@/lib/api'
+import type {
+  BetLedgerDateRange,
+  BetLedgerQuery,
+  BetLedgerResponse,
+  BetLedgerRowState,
+} from '@/lib/api'
 
-export type BetLedgerDefaultQuery = Required<Pick<BetLedgerQuery, 'status' | 'dateRange'>>
+export type BetLedgerDefaultQuery = BetLedgerQuery &
+  Required<Pick<BetLedgerQuery, 'status' | 'dateRange'>>
 
 export const betLedgerDefaultQuery: BetLedgerDefaultQuery = {
   status: 'fresh',
   dateRange: 'next_7_days',
 }
+
+export const betLedgerDateRangeOptions: Array<{
+  label: string
+  value: BetLedgerDateRange
+}> = [
+  { label: 'Today', value: 'today' },
+  { label: 'Tomorrow', value: 'tomorrow' },
+  { label: 'Next 7 days', value: 'next_7_days' },
+  { label: 'Last 7 days', value: 'last_7_days' },
+  { label: 'Last 30 days', value: 'last_30_days' },
+  { label: 'Custom', value: 'custom' },
+  { label: 'All', value: 'all' },
+]
 
 export type BetLedgerTone = 'success' | 'warning' | 'info' | 'muted'
 
@@ -14,7 +33,9 @@ export function buildBetLedgerDisplaySummary(response: BetLedgerResponse) {
 
   return {
     cards: [
-      { label: 'Fresh', value: String(summary.fresh_count), tone: 'success' as const },
+      { label: 'Actionable', value: String(summary.valid_open_count), tone: 'success' as const },
+      { label: 'Unsafe open', value: String(summary.unsafe_open_count), tone: 'warning' as const },
+      { label: 'Candidates', value: String(summary.candidate_count), tone: 'info' as const },
       { label: 'Tracked', value: String(summary.tracked_count), tone: 'info' as const },
       { label: 'Needs result', value: String(summary.needs_result_count), tone: 'warning' as const },
       { label: 'Resulted', value: String(summary.resulted_count), tone: 'info' as const },

@@ -8,6 +8,7 @@ import type {
   BetLedgerStatus,
 } from '@/lib/api'
 import {
+  betLedgerDateRangeOptions,
   betLedgerStateLabel,
   betLedgerStateTone,
   buildBetLedgerDisplaySummary,
@@ -25,30 +26,28 @@ const statusOptions: Array<{ label: string; value: BetLedgerStatus }> = [
   { label: 'All', value: 'all' },
 ]
 
-const dateOptions: Array<{ label: string; value: BetLedgerDateRange }> = [
-  { label: 'Today', value: 'today' },
-  { label: 'Tomorrow', value: 'tomorrow' },
-  { label: 'Next 7 days', value: 'next_7_days' },
-  { label: 'Last 30 days', value: 'last_30_days' },
-  { label: 'All', value: 'all' },
-]
-
 export function BetLedgerPanel({
   dateRange,
   error,
+  fromDate,
   ledger,
   loading,
+  onCustomDatesChange,
   onDateRangeChange,
   onStatusChange,
   status,
+  toDate,
 }: {
   dateRange: BetLedgerDateRange
   error: boolean
+  fromDate?: string
   ledger?: BetLedgerResponse
   loading: boolean
+  onCustomDatesChange: (dates: { from?: string; to?: string }) => void
   onDateRangeChange: (dateRange: BetLedgerDateRange) => void
   onStatusChange: (status: BetLedgerStatus) => void
   status: BetLedgerStatus
+  toDate?: string
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const summary = useMemo(
@@ -78,10 +77,38 @@ export function BetLedgerPanel({
             />
             <SegmentedControl
               label="Kickoff"
-              options={dateOptions}
+              options={betLedgerDateRangeOptions}
               value={dateRange}
               onChange={onDateRangeChange}
             />
+            {dateRange === 'custom' ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="grid gap-1 text-xs font-medium uppercase text-slate-500">
+                  From
+                  <input
+                    aria-label="Custom kickoff from date"
+                    className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-normal normal-case text-slate-900 outline-none ring-offset-white focus:ring-2 focus:ring-slate-400"
+                    onChange={(event) =>
+                      onCustomDatesChange({ from: event.target.value || undefined, to: toDate })
+                    }
+                    type="date"
+                    value={fromDate ?? ''}
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-medium uppercase text-slate-500">
+                  To
+                  <input
+                    aria-label="Custom kickoff to date"
+                    className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-normal normal-case text-slate-900 outline-none ring-offset-white focus:ring-2 focus:ring-slate-400"
+                    onChange={(event) =>
+                      onCustomDatesChange({ from: fromDate, to: event.target.value || undefined })
+                    }
+                    type="date"
+                    value={toDate ?? ''}
+                  />
+                </label>
+              </div>
+            ) : null}
           </div>
         </div>
       </CardHeader>
@@ -93,7 +120,7 @@ export function BetLedgerPanel({
         ) : null}
         {loading ? <LedgerSkeleton /> : null}
         {!loading && summary ? (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {summary.cards.map((card) => (
               <div className="rounded-md border border-slate-200 bg-slate-50 p-3" key={card.label}>
                 <div className="text-xs font-medium uppercase text-slate-500">{card.label}</div>
@@ -296,8 +323,8 @@ function Detail({ label, value }: { label: string; value: string }) {
 function LedgerSkeleton() {
   return (
     <div className="grid gap-3">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-        {Array.from({ length: 6 }, (_, index) => (
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 8 }, (_, index) => (
           <Skeleton className="h-16" key={index} />
         ))}
       </div>

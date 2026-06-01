@@ -82,6 +82,33 @@ export type LiveStatus = {
   errors_count: number
 }
 
+export type ResultFetchJob = {
+  id: number
+  match_id: number
+  source_match_id: string
+  misli_event_id?: string | null
+  detail_url?: string | null
+  status: string
+  next_attempt_at: string
+  attempt_count: number
+  last_error?: string | null
+  is_due: boolean
+  match_label: string
+  kickoff_time: string
+}
+
+export type ResultFetchJobsResponse = {
+  summary: {
+    total: number
+    due: number
+    completed: number
+    postponed: number
+    failed: number
+    pending: number
+  }
+  jobs: ResultFetchJob[]
+}
+
 export type OperationalGuardrail = {
   name: string
   severity: 'ok' | 'warning' | 'critical'
@@ -150,6 +177,36 @@ export type PaperRecommendation = {
   created_at: string
 }
 
+export type PaperBet = {
+  id: number
+  prediction_id: number
+  match_id: number
+  source_match_id: string
+  league: string
+  home_team: string
+  away_team: string
+  match_label: string
+  kickoff_time: string
+  market: string
+  selection: string
+  odds_taken: number
+  stake_units: number
+  expected_value: number
+  status: string
+  profit_loss_units: number | null
+  closing_odds: number | null
+  clv: number | null
+  settled_at: string | null
+  created_at: string
+  model_name: string
+  model_version: string
+  model_probability: number
+  edge: number
+  confidence_score: number | null
+  risk_flags: string[]
+  is_valid_open: boolean
+}
+
 export type BetLedgerRowState = 'fresh' | 'needs_result' | 'resulted' | 'voided'
 
 export type BetLedgerStatus = BetLedgerRowState | 'all'
@@ -165,6 +222,9 @@ export type BetLedgerDateRange =
 
 export type BetLedgerSummary = {
   fresh_count: number
+  valid_open_count: number
+  unsafe_open_count: number
+  candidate_count: number
   tracked_count: number
   needs_result_count: number
   resulted_count: number
@@ -285,6 +345,10 @@ export async function fetchLiveStatus(): Promise<LiveStatus> {
   return getJson('/api/live/status')
 }
 
+export async function fetchResultJobs(): Promise<ResultFetchJobsResponse> {
+  return getJson('/api/live/result-jobs?limit=100')
+}
+
 export async function fetchOperationalGuardrails(): Promise<OperationalGuardrailStatus> {
   return getJson('/api/operations/guardrails')
 }
@@ -294,7 +358,11 @@ export async function fetchOddsMovement(): Promise<OddsMovementSummary[]> {
 }
 
 export async function fetchPaperRecommendations(): Promise<PaperRecommendation[]> {
-  return getJson('/api/live/recommendations')
+  return getJson('/api/live/recommendations?limit=500')
+}
+
+export async function fetchPaperBets(): Promise<PaperBet[]> {
+  return getJson('/api/live/paper-bets?limit=500')
 }
 
 export async function fetchBetLedger(query: BetLedgerQuery = {}): Promise<BetLedgerResponse> {

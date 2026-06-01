@@ -41,8 +41,10 @@ import {
   fetchLatestRecommendationReview,
   fetchLiveStatus,
   fetchOddsMovement,
+  fetchResultJobs,
   fetchBetLedger,
   fetchOperationalGuardrails,
+  fetchPaperBets,
   fetchPaperCombinations,
   fetchPaperRecommendations,
 } from '@/lib/api'
@@ -57,13 +59,16 @@ import type {
   LiveStatus,
   OddsMovementSummary,
   OperationalGuardrailStatus,
+  PaperBet,
   PaperCombination,
   PaperRecommendation,
+  ResultFetchJobsResponse,
 } from '@/lib/api'
 import { buildAIAdvisorySummary } from '@/lib/ai'
 import { betLedgerDefaultQuery } from '@/lib/bet-ledger'
 import { getVisibleCatalogReports } from '@/lib/catalog'
-import { buildLiveProcessSummary } from '@/lib/live'
+import { buildLiveProcessSummary, buildResultPipelineSummary } from '@/lib/live'
+import { groupPaperBets } from '@/lib/paper-bets'
 import {
   buildRecommendationDashboardSummary,
   riskBadgeTone,
@@ -128,6 +133,11 @@ function App() {
     queryFn: fetchLiveStatus,
   })
 
+  const resultJobs = useQuery({
+    queryKey: ['result-jobs'],
+    queryFn: fetchResultJobs,
+  })
+
   const guardrails = useQuery({
     queryKey: ['operational-guardrails'],
     queryFn: fetchOperationalGuardrails,
@@ -141,6 +151,11 @@ function App() {
   const recommendations = useQuery({
     queryKey: ['paper-recommendations'],
     queryFn: fetchPaperRecommendations,
+  })
+
+  const paperBets = useQuery({
+    queryKey: ['paper-bets'],
+    queryFn: fetchPaperBets,
   })
 
   const betLedger = useQuery({
@@ -233,6 +248,7 @@ function App() {
                 void comparisons.refetch()
                 void detail.refetch()
                 void betLedger.refetch()
+                void resultJobs.refetch()
               }}
                 title="Refresh dashboard data"
               >
@@ -260,6 +276,9 @@ function App() {
               liveError={liveStatus.isError}
               liveLoading={liveStatus.isLoading}
               liveStatus={liveStatus.data}
+              resultJobs={resultJobs.data}
+              resultJobsError={resultJobs.isError}
+              resultJobsLoading={resultJobs.isLoading}
               guardrailError={guardrails.isError}
               guardrailLoading={guardrails.isLoading}
               guardrailStatus={guardrails.data}
@@ -269,18 +288,23 @@ function App() {
               betLedger={betLedger.data}
               betLedgerDateRange={betLedgerQuery.dateRange}
               betLedgerError={betLedger.isError}
+              betLedgerFromDate={betLedgerQuery.from}
               betLedgerLoading={betLedger.isLoading}
               betLedgerStatus={betLedgerQuery.status}
+              betLedgerToDate={betLedgerQuery.to}
               combinations={combinations.data ?? []}
               oddsMovement={oddsMovement.data ?? []}
+              paperBets={paperBets.data ?? []}
               recommendationError={
                 recommendations.isError ||
+                paperBets.isError ||
                 combinations.isError ||
                 oddsMovement.isError ||
                 recommendationReview.isError
               }
               recommendationLoading={
                 recommendations.isLoading ||
+                paperBets.isLoading ||
                 combinations.isLoading ||
                 oddsMovement.isLoading ||
                 recommendationReview.isLoading
@@ -288,9 +312,17 @@ function App() {
               recommendationReview={recommendationReview.data}
               recommendations={recommendations.data ?? []}
               runs={rankedRuns}
-              onBetLedgerDateRangeChange={(dateRange) =>
-                setBetLedgerQuery((current) => ({ ...current, dateRange }))
+              onBetLedgerCustomDatesChange={(dates) =>
+                setBetLedgerQuery((current) => ({ ...current, ...dates, dateRange: 'custom' }))
               }
+              onBetLedgerDateRangeChange={(dateRange) => {
+                setBetLedgerQuery((current) => ({
+                  ...current,
+                  dateRange,
+                  from: dateRange === 'custom' ? current.from : undefined,
+                  to: dateRange === 'custom' ? current.to : undefined,
+                }))
+              }}
               onBetLedgerStatusChange={(status) =>
                 setBetLedgerQuery((current) => ({ ...current, status }))
               }
@@ -317,6 +349,9 @@ type DashboardContentProps = {
   liveError: boolean
   liveLoading: boolean
   liveStatus?: LiveStatus
+  resultJobs?: ResultFetchJobsResponse
+  resultJobsError: boolean
+  resultJobsLoading: boolean
   guardrailError: boolean
   guardrailLoading: boolean
   guardrailStatus?: OperationalGuardrailStatus
@@ -326,15 +361,19 @@ type DashboardContentProps = {
   betLedger?: BetLedgerResponse
   betLedgerDateRange: BetLedgerDateRange
   betLedgerError: boolean
+  betLedgerFromDate?: string
   betLedgerLoading: boolean
   betLedgerStatus: BetLedgerStatus
+  betLedgerToDate?: string
   combinations: PaperCombination[]
   oddsMovement: OddsMovementSummary[]
+  paperBets: PaperBet[]
   recommendationError: boolean
   recommendationLoading: boolean
   recommendationReview?: AIAnalysisRun | null
   recommendations: PaperRecommendation[]
   runs: RankedComparisonRun[]
+  onBetLedgerCustomDatesChange: (dates: { from?: string; to?: string }) => void
   onBetLedgerDateRangeChange: (dateRange: BetLedgerDateRange) => void
   onBetLedgerStatusChange: (status: BetLedgerStatus) => void
 }
@@ -354,6 +393,9 @@ function DashboardContent({
   liveError,
   liveLoading,
   liveStatus,
+  resultJobs,
+  resultJobsError,
+  resultJobsLoading,
   guardrailError,
   guardrailLoading,
   guardrailStatus,
@@ -363,15 +405,19 @@ function DashboardContent({
   betLedger,
   betLedgerDateRange,
   betLedgerError,
+  betLedgerFromDate,
   betLedgerLoading,
   betLedgerStatus,
+  betLedgerToDate,
   combinations,
   oddsMovement,
+  paperBets,
   recommendationError,
   recommendationLoading,
   recommendationReview,
   recommendations,
   runs,
+  onBetLedgerCustomDatesChange,
   onBetLedgerDateRangeChange,
   onBetLedgerStatusChange,
 }: DashboardContentProps) {
@@ -416,6 +462,7 @@ function DashboardContent({
         error={recommendationError}
         loading={recommendationLoading}
         movements={oddsMovement}
+        paperBets={paperBets}
         recommendations={recommendations}
         review={recommendationReview}
       />
@@ -423,16 +470,23 @@ function DashboardContent({
       <BetLedgerPanel
         dateRange={betLedgerDateRange}
         error={betLedgerError}
+        fromDate={betLedgerFromDate}
         ledger={betLedger}
         loading={betLedgerLoading}
+        onCustomDatesChange={onBetLedgerCustomDatesChange}
         onDateRangeChange={onBetLedgerDateRangeChange}
         onStatusChange={onBetLedgerStatusChange}
         status={betLedgerStatus}
+        toDate={betLedgerToDate}
       />
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.55fr)]">
         <LiveProcessMonitor
           error={liveError}
           loading={liveLoading}
+          resultJobs={resultJobs}
+          resultJobsError={resultJobsError}
+          resultJobsLoading={resultJobsLoading}
           status={liveStatus}
         />
 
@@ -681,13 +735,20 @@ function DashboardContent({
 function LiveProcessMonitor({
   error,
   loading,
+  resultJobs,
+  resultJobsError,
+  resultJobsLoading,
   status,
 }: {
   error: boolean
   loading: boolean
+  resultJobs?: ResultFetchJobsResponse
+  resultJobsError: boolean
+  resultJobsLoading: boolean
   status?: LiveStatus
 }) {
   const summary = buildLiveProcessSummary(status)
+  const resultSummary = buildResultPipelineSummary(resultJobs)
 
   return (
     <Card data-testid="live-process-monitor">
@@ -717,7 +778,7 @@ function LiveProcessMonitor({
             Live status API is not reachable.
           </div>
         ) : (
-          <div className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr_0.8fr_1fr]">
+          <div className="grid min-w-0 gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)]">
             <LiveStatusTile
               label="Latest run"
               testId="live-latest-run"
@@ -737,9 +798,9 @@ function LiveProcessMonitor({
               helper={summary.settledBetsLabel}
             />
             <LiveStatusTile
-              label="Errors"
+              label="Run errors"
               testId="live-errors"
-              value={status ? String(status.errors_count) : '0'}
+              value={summary.totalErrorsLabel}
               helper={summary.errorLabel}
             />
           </div>
@@ -751,22 +812,68 @@ function LiveProcessMonitor({
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Last success
               </div>
-              <div className="mt-1 truncate font-medium text-slate-900">
-                {status.latest_success?.run_id ?? 'No successful run recorded'}
+              <div className="mt-1 font-medium leading-5 text-slate-900">
+                {status.latest_success
+                  ? buildLiveProcessSummary({ ...status, latest_run: status.latest_success })
+                      .latestRunLabel
+                  : 'No successful run recorded'}
               </div>
             </div>
             <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Last failure
               </div>
-              <div className="mt-1 truncate font-medium text-slate-900">
-                {status.latest_failure?.run_id ?? 'No failed run recorded'}
+              <div className="mt-1 font-medium leading-5 text-slate-900">
+                {status.latest_failure
+                  ? buildLiveProcessSummary({ ...status, latest_run: status.latest_failure })
+                      .latestRunLabel
+                  : 'No failed run recorded'}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {!loading && !error ? (
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Result pipeline
+                </div>
+                <div
+                  className="mt-1 font-medium leading-5 text-slate-900"
+                  data-testid="result-pipeline-latest"
+                >
+                  {resultJobsLoading
+                    ? 'Loading result jobs'
+                    : resultJobsError
+                      ? 'Result jobs unavailable'
+                      : resultSummary.latestJobLabel}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {resultJobsError ? 'Result job API is not reachable.' : resultSummary.latestJobHelper}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <ResultPipelinePill label="Due" value={resultSummary.dueLabel} />
+                <ResultPipelinePill label="Done" value={resultSummary.completedLabel} />
+                <ResultPipelinePill label="Waiting" value={resultSummary.pendingLabel} />
+                <ResultPipelinePill label="Failed" value={resultSummary.failureLabel} />
               </div>
             </div>
           </div>
         ) : null}
       </CardContent>
     </Card>
+  )
+}
+
+function ResultPipelinePill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+      <div className="font-semibold text-slate-900">{value}</div>
+      <div className="mt-1 text-slate-500">{label}</div>
+    </div>
   )
 }
 
@@ -898,6 +1005,7 @@ function RecommendationDashboardPanel({
   error,
   loading,
   movements,
+  paperBets,
   recommendations,
   review,
 }: {
@@ -905,13 +1013,14 @@ function RecommendationDashboardPanel({
   error: boolean
   loading: boolean
   movements: OddsMovementSummary[]
+  paperBets: PaperBet[]
   recommendations: PaperRecommendation[]
   review?: AIAnalysisRun | null
 }) {
   const [filters, setFilters] = useState<RecommendationFilters>({
     approvalState: 'all',
     confidence: 'all',
-    grade: 'all',
+    grade: 'actionable',
     market: 'all',
   })
   const summary = useMemo(
@@ -925,6 +1034,7 @@ function RecommendationDashboardPanel({
       }),
     [combinations, filters, movements, recommendations, review],
   )
+  const paperBetGroups = useMemo(() => groupPaperBets(paperBets), [paperBets])
 
   return (
     <Card data-testid="recommendation-dashboard">
@@ -961,7 +1071,12 @@ function RecommendationDashboardPanel({
         ) : (
           <div className="flex flex-col gap-4">
             <DailyDecisionSummary
+              decisionState={summary.decisionState}
+              latestRecommendationAt={summary.latestRecommendationAt}
+              blockedCount={summary.blockedCount}
               combinationCount={summary.combinations.length}
+              openBetCount={paperBetGroups.validOpenBets.length}
+              unsafeOpenBetCount={paperBetGroups.unsafeOpenBets.length}
               recommendations={summary.rows}
               review={review}
             />
@@ -998,39 +1113,58 @@ function RecommendationDashboardPanel({
 }
 
 function DailyDecisionSummary({
+  blockedCount,
   combinationCount,
+  decisionState,
+  latestRecommendationAt,
+  openBetCount,
   recommendations,
   review,
+  unsafeOpenBetCount,
 }: {
+  blockedCount: number
   combinationCount: number
+  decisionState: ReturnType<typeof buildRecommendationDashboardSummary>['decisionState']
+  latestRecommendationAt?: string
+  openBetCount: number
   recommendations: ReturnType<typeof buildRecommendationDashboardSummary>['rows']
   review?: AIAnalysisRun | null
+  unsafeOpenBetCount: number
 }) {
   const topRecommendation = recommendations[0]
+  const showRecommendation = decisionState === 'candidate_ready' && topRecommendation
+  const decisionLabel =
+    decisionState === 'candidate_ready'
+      ? 'Candidate ready'
+      : decisionState === 'blocked_by_risk'
+        ? 'No paper candidate'
+        : 'Waiting for data'
 
   return (
     <div className="grid gap-3 text-sm md:grid-cols-3" data-testid="daily-decision-summary">
       <InfoBlock
-        label="Best single"
+        label={decisionLabel}
         value={
-          topRecommendation
+          showRecommendation
             ? `${topRecommendation.selection} / ${topRecommendation.market} / EV ${formatOptionalPercent(
                 topRecommendation.expected_value,
               )}`
-            : 'No active paper singles yet.'
+            : blockedCount
+              ? `${blockedCount} blocked by EV, freshness, prediction, or provider risk.`
+              : 'No active paper singles yet.'
         }
       />
       <InfoBlock
-        label="Bet combinations"
+        label="Freshness"
         value={
-          combinationCount
-            ? `${combinationCount} ranked paper combinations ready for review.`
-            : 'No ranked combinations yet.'
+          latestRecommendationAt
+            ? `Last recommendation refresh ${formatDate(latestRecommendationAt)}.`
+            : 'No recommendation refresh recorded.'
         }
       />
       <InfoBlock
         label="AI position"
-        value={review?.output.approval_state ?? 'missing'}
+        value={`${review?.output.approval_state ?? 'missing'} / ${openBetCount} valid open / ${unsafeOpenBetCount} hidden / ${combinationCount} combinations`}
       />
     </div>
   )
@@ -1052,7 +1186,7 @@ function RecommendationFiltersBar({
       <FilterSelect
         label="Grade"
         value={filters.grade}
-        options={['all', ...gradeOptions]}
+        options={['actionable', 'all', ...gradeOptions]}
         onChange={(grade) => onChange({ ...filters, grade })}
       />
       <FilterSelect
@@ -1102,6 +1236,7 @@ function FilterSelect({
     <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
       {label}
       <select
+        aria-label={label}
         className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-normal normal-case tracking-normal text-slate-900 outline-none focus:ring-2 focus:ring-slate-400"
         onChange={(event) => onChange(event.target.value)}
         value={value}
@@ -1271,10 +1406,10 @@ function LiveStatusTile({
       data-testid={testId}
     >
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-2 truncate text-base font-semibold text-slate-950" title={value}>
+      <div className="mt-2 text-base font-semibold leading-5 text-slate-950" title={value}>
         {value}
       </div>
-      <div className="mt-1 truncate text-slate-500" title={helper}>
+      <div className="mt-1 line-clamp-2 text-slate-500" title={helper}>
         {helper}
       </div>
     </div>
@@ -1885,8 +2020,7 @@ function ApiWarning() {
       <div>
         <div className="font-semibold">Dashboard API is not reachable.</div>
         <div className="mt-1">
-          Start FastAPI with .\.venv\Scripts\python.exe -m uvicorn app.api:api --reload,
-          then refresh this page.
+          Check the configured API service and refresh this page after it is healthy.
         </div>
       </div>
     </div>
