@@ -236,12 +236,47 @@ def test_ledger_excludes_voided_from_default_fresh_view(tmp_path: Path) -> None:
     all_rows = BetLedgerService(database_url).ledger(
         status="all",
         date_range="next_7_days",
-        include_voided=True,
         now=datetime(2026, 5, 29, 8, 0, tzinfo=UTC),
     )
 
     assert fresh["rows"] == []
     assert all_rows["rows"][0]["state"] == "voided"
+    assert all_rows["summary"]["voided_count"] == 1
+
+
+def test_resulted_and_voided_paper_bets_remain_tracked_rows(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="tracked-won",
+        kickoff_time="2026-05-27T20:30:00+04:00",
+        selection="HOME",
+        status="won",
+        profit_loss_units=1.2,
+        settled_at="2026-05-27T23:00:00+00:00",
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="tracked-voided",
+        kickoff_time="2026-05-28T20:30:00+04:00",
+        selection="AWAY",
+        status="void",
+        profit_loss_units=0.0,
+        settled_at="2026-05-28T23:00:00+00:00",
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="all",
+        date_range="last_7_days",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=UTC),
+    )
+
+    rows_by_match = {row["source_match_id"]: row for row in payload["rows"]}
+    assert rows_by_match["tracked-won"]["state"] == "resulted"
+    assert rows_by_match["tracked-won"]["row_type"] == "tracked"
+    assert rows_by_match["tracked-voided"]["state"] == "voided"
+    assert rows_by_match["tracked-voided"]["row_type"] == "tracked"
+    assert payload["summary"]["tracked_count"] == 2
 
 
 def test_ledger_deduplicates_candidate_when_matching_paper_bet_exists(

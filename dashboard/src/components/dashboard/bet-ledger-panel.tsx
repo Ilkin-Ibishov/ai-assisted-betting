@@ -347,7 +347,5 @@ function formatId(value: number | null) {
 
 function rowTypeLabel(rowType: BetLedgerRow['row_type']) {
   if (rowType === 'candidate') return 'Candidate'
-  if (rowType === 'tracked') return 'Paper bet'
-  if (rowType === 'resulted') return 'Resulted'
-  return 'Voided'
+  return 'Paper bet'
 }

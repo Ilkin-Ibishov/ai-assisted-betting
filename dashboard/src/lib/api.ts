@@ -175,7 +175,7 @@ export type BetLedgerSummary = {
 
 export type BetLedgerRow = {
   id: string
-  row_type: 'candidate' | 'tracked' | 'resulted' | 'voided'
+  row_type: 'candidate' | 'tracked'
   paper_bet_id: number | null
   recommendation_id: number | null
   prediction_id: number | null

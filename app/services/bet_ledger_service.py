@@ -65,7 +65,7 @@ class BetLedgerService:
                     paper_rows=paper_rows,
                     recommendation_rows=recommendation_rows,
                     window=window,
-                    include_voided=include_voided or status == "voided",
+                    include_voided=include_voided or status in {"all", "voided"},
                     now=reference_time,
                 )
                 rows = _filter_rows(
@@ -155,7 +155,7 @@ def _paper_bet_row(
     risk_flags = _paper_bet_risk_flags(paper_bet, prediction, match, now=now)
     return {
         "id": f"paper-bet-{paper_bet.id}",
-        "row_type": "resulted" if state == "resulted" else "voided" if state == "voided" else "tracked",
+        "row_type": "tracked",
         "paper_bet_id": paper_bet.id,
         "recommendation_id": None,
         "prediction_id": paper_bet.prediction_id,
