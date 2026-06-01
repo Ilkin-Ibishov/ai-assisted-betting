@@ -133,6 +133,28 @@ def test_guardrails_ok_when_worker_ai_and_recommendations_are_healthy(tmp_path) 
     assert all(item["severity"] == "ok" for item in status["guardrails"])
 
 
+def test_guardrails_count_recommendations_created_during_latest_worker_run(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'guardrails-during-worker.sqlite').as_posix()}"
+    engine = create_engine_from_url(database_url)
+    Base.metadata.create_all(engine)
+    _seed_worker_run(
+        engine,
+        run_id="worker-fresh-during-recs",
+        status="completed",
+        started_at="2026-05-22T08:30:00+00:00",
+        finished_at="2026-05-22T08:31:00+00:00",
+    )
+    _seed_recommendation(engine, created_at="2026-05-22T08:30:30+00:00")
+
+    status = OperationalGuardrailService(database_url).status(
+        now_iso="2026-05-22T09:00:00+00:00",
+        worker_fresh_after_minutes=60,
+    )
+
+    assert status["overall_status"] == "ok"
+    assert _guardrail(status, "recommendation_output")["observed_value"] == 1
+
+
 def _guardrail(status: dict, name: str) -> dict:
     return next(item for item in status["guardrails"] if item["name"] == name)
 

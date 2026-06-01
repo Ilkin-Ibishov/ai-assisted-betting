@@ -9,13 +9,22 @@ from sqlalchemy import select, text
 
 from app.config import load_settings
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation
+from app.db.models import (
+    AIAnalysisRun,
+    Match,
+    PaperBet,
+    PaperCombination,
+    PaperRecommendation,
+    Prediction,
+)
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.bet_ledger_service import BetLedgerService, DateRange, LedgerStatus
 from app.services.live_snapshot_service import LiveSnapshotService
 from app.services.live_status_service import LiveStatusService
+from app.services.misli_result_service import result_jobs_payload
 from app.services.odds_movement_service import OddsMovementService
 from app.services.operational_guardrail_service import OperationalGuardrailService
+from app.services.paper_bet_maintenance_service import PaperBetMaintenanceService
 from app.services.worker_monitoring_service import WorkerMonitoringService
 
 SNAPSHOT_BODY = Body(...)
@@ -44,6 +53,18 @@ def create_api(
     @api.get("/api/health")
     def get_health() -> dict[str, Any]:
         return _health_payload(live_database_url)
+
+    @api.get("/favicon.ico", include_in_schema=False)
+    def get_favicon() -> Response:
+        return Response(
+            content=(
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+                '<rect width="32" height="32" rx="6" fill="#0f172a"/>'
+                '<path d="M9 19h14v3H9zM11 14h10v3H11zM13 9h6v3h-6z" fill="#22c55e"/>'
+                "</svg>"
+            ),
+            media_type="image/svg+xml",
+        )
 
     @api.get("/api/reports/comparisons")
     def list_comparisons(include_test_reports: bool = False) -> list[dict[str, Any]]:
@@ -120,9 +141,25 @@ def create_api(
         finally:
             engine.dispose()
 
+    @api.get("/api/live/result-jobs")
+    def get_live_result_jobs(
+        limit: int = 100,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        _parse_optional_query_datetime(now, parameter="now")
+        engine = create_engine_from_url(live_database_url)
+        try:
+            return result_jobs_payload(engine, now_iso=now, limit=limit)
+        finally:
+            engine.dispose()
+
     @api.get("/api/live/recommendations")
     def list_live_recommendations(limit: int = 100) -> list[dict[str, Any]]:
         return _paper_recommendation_payloads(live_database_url, limit=limit)
+
+    @api.get("/api/live/paper-bets")
+    def list_live_paper_bets(limit: int = 100) -> list[dict[str, Any]]:
+        return _paper_bet_payloads(live_database_url, limit=limit)
 
     @api.get("/api/live/bet-ledger")
     def get_live_bet_ledger(
@@ -195,6 +232,31 @@ def create_api(
             content=json.dumps(payload, indent=2, sort_keys=True) + "\n",
             media_type="application/json",
         )
+
+    @api.post("/api/admin/paper-bets/void-unsafe")
+    def post_void_unsafe_paper_bets(
+        dry_run: bool = True,
+        authorization: str | None = AUTHORIZATION_HEADER,
+    ) -> dict[str, Any]:
+        _require_snapshot_ingest_token(
+            configured_token=settings.snapshot_ingest_token,
+            authorization=authorization,
+        )
+        engine = create_engine_from_url(live_database_url)
+        try:
+            summary = PaperBetMaintenanceService(engine).void_unsafe_open_bets(dry_run=dry_run)
+            return {
+                "items_read": summary.items_read,
+                "items_created": summary.items_created,
+                "items_updated": summary.items_updated,
+                "items_skipped": summary.items_skipped,
+                "errors_count": summary.errors_count,
+                "unsafe_count": summary.unsafe_count,
+                "risk_flag_counts": summary.risk_flag_counts,
+                "dry_run": summary.dry_run,
+            }
+        finally:
+            engine.dispose()
 
     @api.get("/api/ai/analysis/latest")
     def get_latest_ai_analysis() -> dict[str, Any]:
@@ -495,6 +557,84 @@ def _paper_recommendation_payload(recommendation: PaperRecommendation) -> dict[s
         "rationale": recommendation.rationale,
         "created_at": recommendation.created_at,
     }
+
+
+def _paper_bet_payloads(database_url: str, *, limit: int) -> list[dict[str, Any]]:
+    engine = create_engine_from_url(database_url)
+    try:
+        with session_scope(engine) as session:
+            rows = session.execute(
+                select(PaperBet, Prediction, Match)
+                .join(Prediction, PaperBet.prediction_id == Prediction.id)
+                .join(Match, PaperBet.match_id == Match.id)
+                .order_by(
+                    PaperBet.status.asc(),
+                    PaperBet.created_at.desc(),
+                    PaperBet.id.desc(),
+                )
+                .limit(max(1, min(limit, 500)))
+            ).all()
+            return [
+                _paper_bet_payload(paper_bet, prediction, match)
+                for paper_bet, prediction, match in rows
+            ]
+    finally:
+        engine.dispose()
+
+
+def _paper_bet_payload(paper_bet: PaperBet, prediction: Prediction, match: Match) -> dict[str, Any]:
+    risk_flags = _paper_bet_risk_flags(paper_bet, prediction, match)
+    return {
+        "id": paper_bet.id,
+        "prediction_id": paper_bet.prediction_id,
+        "match_id": paper_bet.match_id,
+        "source_match_id": match.source_match_id,
+        "league": match.league,
+        "home_team": match.home_team,
+        "away_team": match.away_team,
+        "match_label": f"{match.home_team} vs {match.away_team}",
+        "kickoff_time": match.kickoff_time,
+        "market": paper_bet.market,
+        "selection": paper_bet.selection,
+        "odds_taken": paper_bet.odds_taken,
+        "stake_units": paper_bet.stake_units,
+        "expected_value": paper_bet.expected_value,
+        "status": paper_bet.status,
+        "profit_loss_units": paper_bet.profit_loss_units,
+        "closing_odds": paper_bet.closing_odds,
+        "clv": paper_bet.clv,
+        "settled_at": paper_bet.settled_at,
+        "created_at": paper_bet.created_at,
+        "model_name": prediction.model_name,
+        "model_version": prediction.model_version,
+        "model_probability": prediction.model_probability,
+        "edge": prediction.edge,
+        "confidence_score": prediction.confidence_score,
+        "risk_flags": risk_flags,
+        "is_valid_open": paper_bet.status == "open" and risk_flags == ["no_current_risk_flags"],
+    }
+
+
+def _paper_bet_risk_flags(
+    paper_bet: PaperBet,
+    prediction: Prediction,
+    match: Match,
+) -> list[str]:
+    risk_flags: list[str] = []
+    if paper_bet.status != "open":
+        risk_flags.append(f"status_{paper_bet.status}")
+    if paper_bet.expected_value <= 0:
+        risk_flags.append("negative_expected_value")
+    if prediction.confidence_score is not None and prediction.confidence_score < 0.5:
+        risk_flags.append("low_confidence")
+    kickoff_time = _parse_iso_datetime(match.kickoff_time)
+    if (
+        paper_bet.status == "open"
+        and kickoff_time is not None
+        and kickoff_time <= datetime.now(UTC)
+    ):
+        risk_flags.append("past_kickoff_open")
+    return risk_flags or ["no_current_risk_flags"]
 
 
 def _parse_iso_datetime(value: str | None) -> datetime | None:

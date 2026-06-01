@@ -17,7 +17,10 @@ from app.services.live_cycle_service import (
     LivePaperCycleService,
     LivePaperCycleSummary,
 )
+from app.services.misli_result_service import MisliResultService
+from app.services.prediction_service import StepSummary
 from app.services.recommendation_service import RecommendationService
+from app.services.settlement_service import SettlementService
 
 MAX_SNAPSHOT_DOWNLOAD_BYTES = 5_000_000
 
@@ -42,6 +45,8 @@ class ScheduledPaperWorkerSummary:
     recommendation_items: int = 0
     combination_items: int = 0
     ai_review_id: int | None = None
+    result_summary: StepSummary | None = None
+    settlement_summary: StepSummary | None = None
 
     @property
     def items_read(self) -> int:
@@ -139,11 +144,19 @@ class ScheduledPaperWorkerService:
         recommendation_items = 0
         combination_items = 0
         ai_review_id = None
+        settlement_summary = None
+        result_summary = None
         if cycle_summary.status == "completed":
             recommendation_summary = RecommendationService(self.engine, self.settings).generate()
             recommendation_items = recommendation_summary.items_created
             combination_summary = CombinationService(self.engine).generate()
             combination_items = combination_summary.items_created
+            if self.settings.misli_result_fetch_enabled:
+                result_summary = MisliResultService(self.engine).collect_due_results(
+                    dry_run=self.settings.misli_result_preview_mode,
+                )
+            if self.settings.scheduled_settlement_enabled:
+                settlement_summary = SettlementService(self.engine).settle_results()
             ai_review = AIAnalysisService(self.engine).analyze_recommendation_review()
             ai_review_id = ai_review.id
 
@@ -177,6 +190,8 @@ class ScheduledPaperWorkerService:
             recommendation_items=recommendation_items,
             combination_items=combination_items,
             ai_review_id=ai_review_id,
+            result_summary=result_summary,
+            settlement_summary=settlement_summary,
         )
 
 

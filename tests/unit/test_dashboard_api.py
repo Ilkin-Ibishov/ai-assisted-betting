@@ -2,10 +2,11 @@ import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from app.api import create_api
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import AIAnalysisRun, Base, PaperCombination, PaperRecommendation
+from app.db.models import AIAnalysisRun, Base, PaperCombination, PaperRecommendation, ResultFetchJob
 from app.db.repositories import (
     LiveRunRepository,
     MatchRepository,
@@ -156,6 +157,15 @@ def test_health_endpoint_returns_service_status(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["database"] == "ok"
+
+
+def test_favicon_endpoint_avoids_browser_probe_404s(tmp_path: Path) -> None:
+    client = TestClient(create_api(reports_dir=tmp_path / "reports"))
+
+    response = client.get("/favicon.ico")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/svg+xml")
 
 
 def test_comparison_report_list_prefers_generated_at_for_modified_at(
@@ -630,6 +640,123 @@ def test_live_bet_ledger_endpoint_rejects_inverted_custom_date_range(
     assert response.status_code == 422
 
 
+def test_live_paper_bets_endpoint_lists_open_bets_with_match_context(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_live_status_database(database_url)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/paper-bets")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 2
+    assert payload[0]["status"] == "open"
+    assert payload[0]["source_match_id"] == "match-001"
+    assert payload[0]["match_label"] == "Northbridge FC vs Metro United"
+    assert payload[0]["selection"] == "HOME"
+    assert payload[0]["odds_taken"] == 2.0
+    assert payload[0]["model_probability"] == 0.55
+    assert payload[0]["risk_flags"] == ["no_current_risk_flags"]
+    assert payload[0]["is_valid_open"] is True
+    assert payload[1]["status"] == "won"
+
+
+def test_live_paper_bets_endpoint_flags_unsafe_open_bets(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        match = MatchRepository(session).add(
+            source="sample",
+            source_match_id="match-risky",
+            league="Sample Premier",
+            home_team="Old Town",
+            away_team="Low Edge City",
+            kickoff_time="2026-05-19T20:30:00+04:00",
+        )
+        prediction = PredictionRepository(session).add(
+            match_id=match.id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=0.40,
+            bookmaker_probability=0.32,
+            edge=0.08,
+            confidence_score=0.35,
+            decision="BET",
+            reason="legacy unsafe paper bet",
+        )
+        PaperBetRepository(session).add(
+            prediction_id=prediction.id,
+            match_id=match.id,
+            market="1X2",
+            selection="HOME",
+            odds_taken=2.2,
+            stake_units=1.0,
+            expected_value=-0.12,
+            status="open",
+        )
+    engine.dispose()
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/paper-bets")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload[0]["is_valid_open"] is False
+    assert payload[0]["risk_flags"] == [
+        "negative_expected_value",
+        "low_confidence",
+        "past_kickoff_open",
+    ]
+
+
+def test_live_result_jobs_endpoint_reports_pipeline_health(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        match = MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:2816300",
+            league="Sample Premier",
+            home_team="Forest City",
+            away_team="Eastport Athletic",
+            kickoff_time="2026-05-19T20:30:00+04:00",
+        )
+        session.add(
+            ResultFetchJob(
+                match_id=match.id,
+                source_match_id=match.source_match_id,
+                misli_event_id="2816300",
+                detail_url="https://www.misli.az/idman-novleri-canli-merc-teferruati/futbol/2816300",
+                status="pending",
+                next_attempt_at="2026-05-20T01:00:00+04:00",
+                attempt_count=2,
+                last_error="result not final",
+            )
+        )
+    engine.dispose()
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get(
+        "/api/live/result-jobs",
+        params={"now": "2026-05-20T02:00:00+04:00"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"] == {
+        "total": 1,
+        "due": 1,
+        "completed": 0,
+        "postponed": 0,
+        "failed": 0,
+        "pending": 1,
+    }
+    assert payload["jobs"][0]["source_match_id"] == "misli:football:2816300"
+    assert payload["jobs"][0]["match_label"] == "Forest City vs Eastport Athletic"
+
+
 def test_live_combinations_endpoint_lists_ranked_paper_combinations(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_combination_database(database_url)
@@ -693,6 +820,51 @@ def test_live_snapshot_post_requires_configured_bearer_token(
 
     assert disabled_response.status_code == 403
     assert invalid_response.status_code == 401
+
+
+def test_admin_void_unsafe_paper_bets_requires_token_and_executes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SNAPSHOT_INGEST_TOKEN", "test-token")
+    database_url = _create_live_api_database(tmp_path)
+    _seed_live_status_database(database_url)
+    engine = create_engine_from_url(database_url)
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE paper_bets SET expected_value = -0.01"))
+    engine.dispose()
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    unauthorized = client.post("/api/admin/paper-bets/void-unsafe?dry_run=false")
+    dry_run = client.post(
+        "/api/admin/paper-bets/void-unsafe",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    execute = client.post(
+        "/api/admin/paper-bets/void-unsafe?dry_run=false",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert unauthorized.status_code == 401
+    assert dry_run.status_code == 200
+    assert dry_run.json()["dry_run"] is True
+    assert dry_run.json()["unsafe_count"] == 1
+    assert dry_run.json()["risk_flag_counts"]["negative_expected_value"] == 1
+    assert dry_run.json()["items_updated"] == 0
+    assert execute.status_code == 200
+    assert execute.json()["dry_run"] is False
+    assert execute.json()["items_updated"] == 1
+    engine = create_engine_from_url(database_url)
+    with engine.connect() as connection:
+        open_count = connection.execute(
+            text("SELECT count(*) FROM paper_bets WHERE status = 'open'")
+        ).scalar_one()
+        void_count = connection.execute(
+            text("SELECT count(*) FROM paper_bets WHERE status = 'void'")
+        ).scalar_one()
+    engine.dispose()
+    assert open_count == 0
+    assert void_count == 1
 
 
 def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> None:
@@ -816,7 +988,7 @@ def _seed_live_status_database(database_url: str) -> None:
             league="Sample Premier",
             home_team="Northbridge FC",
             away_team="Metro United",
-            kickoff_time="2026-05-19T20:30:00+04:00",
+            kickoff_time="2026-06-19T20:30:00+04:00",
         )
         predictions = PredictionRepository(session)
         home_prediction = predictions.add(

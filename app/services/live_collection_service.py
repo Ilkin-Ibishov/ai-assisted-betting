@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -13,6 +13,7 @@ from app.db.repositories import (
     LiveRunRepository,
     MatchRepository,
     OddsSnapshotRepository,
+    ResultFetchJobRepository,
 )
 from app.providers.misli_public import MisliPublicEvent, resolve_misli_public_event_date
 from app.services.prediction_service import StepSummary
@@ -47,6 +48,7 @@ class LiveCollectionService:
             live_runs = LiveRunRepository(session)
             matches = MatchRepository(session)
             logs = DecisionLogRepository(session)
+            result_jobs = ResultFetchJobRepository(session)
             live_runs.start(
                 run_id=run_id,
                 run_type="collect_matches",
@@ -67,6 +69,7 @@ class LiveCollectionService:
                     items_skipped += 1
                     continue
 
+                kickoff_time = _kickoff_iso(event.kickoff_date, event.kickoff_time)
                 match = matches.add(
                     source=MISLI_PUBLIC_SOURCE,
                     source_match_id=event.source_match_id,
@@ -74,9 +77,16 @@ class LiveCollectionService:
                     season=request.season,
                     home_team=event.home_team,
                     away_team=event.away_team,
-                    kickoff_time=_kickoff_iso(event.kickoff_date, event.kickoff_time),
+                    kickoff_time=kickoff_time,
                     status="scheduled",
                     raw_payload_json=json.dumps(raw_event, sort_keys=True, ensure_ascii=False),
+                )
+                result_jobs.ensure(
+                    match_id=match.id,
+                    source_match_id=match.source_match_id,
+                    misli_event_id=event.event_id,
+                    detail_url=event.detail_url,
+                    next_attempt_at=_result_followup_time(kickoff_time),
                 )
                 items_created += 1
                 logs.add(
@@ -248,6 +258,10 @@ def _kickoff_iso(kickoff_date: str, kickoff_time: str) -> str:
         "%d.%m.%Y %H:%M",
     ).replace(tzinfo=ZoneInfo("Asia/Baku"))
     return local_datetime.isoformat()
+
+
+def _result_followup_time(kickoff_time: str) -> str:
+    return (datetime.fromisoformat(kickoff_time) + timedelta(hours=2)).isoformat()
 
 
 def _run_id(run_type: str, request: LiveCollectionRequest) -> str:

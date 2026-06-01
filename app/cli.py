@@ -17,7 +17,9 @@ from app.services.football_data_service import FootballDataImportRequest, Footba
 from app.services.live_collection_service import LiveCollectionRequest, LiveCollectionService
 from app.services.live_cycle_service import LivePaperCycleRequest, LivePaperCycleService
 from app.services.live_result_service import LiveResultRequest, LiveResultService
+from app.services.misli_result_service import MisliResultService
 from app.services.operational_guardrail_service import OperationalGuardrailService
+from app.services.paper_bet_maintenance_service import PaperBetMaintenanceService
 from app.services.prediction_service import PredictionService
 from app.services.production_smoke_service import (
     ProductionSmokeError,
@@ -59,7 +61,7 @@ SNAPSHOT_URL_OPTION = typer.Option(
     help="HTTPS URL returning a fresh live provider snapshot JSON document.",
 )
 RESULT_PROVIDER_OPTION = typer.Option("manual", help="Result provider key.")
-RESULT_PATH_OPTION = typer.Option(..., help="Manual result JSON path.")
+RESULT_PATH_OPTION = typer.Option(None, help="Manual result JSON path.")
 RECOMMENDATION_BACKTEST_REPORT_OPTION = typer.Option(
     ...,
     help="Recommendation backtest JSON report path.",
@@ -516,9 +518,13 @@ def run_scheduled_paper_worker(
         _print_stage_summary("cycle.write_paper_bets", summary.cycle_summary.write_paper_bets)
     if summary.snapshot_path is not None:
         typer.echo(f"snapshot_path={summary.snapshot_path}")
-    typer.echo(f"recommendations.created={summary.recommendation_items}")
-    typer.echo(f"combinations.created={summary.combination_items}")
-    typer.echo(f"ai_review_id={summary.ai_review_id}")
+        typer.echo(f"recommendations.created={summary.recommendation_items}")
+        typer.echo(f"combinations.created={summary.combination_items}")
+        if summary.result_summary is not None:
+            _print_stage_summary("results", summary.result_summary)
+        if summary.settlement_summary is not None:
+            _print_stage_summary("settlement", summary.settlement_summary)
+        typer.echo(f"ai_review_id={summary.ai_review_id}")
     if summary.error_summary:
         typer.echo(f"error_summary={summary.error_summary}")
     typer.echo(f"items_read={summary.items_read}")
@@ -532,12 +538,36 @@ def run_scheduled_paper_worker(
 @app.command("collect-results")
 def collect_results(
     provider: str = RESULT_PROVIDER_OPTION,
-    path: Path = RESULT_PATH_OPTION,
+    path: Path | None = RESULT_PATH_OPTION,
     league: str | None = typer.Option(None, help="Live league name or provider sport."),
     season: str | None = typer.Option(None, help="Season label for result rows."),
+    limit: int = typer.Option(50, help="Maximum Misli result jobs to process."),
+    now: str | None = typer.Option(None, help="ISO timestamp used for due result jobs."),
+    dry_run: bool | None = typer.Option(
+        None,
+        "--dry-run/--execute",
+        help="Preview Misli result collection unless --execute is used.",
+    ),
+    fixture: str | None = typer.Option(
+        None,
+        help="JSON Misli result fixture for tests or dry local verification.",
+    ),
 ) -> None:
     settings = load_settings()
     engine = create_engine_from_url(settings.database_url)
+    if provider == "misli-public":
+        effective_dry_run = settings.misli_result_preview_mode if dry_run is None else dry_run
+        fetcher = (lambda: json.loads(fixture)) if fixture is not None else None
+        summary = MisliResultService(engine, fetcher=fetcher).collect_due_results(
+            now_iso=now,
+            dry_run=effective_dry_run,
+            limit=limit,
+        )
+        _print_summary("collect-results", summary)
+        typer.echo(f"dry_run={str(effective_dry_run).lower()}")
+        return
+    if path is None:
+        raise typer.BadParameter("--path is required for manual result collection")
     summary = LiveResultService(engine).collect_results(
         LiveResultRequest(
             provider=provider,
@@ -612,6 +642,23 @@ def write_paper_bets(model: str | None = MODEL_OPTION) -> None:
     engine = create_engine_from_url(settings.database_url)
     summary = PredictionService(engine, settings).write_paper_bets()
     _print_summary("write-paper-bets", summary)
+
+
+@app.command("void-unsafe-paper-bets")
+def void_unsafe_paper_bets(
+    dry_run: bool = typer.Option(
+        True,
+        "--dry-run/--execute",
+        help="Preview unsafe open paper bets by default; use --execute to void them.",
+    ),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    summary = PaperBetMaintenanceService(engine).void_unsafe_open_bets(dry_run=dry_run)
+    _print_summary("void-unsafe-paper-bets", summary)
+    typer.echo(f"unsafe_count={summary.unsafe_count}")
+    typer.echo(f"risk_flag_counts={json.dumps(summary.risk_flag_counts, sort_keys=True)}")
+    typer.echo(f"dry_run={str(summary.dry_run).lower()}")
 
 
 @app.command("settle-results")

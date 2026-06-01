@@ -9,6 +9,7 @@ MIGRATION_NAMES = [
     "005_create_paper_recommendations",
     "006_create_paper_combinations",
     "007_create_live_snapshots",
+    "008_create_result_fetch_jobs",
 ]
 
 
@@ -61,6 +62,11 @@ def run_migrations(engine) -> None:
             connection,
             "007_create_live_snapshots",
             _create_live_snapshots,
+        )
+        _run_migration(
+            connection,
+            "008_create_result_fetch_jobs",
+            _create_result_fetch_jobs,
         )
 
 
@@ -385,5 +391,45 @@ def _create_live_snapshots(connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_live_snapshots_provider_created
         ON live_snapshots (provider, created_at)
+        """
+    )
+
+
+def _create_result_fetch_jobs(connection) -> None:
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE IF NOT EXISTS result_fetch_jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_id INTEGER NOT NULL,
+            source_match_id TEXT NOT NULL,
+            misli_event_id TEXT,
+            detail_url TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            next_attempt_at TEXT NOT NULL,
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            last_result_payload_json TEXT,
+            last_error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(match_id) REFERENCES matches(id)
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_result_fetch_jobs_match_id
+        ON result_fetch_jobs (match_id)
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS idx_result_fetch_jobs_status_next
+        ON result_fetch_jobs (status, next_attempt_at)
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS idx_result_fetch_jobs_source_match
+        ON result_fetch_jobs (source_match_id)
         """
     )

@@ -13,6 +13,7 @@ from app.db.models import (
     PaperCombination,
     PaperRecommendation,
     Prediction,
+    ResultFetchJob,
 )
 
 
@@ -254,6 +255,33 @@ class PaperRecommendationRepository:
         )
         return recommendation_id is not None
 
+    def get_by_identity(
+        self,
+        *,
+        source_match_id: str,
+        market: str,
+        selection: str,
+        model_name: str,
+        model_version: str,
+        latest_snapshot_time: str,
+    ) -> PaperRecommendation | None:
+        return self.session.scalar(
+            select(PaperRecommendation).where(
+                PaperRecommendation.source_match_id == source_match_id,
+                PaperRecommendation.market == market,
+                PaperRecommendation.selection == selection,
+                PaperRecommendation.model_name == model_name,
+                PaperRecommendation.model_version == model_version,
+                PaperRecommendation.latest_snapshot_time == latest_snapshot_time,
+            )
+        )
+
+    def update(self, recommendation: PaperRecommendation, **values: object) -> PaperRecommendation:
+        for key, value in values.items():
+            setattr(recommendation, key, value)
+        self.session.flush()
+        return recommendation
+
 
 class PaperCombinationRepository:
     def __init__(self, session: Session) -> None:
@@ -417,6 +445,51 @@ class LiveSnapshotRepository:
             .where(LiveSnapshot.provider == provider)
             .order_by(LiveSnapshot.created_at.desc(), LiveSnapshot.id.desc())
             .limit(1)
+        )
+
+
+class ResultFetchJobRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def ensure(
+        self,
+        *,
+        match_id: int,
+        source_match_id: str,
+        next_attempt_at: str,
+        misli_event_id: str | None = None,
+        detail_url: str | None = None,
+    ) -> ResultFetchJob:
+        existing = self.session.scalar(
+            select(ResultFetchJob).where(ResultFetchJob.match_id == match_id)
+        )
+        if existing is not None:
+            return existing
+
+        job = ResultFetchJob(
+            match_id=match_id,
+            source_match_id=source_match_id,
+            misli_event_id=misli_event_id,
+            detail_url=detail_url,
+            status="pending",
+            next_attempt_at=next_attempt_at,
+        )
+        self.session.add(job)
+        self.session.flush()
+        return job
+
+    def due(self, *, now_iso: str, limit: int) -> list[ResultFetchJob]:
+        return list(
+            self.session.scalars(
+                select(ResultFetchJob)
+                .where(
+                    ResultFetchJob.status != "completed",
+                    ResultFetchJob.next_attempt_at <= now_iso,
+                )
+                .order_by(ResultFetchJob.next_attempt_at.asc(), ResultFetchJob.id.asc())
+                .limit(limit)
+            )
         )
 
 

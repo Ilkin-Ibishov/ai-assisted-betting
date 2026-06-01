@@ -28,10 +28,12 @@ class FeatureBuilder:
         elo_initial_rating: float = 1500,
         elo_k_factor: float = 20,
         elo_home_advantage: float = 65,
+        allow_cold_start_features: bool = False,
     ) -> None:
         self.elo_initial_rating = elo_initial_rating
         self.elo_k_factor = elo_k_factor
         self.elo_home_advantage = elo_home_advantage
+        self.allow_cold_start_features = allow_cold_start_features
 
     def build_for_match(
         self,
@@ -42,15 +44,17 @@ class FeatureBuilder:
     ) -> list[BuiltFeature]:
         home_history = _team_history(match.home_team, match.kickoff_time, completed_matches)
         away_history = _team_history(match.away_team, match.kickoff_time, completed_matches)
-        if len(home_history) < 3 or len(away_history) < 3:
+        if (
+            not self.allow_cold_start_features
+            and (len(home_history) < 3 or len(away_history) < 3)
+        ):
             return []
-
         implied_sum = sum(snapshot.implied_probability for snapshot in odds_snapshots)
         if implied_sum <= 0:
             return []
 
-        home_stats = _team_stats(match.home_team, home_history)
-        away_stats = _team_stats(match.away_team, away_history)
+        home_stats = _team_stats_or_neutral(match.home_team, home_history)
+        away_stats = _team_stats_or_neutral(match.away_team, away_history)
         ratings = _elo_ratings_before(
             match.kickoff_time,
             completed_matches,
@@ -126,6 +130,16 @@ def _team_stats(team: str, matches: list[Match]) -> _TeamStats:
         goals_for_avg=round(goals_for / count, 6),
         goals_against_avg=round(goals_against / count, 6),
     )
+
+
+def _team_stats_or_neutral(team: str, matches: list[Match]) -> _TeamStats:
+    if len(matches) < 3:
+        return _TeamStats(
+            form_points=0.0,
+            goals_for_avg=0.0,
+            goals_against_avg=0.0,
+        )
+    return _team_stats(team, matches)
 
 
 def _elo_ratings_before(

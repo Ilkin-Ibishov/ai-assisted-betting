@@ -4,7 +4,7 @@ from sqlalchemy import Engine, select
 
 from app.config import Settings
 from app.db.engine import session_scope
-from app.db.models import LiveRun, Prediction
+from app.db.models import LiveRun, Prediction, utc_now_iso
 from app.db.repositories import PaperRecommendationRepository
 from app.services.odds_movement_service import OddsMovementService
 from app.services.prediction_service import StepSummary
@@ -23,6 +23,7 @@ class RecommendationService:
         provider_unhealthy = _provider_unhealthy(self.engine)
         items_read = 0
         items_created = 0
+        items_updated = 0
         items_skipped = 0
 
         with session_scope(self.engine) as session:
@@ -45,50 +46,59 @@ class RecommendationService:
                 )
                 edge = prediction.edge if prediction else None
                 confidence = prediction.confidence_score if prediction else None
+                expected_value = _expected_value(model_probability, movement.get("current_odds"))
                 grade, risk_flags, rationale = _score_recommendation(
                     movement=movement,
                     edge=edge,
                     confidence=confidence,
+                    expected_value=expected_value,
                     min_edge=self.settings.min_edge,
                     provider_unhealthy=provider_unhealthy,
                 )
                 latest_snapshot_time = str(movement["latest_snapshot_time"])
-                if repository.exists(
+                recommendation_values = {
+                    "match_id": int(movement["match_id"]),
+                    "prediction_id": prediction.id if prediction else None,
+                    "source_run_id": None,
+                    "source_match_id": str(movement["source_match_id"]),
+                    "bookmaker": str(movement["bookmaker"]),
+                    "market": str(movement["market"]),
+                    "selection": str(movement["selection"]),
+                    "latest_snapshot_time": latest_snapshot_time,
+                    "model_name": self.settings.model_name,
+                    "model_version": self.settings.model_version,
+                    "grade": grade,
+                    "status": "active" if grade != "reject" else "rejected",
+                    "model_probability": model_probability,
+                    "implied_probability": implied_probability,
+                    "edge": edge,
+                    "confidence_score": confidence,
+                    "current_odds": movement.get("current_odds"),
+                    "expected_value": expected_value,
+                    "risk_flags_json": json.dumps(risk_flags),
+                    "rationale": rationale,
+                }
+                existing = repository.get_by_identity(
                     source_match_id=str(movement["source_match_id"]),
                     market=str(movement["market"]),
                     selection=str(movement["selection"]),
                     model_name=self.settings.model_name,
                     model_version=self.settings.model_version,
                     latest_snapshot_time=latest_snapshot_time,
-                ):
-                    items_skipped += 1
+                )
+                if existing is not None:
+                    repository.update(
+                        existing,
+                        **recommendation_values,
+                        created_at=utc_now_iso(),
+                    )
+                    items_updated += 1
                     continue
 
-                repository.add(
-                    match_id=int(movement["match_id"]),
-                    prediction_id=prediction.id if prediction else None,
-                    source_run_id=None,
-                    source_match_id=str(movement["source_match_id"]),
-                    bookmaker=str(movement["bookmaker"]),
-                    market=str(movement["market"]),
-                    selection=str(movement["selection"]),
-                    latest_snapshot_time=latest_snapshot_time,
-                    model_name=self.settings.model_name,
-                    model_version=self.settings.model_version,
-                    grade=grade,
-                    status="active" if grade != "reject" else "rejected",
-                    model_probability=model_probability,
-                    implied_probability=implied_probability,
-                    edge=edge,
-                    confidence_score=confidence,
-                    current_odds=movement.get("current_odds"),
-                    expected_value=_expected_value(model_probability, movement.get("current_odds")),
-                    risk_flags_json=json.dumps(risk_flags),
-                    rationale=rationale,
-                )
+                repository.add(**recommendation_values)
                 items_created += 1
 
-        return StepSummary(items_read, items_created, 0, items_skipped, 0)
+        return StepSummary(items_read, items_created, items_updated, items_skipped, 0)
 
 
 def _latest_prediction(
@@ -119,6 +129,7 @@ def _score_recommendation(
     movement: dict,
     edge: float | None,
     confidence: float | None,
+    expected_value: float | None,
     min_edge: float,
     provider_unhealthy: bool,
 ) -> tuple[str, list[str], str]:
@@ -134,6 +145,8 @@ def _score_recommendation(
         risk_flags.append("missing_prediction")
     elif edge < min_edge:
         risk_flags.append("edge_below_threshold")
+    if expected_value is not None and expected_value <= 0:
+        risk_flags.append("negative_expected_value")
     if confidence is not None and confidence < 0.5:
         risk_flags.append("low_confidence")
 
@@ -148,6 +161,8 @@ def _score_recommendation(
         return "reject", risk_flags, "Rejected because no model prediction is available."
     if edge < min_edge:
         return "reject", risk_flags, "Rejected because edge is below threshold."
+    if expected_value is not None and expected_value <= 0:
+        return "reject", risk_flags, "Rejected because current-odds EV is not positive."
     if confidence is not None and confidence < 0.5:
         return "watch", risk_flags, "Positive edge exists, but confidence is low."
     if edge >= min_edge * 1.5:

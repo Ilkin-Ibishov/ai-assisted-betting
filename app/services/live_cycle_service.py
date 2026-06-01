@@ -7,7 +7,7 @@ from sqlalchemy import Engine
 from app.config import Settings
 from app.db.engine import session_scope
 from app.db.repositories import LiveRunRepository, MatchRepository
-from app.providers.misli_public import MisliPublicEvent
+from app.providers.misli_public import MisliPublicEvent, resolve_misli_public_event_date
 from app.services.live_collection_service import (
     LiveCollectionRequest,
     LiveCollectionService,
@@ -97,7 +97,10 @@ class LivePaperCycleService:
         collect_matches = collection.collect_matches(collection_request)
         collect_odds = collection.collect_odds(collection_request)
         scoped_match_ids = _snapshot_match_ids(self.engine, request)
-        generate_features = predictions.generate_features_for_matches(scoped_match_ids)
+        generate_features = predictions.generate_features_for_matches(
+            scoped_match_ids,
+            allow_cold_start_features=True,
+        )
         generate_predictions = predictions.generate_predictions_for_matches(scoped_match_ids)
         write_paper_bets = predictions.write_paper_bets_for_matches(scoped_match_ids)
 
@@ -155,10 +158,11 @@ def _provider_source(provider: str) -> str:
 def _snapshot_match_ids(engine: Engine, request: LivePaperCycleRequest) -> set[int]:
     payload = json.loads(request.snapshot.read_text(encoding="utf-8"))
     source = _provider_source(request.provider)
+    scraped_at = str(payload.get("scraped_at") or "")
     source_match_ids = {
         event.source_match_id
         for raw_event in payload.get("events", [])
-        if (event := _valid_snapshot_event(raw_event)) is not None
+        if (event := _valid_snapshot_event(raw_event, scraped_at)) is not None
     }
     if not source_match_ids:
         return set()
@@ -171,9 +175,11 @@ def _snapshot_match_ids(engine: Engine, request: LivePaperCycleRequest) -> set[i
         }
 
 
-def _valid_snapshot_event(raw_event: dict) -> MisliPublicEvent | None:
+def _valid_snapshot_event(raw_event: dict, scraped_at: str) -> MisliPublicEvent | None:
     try:
-        return MisliPublicEvent.model_validate(raw_event)
+        return MisliPublicEvent.model_validate(
+            resolve_misli_public_event_date(raw_event, scraped_at)
+        )
     except ValueError:
         return None
 

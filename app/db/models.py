@@ -301,6 +301,33 @@ class LiveSnapshot(Base):
     created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
 
 
+class ResultFetchJob(Base):
+    __tablename__ = "result_fetch_jobs"
+    __table_args__ = (
+        UniqueConstraint("match_id", name="uq_result_fetch_jobs_match_id"),
+        Index("idx_result_fetch_jobs_status_next", "status", "next_attempt_at"),
+        Index("idx_result_fetch_jobs_source_match", "source_match_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), nullable=False)
+    source_match_id: Mapped[str] = mapped_column(String, nullable=False)
+    misli_event_id: Mapped[str | None] = mapped_column(String)
+    detail_url: Mapped[str | None] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    next_attempt_at: Mapped[str] = mapped_column(String, nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_result_payload_json: Mapped[str | None] = mapped_column(Text)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
+    updated_at: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default=utc_now_iso,
+        onupdate=utc_now_iso,
+    )
+
+
 class AIAnalysisRun(Base):
     __tablename__ = "ai_analysis_runs"
     __table_args__ = (

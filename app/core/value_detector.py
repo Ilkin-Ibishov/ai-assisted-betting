@@ -30,4 +30,6 @@ class ValueDetector:
 
         probability = model_probability if model_probability is not None else edge
         expected_value = probability * (odds_decimal - 1) - (1 - probability)
+        if expected_value <= 0:
+            return ValueDecision("SKIP", round(expected_value, 6), "expected value not positive")
         return ValueDecision("BET", round(expected_value, 6), "edge and odds passed value rules")

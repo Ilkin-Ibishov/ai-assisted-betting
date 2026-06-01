@@ -45,6 +45,7 @@ def test_init_db_creates_expected_tables(tmp_path) -> None:
         "paper_recommendations",
         "paper_bets",
         "predictions",
+        "result_fetch_jobs",
         "schema_migrations",
     }.issubset(table_names)
 
@@ -63,7 +64,7 @@ def test_postgres_model_managed_migrations_are_recorded_as_noops() -> None:
 
     _record_noop_migrations_for_model_managed_database(connection)
 
-    assert len(connection.statements) == 7
+    assert len(connection.statements) == 8
     assert all("ON CONFLICT" in statement for statement, _params in connection.statements)
     assert connection.statements[0][1] == {"migration_name": "001_add_feature_elo_columns"}
 
@@ -132,6 +133,7 @@ def test_init_db_upgrades_old_database_with_missing_elo_feature_columns(tmp_path
         ("005_create_paper_recommendations",),
         ("006_create_paper_combinations",),
         ("007_create_live_snapshots",),
+        ("008_create_result_fetch_jobs",),
     ]
 
 
@@ -220,6 +222,7 @@ def test_init_db_upgrades_old_database_with_identity_uniqueness_indexes(tmp_path
         ("005_create_paper_recommendations",),
         ("006_create_paper_combinations",),
         ("007_create_live_snapshots",),
+        ("008_create_result_fetch_jobs",),
     ]
 
 
@@ -284,6 +287,7 @@ def test_init_db_upgrades_old_database_with_live_run_registry(tmp_path) -> None:
         ("005_create_paper_recommendations",),
         ("006_create_paper_combinations",),
         ("007_create_live_snapshots",),
+        ("008_create_result_fetch_jobs",),
     ]
 
 
@@ -345,6 +349,7 @@ def test_init_db_upgrades_old_database_with_ai_analysis_runs(tmp_path) -> None:
         ("005_create_paper_recommendations",),
         ("006_create_paper_combinations",),
         ("007_create_live_snapshots",),
+        ("008_create_result_fetch_jobs",),
     ]
 
 

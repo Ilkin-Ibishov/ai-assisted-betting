@@ -217,8 +217,7 @@ def _recommendation_count_since_latest_worker(session) -> int:
     )
     query = select(func.count()).select_from(PaperRecommendation)
     if latest_worker is not None:
-        reference = latest_worker.finished_at or latest_worker.started_at
-        query = query.where(PaperRecommendation.created_at >= reference)
+        query = query.where(PaperRecommendation.created_at >= latest_worker.started_at)
     count = session.scalar(query)
     return int(count or 0)
 

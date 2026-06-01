@@ -34,11 +34,17 @@ class PredictionService:
     def generate_features(self) -> StepSummary:
         return self.generate_features_for_matches(None)
 
-    def generate_features_for_matches(self, match_ids: set[int] | None) -> StepSummary:
+    def generate_features_for_matches(
+        self,
+        match_ids: set[int] | None,
+        *,
+        allow_cold_start_features: bool = False,
+    ) -> StepSummary:
         builder = FeatureBuilder(
             elo_initial_rating=self.settings.elo_initial_rating,
             elo_k_factor=self.settings.elo_k_factor,
             elo_home_advantage=self.settings.elo_home_advantage,
+            allow_cold_start_features=allow_cold_start_features,
         )
         items_read = 0
         items_created = 0

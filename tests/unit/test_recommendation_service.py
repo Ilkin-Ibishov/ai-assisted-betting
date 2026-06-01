@@ -84,6 +84,60 @@ def test_recommendation_service_marks_low_confidence_candidate_as_watch(tmp_path
     assert "low_confidence" in json.loads(recommendation.risk_flags_json)
 
 
+def test_recommendation_service_rejects_negative_current_odds_ev(tmp_path) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'recs.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_candidate(
+        engine,
+        edge=0.12,
+        confidence=0.8,
+        model_probability=0.4,
+        prediction_bookmaker_probability=0.28,
+    )
+
+    RecommendationService(engine, _settings()).generate(stale_after_minutes=100000)
+
+    with session_scope(engine) as session:
+        recommendation = session.scalar(select(PaperRecommendation))
+
+    assert recommendation is not None
+    assert round(recommendation.expected_value or 0, 6) == -0.2
+    assert recommendation.grade == "reject"
+    assert recommendation.status == "rejected"
+    assert "negative_expected_value" in json.loads(recommendation.risk_flags_json)
+
+
+def test_recommendation_service_updates_existing_snapshot_recommendation(tmp_path) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'recs.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_candidate(engine, edge=0.12, confidence=0.8)
+
+    first_summary = RecommendationService(engine, _settings()).generate(stale_after_minutes=100000)
+    with session_scope(engine) as session:
+        original = session.scalar(select(PaperRecommendation))
+        assert original is not None
+        original_id = original.id
+
+    _seed_new_prediction(engine, edge=0.12, confidence=0.8, model_probability=0.4)
+
+    second_summary = RecommendationService(engine, _settings()).generate(stale_after_minutes=100000)
+
+    assert first_summary.items_created == 1
+    assert second_summary.items_created == 0
+    assert second_summary.items_updated == 1
+    assert second_summary.items_skipped == 0
+    with session_scope(engine) as session:
+        recommendations = session.scalars(select(PaperRecommendation)).all()
+
+    assert len(recommendations) == 1
+    recommendation = recommendations[0]
+    assert recommendation.id == original_id
+    assert recommendation.grade == "reject"
+    assert recommendation.status == "rejected"
+    assert round(recommendation.expected_value or 0, 6) == -0.2
+    assert "negative_expected_value" in json.loads(recommendation.risk_flags_json)
+
+
 def test_recommendation_service_rejects_when_provider_health_is_unhealthy(tmp_path) -> None:
     engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'recs.sqlite').as_posix()}")
     Base.metadata.create_all(engine)
@@ -119,6 +173,8 @@ def _seed_candidate(
     edge: float,
     confidence: float,
     snapshot_time: str = "2026-05-19T12:00:00+00:00",
+    model_probability: float | None = None,
+    prediction_bookmaker_probability: float | None = None,
 ) -> None:
     with session_scope(engine) as session:
         match = MatchRepository(session).add(
@@ -146,12 +202,45 @@ def _seed_candidate(
             selection="HOME",
             model_name="baseline_heuristic",
             model_version="v0",
-            model_probability=(1 / odds_decimal) + edge,
-            bookmaker_probability=1 / odds_decimal,
+            model_probability=model_probability
+            if model_probability is not None
+            else (1 / odds_decimal) + edge,
+            bookmaker_probability=prediction_bookmaker_probability
+            if prediction_bookmaker_probability is not None
+            else 1 / odds_decimal,
             edge=edge,
             confidence_score=confidence,
             decision="PENDING",
             reason="seed prediction",
+        )
+
+
+def _seed_new_prediction(
+    engine,
+    *,
+    edge: float,
+    confidence: float,
+    model_probability: float,
+    prediction_bookmaker_probability: float = 0.5,
+) -> None:
+    with session_scope(engine) as session:
+        match = MatchRepository(session).get_by_source_id(
+            source="misli_public",
+            source_match_id="misli:football:2816300",
+        )
+        assert match is not None
+        PredictionRepository(session).add(
+            match_id=match.id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=model_probability,
+            bookmaker_probability=prediction_bookmaker_probability,
+            edge=edge,
+            confidence_score=confidence,
+            decision="PENDING",
+            reason="replacement seed prediction",
         )
 
 

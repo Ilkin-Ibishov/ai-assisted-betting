@@ -12,7 +12,12 @@ from app.db.models import (
     PaperCombination,
     PaperRecommendation,
 )
-from app.db.repositories import LiveRunRepository
+from app.db.repositories import (
+    LiveRunRepository,
+    MatchRepository,
+    PaperBetRepository,
+    PredictionRepository,
+)
 from app.services.collection_service import CollectionService
 from app.services.scheduled_worker_service import (
     ScheduledPaperWorkerRequest,
@@ -46,6 +51,7 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
     assert summary.errors_count == 0
     assert summary.snapshot_path == snapshot_path
     assert summary.ai_review_id is not None
+    assert summary.settlement_summary is None
 
     with session_scope(engine) as session:
         worker_run = session.scalar(
@@ -67,6 +73,43 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
     assert len(recommendations) == summary.recommendation_items
     assert len(combinations) == summary.combination_items
     assert len(ai_reviews) == 1
+
+
+def test_scheduled_worker_settles_completed_open_bets_when_enabled(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    snapshot_path = tmp_path / "misli.json"
+    snapshot_path.write_text(json.dumps(_valid_snapshot()), encoding="utf-8")
+    db_path = tmp_path / "worker-settlement.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("LIVE_COLLECTION_ENABLED", "true")
+    monkeypatch.setenv("SCHEDULED_SETTLEMENT_ENABLED", "true")
+    monkeypatch.setenv("MIN_EDGE", "0.01")
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    Base.metadata.create_all(engine)
+    CollectionService(engine).import_sample_data()
+    _seed_completed_open_bet(engine)
+
+    summary = ScheduledPaperWorkerService(engine, settings).run_once(
+        ScheduledPaperWorkerRequest(
+            provider="misli-public",
+            snapshot=snapshot_path,
+            model="baseline_heuristic",
+        )
+    )
+
+    assert summary.status == "completed"
+    assert summary.settlement_summary is not None
+    assert summary.settlement_summary.items_read >= 1
+    assert summary.settlement_summary.items_updated == 1
+
+    with session_scope(engine) as session:
+        settled_bets = list(session.scalars(select(PaperBet).where(PaperBet.status == "won")))
+
+    assert len(settled_bets) == 1
+    assert settled_bets[0].profit_loss_units == 1.0
 
 
 def test_scheduled_worker_can_resolve_fresh_snapshot_url(
@@ -200,9 +243,48 @@ def _valid_snapshot() -> dict:
                 "odds": [
                     {"market": "1X2", "selection": "HOME", "odds_decimal": 2.16},
                     {"market": "1X2", "selection": "DRAW", "odds_decimal": 3.18},
-                    {"market": "1X2", "selection": "AWAY", "odds_decimal": 2.94},
+                    {"market": "1X2", "selection": "AWAY", "odds_decimal": 3.40},
                 ],
-                "raw_text": "20:30 1 Forest City - Eastport Athletic 1 2.16 X 3.18 2 2.94",
+                "raw_text": "20:30 1 Forest City - Eastport Athletic 1 2.16 X 3.18 2 3.40",
             }
         ],
     }
+
+
+def _seed_completed_open_bet(engine) -> None:
+    with session_scope(engine) as session:
+        match = MatchRepository(session).add(
+            source="manual",
+            source_match_id="completed-001",
+            league="Sample Premier",
+            home_team="Completed Home",
+            away_team="Completed Away",
+            kickoff_time="2026-05-18T20:30:00+04:00",
+            status="completed",
+        )
+        match.home_score = 2
+        match.away_score = 1
+        match.result = "HOME"
+        prediction = PredictionRepository(session).add(
+            match_id=match.id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=0.6,
+            bookmaker_probability=0.5,
+            edge=0.1,
+            confidence_score=0.7,
+            decision="BET",
+            reason="seed completed open bet",
+        )
+        PaperBetRepository(session).add(
+            prediction_id=prediction.id,
+            match_id=match.id,
+            market="1X2",
+            selection="HOME",
+            odds_taken=2.0,
+            stake_units=1.0,
+            expected_value=0.2,
+            status="open",
+        )

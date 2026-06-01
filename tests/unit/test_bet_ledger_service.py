@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import text
@@ -545,3 +545,43 @@ def test_summary_counts_date_filtered_rows_before_status_filtering(tmp_path: Pat
     assert payload["summary"]["resulted_count"] == 1
     assert payload["summary"]["paper_profit_loss"] == 1.4
     assert payload["summary"]["win_rate"] == 1.0
+
+
+def test_summary_separates_valid_open_unsafe_open_and_candidates(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_recommendation(
+        database_url,
+        source_match_id="summary-candidate",
+        kickoff_time="2026-05-30T20:30:00+04:00",
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="summary-valid-open",
+        kickoff_time="2026-05-30T21:30:00+04:00",
+        selection="HOME",
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="summary-unsafe-future",
+        kickoff_time="2026-05-31T20:30:00+04:00",
+        selection="DRAW",
+        expected_value=-0.02,
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="summary-past-open",
+        kickoff_time="2026-05-28T20:30:00+04:00",
+        selection="AWAY",
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="all",
+        date_range="all",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=UTC),
+    )
+
+    assert payload["summary"]["fresh_count"] == 2
+    assert payload["summary"]["valid_open_count"] == 2
+    assert payload["summary"]["unsafe_open_count"] == 2
+    assert payload["summary"]["candidate_count"] == 1
+    assert payload["summary"]["tracked_count"] == 3

@@ -296,8 +296,17 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     resulted = [row for row in rows if row["state"] == "resulted"]
     wins = [row for row in resulted if row["outcome"] == "won"]
     profit_loss = sum(row["paper_profit_loss"] or 0 for row in resulted)
+    valid_open_count = sum(1 for row in rows if row["is_valid_open"])
+    unsafe_open_count = sum(
+        1
+        for row in rows
+        if row["status"] == "open" and not row["is_valid_open"]
+    )
     return {
-        "fresh_count": sum(1 for row in rows if row["state"] == "fresh" and row["is_valid_open"]),
+        "fresh_count": valid_open_count,
+        "valid_open_count": valid_open_count,
+        "unsafe_open_count": unsafe_open_count,
+        "candidate_count": sum(1 for row in rows if row["row_type"] == "candidate"),
         "tracked_count": sum(1 for row in rows if row["row_type"] == "tracked"),
         "needs_result_count": sum(1 for row in rows if row["state"] == "needs_result"),
         "resulted_count": len(resulted),

@@ -36,7 +36,8 @@ def test_live_paper_cycle_runs_collection_prediction_and_bet_steps_idempotently(
     assert first.collect_odds.items_created == 3
     assert first.generate_features.items_created > 0
     assert first.generate_predictions.items_created > 0
-    assert first.write_paper_bets.items_created > 0
+    assert first.write_paper_bets.items_created == 1
+    assert first.write_paper_bets.items_skipped == 2
     assert second.write_paper_bets.items_created == 0
 
     with session_scope(engine) as session:
@@ -47,7 +48,7 @@ def test_live_paper_cycle_runs_collection_prediction_and_bet_steps_idempotently(
             )
         )
 
-    assert len(paper_bets) == first.write_paper_bets.items_created
+    assert len(paper_bets) == 1
     assert len(cycle_runs) == 1
     assert cycle_runs[0].status == "completed"
 
@@ -135,6 +136,63 @@ def test_live_paper_cycle_scopes_prediction_steps_to_snapshot_matches(
     assert len(predictions) == 3
 
 
+def test_live_paper_cycle_scopes_bare_time_snapshot_rows_with_scraped_at(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    snapshot = _valid_snapshot()
+    snapshot["events"][0]["kickoff_date"] = ""
+    snapshot["events"][0]["kickoff_time"] = "20:30"
+    snapshot_path = tmp_path / "misli-bare-time.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    db_path = tmp_path / "test.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MIN_EDGE", "0.01")
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    Base.metadata.create_all(engine)
+    CollectionService(engine).import_sample_data()
+
+    result = LivePaperCycleService(engine, settings).run(
+        LivePaperCycleRequest(
+            provider="misli-public",
+            snapshot=snapshot_path,
+            model="baseline_heuristic",
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.collect_matches.items_created == 1
+    assert result.generate_features.items_created == 3
+    assert result.generate_predictions.items_created == 3
+
+
+def test_live_paper_cycle_generates_cold_start_predictions_without_team_history(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    snapshot_path = tmp_path / "misli.json"
+    snapshot_path.write_text(json.dumps(_valid_snapshot()), encoding="utf-8")
+    db_path = tmp_path / "test.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    Base.metadata.create_all(engine)
+
+    result = LivePaperCycleService(engine, settings).run(
+        LivePaperCycleRequest(
+            provider="misli-public",
+            snapshot=snapshot_path,
+            model="baseline_heuristic",
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.collect_matches.items_created == 1
+    assert result.generate_features.items_created == 3
+    assert result.generate_predictions.items_created == 3
+
+
 def _valid_snapshot() -> dict:
     return {
         "source": "misli_public",
@@ -155,9 +213,9 @@ def _valid_snapshot() -> dict:
                 "odds": [
                     {"market": "1X2", "selection": "HOME", "odds_decimal": 2.16},
                     {"market": "1X2", "selection": "DRAW", "odds_decimal": 3.18},
-                    {"market": "1X2", "selection": "AWAY", "odds_decimal": 2.94},
+                    {"market": "1X2", "selection": "AWAY", "odds_decimal": 3.40},
                 ],
-                "raw_text": "20:30 1 Forest City - Eastport Athletic 1 2.16 X 3.18 2 2.94",
+                "raw_text": "20:30 1 Forest City - Eastport Athletic 1 2.16 X 3.18 2 3.40",
             }
         ],
     }

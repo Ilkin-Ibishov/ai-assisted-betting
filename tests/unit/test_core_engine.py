@@ -1,10 +1,12 @@
 from app.config import Settings
+from app.core.paper_bet_logger import PaperBetLogger
 from app.core.prediction_engine import (
     BaselineHeuristicPredictionEngine,
     EloPredictionEngine,
     PredictionInput,
 )
 from app.core.value_detector import ValueDetector
+from app.db.models import Match, Prediction
 
 
 def test_prediction_engine_calculates_edge_and_confidence() -> None:
@@ -51,16 +53,56 @@ def test_value_detector_bets_only_when_edge_and_odds_are_in_range() -> None:
     )
     detector = ValueDetector(settings)
 
-    bet_decision = detector.evaluate(edge=0.08, odds_decimal=2.2)
+    bet_decision = detector.evaluate(edge=0.08, odds_decimal=2.2, model_probability=0.55)
+    negative_ev_decision = detector.evaluate(
+        edge=0.08,
+        odds_decimal=2.2,
+        model_probability=0.40,
+    )
     low_edge_decision = detector.evaluate(edge=0.06, odds_decimal=2.2)
     low_odds_decision = detector.evaluate(edge=0.08, odds_decimal=1.5)
     high_odds_decision = detector.evaluate(edge=0.08, odds_decimal=4.0)
 
     assert bet_decision.decision == "BET"
     assert bet_decision.expected_value is not None
+    assert negative_ev_decision.decision == "SKIP"
+    assert negative_ev_decision.reason == "expected value not positive"
     assert low_edge_decision.decision == "SKIP"
     assert low_odds_decision.decision == "SKIP"
     assert high_odds_decision.decision == "SKIP"
+
+
+def test_paper_bet_logger_rejects_low_confidence_predictions() -> None:
+    prediction = Prediction(
+        match_id=1,
+        market="1X2",
+        selection="HOME",
+        model_name="baseline_heuristic",
+        model_version="v0",
+        model_probability=0.6,
+        bookmaker_probability=0.5,
+        edge=0.1,
+        confidence_score=0.49,
+        decision="BET",
+    )
+    match = Match(
+        source="sample",
+        source_match_id="match-001",
+        league="Sample Premier",
+        home_team="Home",
+        away_team="Away",
+        kickoff_time="2026-06-02T20:00:00+04:00",
+        status="scheduled",
+    )
+
+    assert (
+        PaperBetLogger().should_create(
+            prediction=prediction,
+            match=match,
+            existing_bet=None,
+        )
+        is False
+    )
 
 
 def test_elo_prediction_engine_uses_team_strength_signal() -> None:

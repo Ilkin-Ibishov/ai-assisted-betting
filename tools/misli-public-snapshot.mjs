@@ -229,7 +229,7 @@ async function postSnapshot(postUrl, bearerToken, snapshot) {
     const body = await response.text();
     throw new Error(`Snapshot POST failed: ${response.status} ${response.statusText} ${body}`);
   }
-  process.stderr.write(`snapshot_posted=${postUrl}\n`);
+  process.stdout.write(`snapshot_posted=${postUrl}\n`);
 }
 
 function assertAllowedPublicMisliUrl(candidateUrl) {

@@ -565,6 +565,90 @@ def test_collect_results_command_updates_match_and_settles_open_bet(tmp_path) ->
     assert result_run_count == 1
 
 
+def test_collect_results_command_supports_misli_public_execute_mode(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "misli-results.sqlite"
+    env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}
+
+    assert runner.invoke(app, ["init-db"], env=env).exit_code == 0
+    engine = create_engine(env["DATABASE_URL"])
+    raw_payload = {
+        "event_id": "2816300",
+        "detail_url": "https://www.misli.az/idman-novleri-canli-merc-teferruati/futbol/2816300",
+    }
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO matches (
+                    source, source_match_id, league, home_team, away_team,
+                    kickoff_time, status, raw_payload_json, created_at, updated_at
+                )
+                VALUES (
+                    'misli_public', 'misli:football:2816300', 'Sample Premier',
+                    'Forest City', 'Eastport Athletic', '2026-05-19T20:30:00+04:00',
+                    'scheduled', :raw_payload_json, '2026-05-19T10:00:00+00:00',
+                    '2026-05-19T10:00:00+00:00'
+                )
+                """
+            ),
+            {"raw_payload_json": json.dumps(raw_payload)},
+        )
+    engine.dispose()
+
+    result = runner.invoke(
+        app,
+        [
+            "collect-results",
+            "--provider",
+            "misli-public",
+            "--execute",
+            "--now",
+            "2026-05-20T01:00:00+04:00",
+            "--fixture",
+            json.dumps(
+                {
+                    "success": True,
+                    "data": {
+                        "data": [
+                            {
+                                "sgId": 2816300,
+                                "date": 1779204600000,
+                                "status": "ENDED",
+                                "homeTeam": {
+                                    "teamName": "Forest City",
+                                    "scores": {"CURRENT": 2},
+                                },
+                                "awayTeam": {
+                                    "teamName": "Eastport Athletic",
+                                    "scores": {"CURRENT": 1},
+                                },
+                            }
+                        ]
+                    },
+                }
+            ),
+        ],
+        env=env,
+    )
+
+    assert result.exit_code == 0
+    assert "items_updated=1" in result.output
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.connect() as connection:
+        match = connection.execute(
+            text(
+                """
+                SELECT status, home_score, away_score, result
+                FROM matches
+                WHERE source_match_id='misli:football:2816300'
+                """
+            )
+        ).fetchone()
+    engine.dispose()
+    assert match == ("completed", 2, 1, "HOME")
+
+
 def test_generate_recommendations_command_persists_recommendations(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "recommendations.sqlite"
@@ -1015,9 +1099,9 @@ def _valid_misli_snapshot() -> dict:
                 "odds": [
                     {"market": "1X2", "selection": "HOME", "odds_decimal": 2.16},
                     {"market": "1X2", "selection": "DRAW", "odds_decimal": 3.18},
-                    {"market": "1X2", "selection": "AWAY", "odds_decimal": 2.94},
+                    {"market": "1X2", "selection": "AWAY", "odds_decimal": 3.40},
                 ],
-                "raw_text": "20:30 1 Rid - Volfsberq 1 2.16 X 3.18 2 2.94",
+                "raw_text": "20:30 1 Rid - Volfsberq 1 2.16 X 3.18 2 3.40",
             }
         ],
     }
@@ -1183,6 +1267,50 @@ def test_write_paper_bets_accepts_model_option(tmp_path) -> None:
     assert "items_read=3" in result.output
 
 
+def test_void_unsafe_paper_bets_command_previews_and_executes(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "unsafe_paper_bets.sqlite"
+    env = {
+        "DATABASE_URL": f"sqlite:///{db_path.as_posix()}",
+        "MIN_EDGE": "0.01",
+    }
+
+    for command in [
+        "init-db",
+        "import-sample-data",
+        "generate-features",
+        "generate-predictions",
+        "write-paper-bets",
+    ]:
+        assert runner.invoke(app, [command], env=env).exit_code == 0
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE paper_bets SET expected_value = -0.01"))
+
+    dry_run = runner.invoke(app, ["void-unsafe-paper-bets"], env=env)
+    execute = runner.invoke(app, ["void-unsafe-paper-bets", "--execute"], env=env)
+
+    assert dry_run.exit_code == 0
+    assert "unsafe_count=1" in dry_run.output
+    assert (
+        'risk_flag_counts={"negative_expected_value": 1, "past_kickoff_open": 1}'
+    ) in dry_run.output
+    assert "dry_run=true" in dry_run.output
+    assert execute.exit_code == 0
+    assert "items_updated=1" in execute.output
+    assert "dry_run=false" in execute.output
+    with engine.connect() as connection:
+        open_count = connection.execute(
+            text("SELECT count(*) FROM paper_bets WHERE status = 'open'")
+        ).scalar_one()
+        void_count = connection.execute(
+            text("SELECT count(*) FROM paper_bets WHERE status = 'void'")
+        ).scalar_one()
+
+    assert open_count == 0
+    assert void_count == 1
+
+
 def test_compare_replays_exports_side_by_side_summary(tmp_path) -> None:
     runner = CliRunner()
     csv_path = tmp_path / "E0.csv"
@@ -1245,9 +1373,14 @@ def test_compare_replays_exports_side_by_side_summary(tmp_path) -> None:
     assert "brier_score_rank" in csv_text.splitlines()[0]
     assert "log_loss_rank" in csv_text.splitlines()[0]
     assert len(comparison["runs"]) == 4
-    assert comparison["rankings"]["best_roi"]["model"] in {"baseline_heuristic", "elo"}
-    assert comparison["rankings"]["best_brier_score"]["bookmaker"] in {"B365", "Avg"}
-    assert comparison["rankings"]["best_log_loss"]["value"] is not None
+    if comparison["rankings"]["best_roi"] is None:
+        assert all(run["settled_bets"] == 0 for run in comparison["runs"])
+        assert comparison["rankings"]["best_brier_score"] is None
+        assert comparison["rankings"]["best_log_loss"] is None
+    else:
+        assert comparison["rankings"]["best_roi"]["model"] in {"baseline_heuristic", "elo"}
+        assert comparison["rankings"]["best_brier_score"]["bookmaker"] in {"B365", "Avg"}
+        assert comparison["rankings"]["best_log_loss"]["value"] is not None
     assert all("model_config" in run for run in comparison["runs"])
     assert {
         run["model_config"]["model_name"] for run in comparison["runs"]

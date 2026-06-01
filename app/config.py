@@ -21,6 +21,9 @@ class Settings:
     elo_home_advantage: float
     log_level: str
     live_collection_enabled: bool
+    misli_result_fetch_enabled: bool = False
+    misli_result_preview_mode: bool = True
+    scheduled_settlement_enabled: bool = False
     ai_analysis_mode: str = "deterministic"
     ai_analysis_model_name: str = "deterministic_ai_fallback"
     snapshot_ingest_token: str = ""
@@ -67,6 +70,9 @@ def load_settings() -> Settings:
         elo_home_advantage=_get_float("ELO_HOME_ADVANTAGE", "65"),
         log_level=getenv("LOG_LEVEL", "INFO"),
         live_collection_enabled=_get_bool("LIVE_COLLECTION_ENABLED", "false"),
+        misli_result_fetch_enabled=_get_bool("MISLI_RESULT_FETCH_ENABLED", "false"),
+        misli_result_preview_mode=_get_bool("MISLI_RESULT_PREVIEW_MODE", "true"),
+        scheduled_settlement_enabled=_get_bool("SCHEDULED_SETTLEMENT_ENABLED", "false"),
         ai_analysis_mode=getenv("AI_ANALYSIS_MODE", "deterministic"),
         ai_analysis_model_name=getenv("AI_ANALYSIS_MODEL_NAME", "deterministic_ai_fallback"),
         snapshot_ingest_token=getenv("SNAPSHOT_INGEST_TOKEN", ""),

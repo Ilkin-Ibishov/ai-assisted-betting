@@ -19,9 +19,9 @@ class SampleProvider(MatchProvider, OddsProvider, ResultProvider):
         ("hist-003", "Forest City", "Eastport Athletic", "2026-04-05T18:00:00+00:00", 1, 3),
         ("hist-004", "Northbridge FC", "Harbor Rovers", "2026-04-10T18:00:00+00:00", 2, 2),
         ("hist-005", "Lakeside Town", "Forest City", "2026-04-12T18:00:00+00:00", 1, 0),
-        ("hist-006", "Metro United", "Eastport Athletic", "2026-04-14T18:00:00+00:00", 3, 1),
+        ("hist-006", "Metro United", "Eastport Athletic", "2026-04-14T18:00:00+00:00", 0, 4),
         ("hist-007", "Harbor Rovers", "Forest City", "2026-04-18T18:00:00+00:00", 2, 0),
-        ("hist-008", "Eastport Athletic", "Northbridge FC", "2026-04-20T18:00:00+00:00", 1, 1),
+        ("hist-008", "Eastport Athletic", "Northbridge FC", "2026-04-20T18:00:00+00:00", 3, 0),
         ("upcoming-001", "Northbridge FC", "Metro United", "2026-05-19T18:00:00+00:00", None, None),
         ("upcoming-002", "Lakeside Town", "Harbor Rovers", "2026-05-20T18:00:00+00:00", None, None),
         (
@@ -37,7 +37,7 @@ class SampleProvider(MatchProvider, OddsProvider, ResultProvider):
     _odds = {
         "upcoming-001": {"HOME": 2.05, "DRAW": 3.25, "AWAY": 3.40},
         "upcoming-002": {"HOME": 2.45, "DRAW": 3.10, "AWAY": 2.80},
-        "upcoming-003": {"HOME": 2.90, "DRAW": 3.30, "AWAY": 2.25},
+        "upcoming-003": {"HOME": 2.90, "DRAW": 3.30, "AWAY": 2.60},
     }
 
     def get_matches(
