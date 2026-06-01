@@ -363,6 +363,52 @@ def test_fresh_ledger_excludes_risky_or_non_recommended_candidates(tmp_path: Pat
     assert payload["summary"]["fresh_count"] == 0
 
 
+def test_next_7_days_includes_seven_local_calendar_days(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_recommendation(
+        database_url,
+        source_match_id="next-window-included",
+        kickoff_time="2026-06-04T20:30:00+04:00",
+    )
+    seed_recommendation(
+        database_url,
+        source_match_id="next-window-excluded",
+        kickoff_time="2026-06-05T20:30:00+04:00",
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="fresh",
+        date_range="next_7_days",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=timezone(timedelta(hours=4))),
+    )
+
+    assert [row["source_match_id"] for row in payload["rows"]] == ["next-window-included"]
+
+
+def test_last_7_days_includes_seven_local_calendar_days(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="last-window-excluded",
+        kickoff_time="2026-05-22T20:30:00+04:00",
+        selection="HOME",
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="last-window-included",
+        kickoff_time="2026-05-23T20:30:00+04:00",
+        selection="AWAY",
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="all",
+        date_range="last_7_days",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=timezone(timedelta(hours=4))),
+    )
+
+    assert [row["source_match_id"] for row in payload["rows"]] == ["last-window-included"]
+
+
 def test_tomorrow_ledger_uses_kickoff_local_calendar_day(tmp_path: Path) -> None:
     database_url = create_database(tmp_path)
     seed_recommendation(

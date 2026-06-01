@@ -562,15 +562,24 @@ def _validate_bet_ledger_custom_dates(
 ) -> None:
     if date_range != "custom":
         return
-    _validate_optional_query_date(from_date, parameter="from_date")
-    _validate_optional_query_date(to_date, parameter="to_date")
+    parsed_from_date = _validate_optional_query_date(from_date, parameter="from_date")
+    parsed_to_date = _validate_optional_query_date(to_date, parameter="to_date")
+    if (
+        parsed_from_date is not None
+        and parsed_to_date is not None
+        and parsed_from_date > parsed_to_date
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid custom date range: from_date must be before or equal to to_date",
+        )
 
 
-def _validate_optional_query_date(value: str | None, *, parameter: str) -> None:
+def _validate_optional_query_date(value: str | None, *, parameter: str) -> date | None:
     if value is None:
-        return
+        return None
     try:
-        date.fromisoformat(value)
+        return date.fromisoformat(value)
     except ValueError:
         raise HTTPException(
             status_code=422,

@@ -309,14 +309,14 @@ def _date_window(
     if date_range == "tomorrow":
         return _day_window(today + timedelta(days=1))
     if date_range == "next_7_days":
-        return DateWindow(today, today + timedelta(days=8))
+        return DateWindow(today, today + timedelta(days=7))
     if date_range == "last_7_days":
-        return DateWindow(today - timedelta(days=7), today + timedelta(days=1))
+        return DateWindow(today - timedelta(days=6), today + timedelta(days=1))
     if date_range == "last_30_days":
         return DateWindow(today - timedelta(days=30), today + timedelta(days=1))
     if date_range == "custom":
         return DateWindow(_parse_date_start(from_date), _parse_date_end(to_date))
-    return DateWindow(today, today + timedelta(days=8))
+    return DateWindow(today, today + timedelta(days=7))
 
 
 def _default_reference_time() -> datetime:
