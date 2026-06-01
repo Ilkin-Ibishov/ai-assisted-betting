@@ -363,6 +363,31 @@ def test_fresh_ledger_excludes_risky_or_non_recommended_candidates(tmp_path: Pat
     assert payload["summary"]["fresh_count"] == 0
 
 
+def test_ledger_excludes_non_actionable_past_candidate_rows(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_recommendation(
+        database_url,
+        source_match_id="past-rejected",
+        kickoff_time="2026-05-28T20:30:00+04:00",
+        status="rejected",
+    )
+    seed_recommendation(
+        database_url,
+        source_match_id="past-risky",
+        kickoff_time="2026-05-28T21:30:00+04:00",
+        risk_flags='["low_confidence"]',
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="all",
+        date_range="last_7_days",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=timezone(timedelta(hours=4))),
+    )
+
+    assert payload["rows"] == []
+    assert payload["summary"]["needs_result_count"] == 0
+
+
 def test_next_7_days_includes_seven_local_calendar_days(tmp_path: Path) -> None:
     database_url = create_database(tmp_path)
     seed_recommendation(
@@ -454,6 +479,31 @@ def test_tomorrow_ledger_uses_kickoff_local_calendar_day(tmp_path: Path) -> None
 
     assert today_payload["rows"] == []
     assert [row["source_match_id"] for row in tomorrow_payload["rows"]] == ["local-tomorrow"]
+
+
+def test_ledger_converts_utc_kickoff_to_reference_local_calendar_day(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_recommendation(
+        database_url,
+        source_match_id="utc-local-tomorrow",
+        kickoff_time="2026-05-29T21:30:00+00:00",
+    )
+
+    today_payload = BetLedgerService(database_url).ledger(
+        status="fresh",
+        date_range="today",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=timezone(timedelta(hours=4))),
+    )
+    tomorrow_payload = BetLedgerService(database_url).ledger(
+        status="fresh",
+        date_range="tomorrow",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=timezone(timedelta(hours=4))),
+    )
+
+    assert today_payload["rows"] == []
+    assert [row["source_match_id"] for row in tomorrow_payload["rows"]] == [
+        "utc-local-tomorrow"
+    ]
 
 
 def test_default_reference_time_uses_provider_local_timezone() -> None:

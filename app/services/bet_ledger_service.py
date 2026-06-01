@@ -92,7 +92,12 @@ def _build_rows(
     for paper_bet, prediction, match in paper_rows:
         tracked_keys.add((paper_bet.match_id, paper_bet.market, paper_bet.selection))
         row = _paper_bet_row(paper_bet, prediction, match, now=now)
-        if _row_is_date_eligible(row, window=window, include_voided=include_voided):
+        if _row_is_date_eligible(
+            row,
+            window=window,
+            include_voided=include_voided,
+            local_tz=now.tzinfo or PROVIDER_TIMEZONE,
+        ):
             rows.append(row)
 
     for recommendation, match in recommendation_rows:
@@ -100,7 +105,14 @@ def _build_rows(
         if key in tracked_keys:
             continue
         row = _recommendation_row(recommendation, match, now=now)
-        if _row_is_date_eligible(row, window=window, include_voided=include_voided):
+        if not row["is_valid_open"]:
+            continue
+        if _row_is_date_eligible(
+            row,
+            window=window,
+            include_voided=include_voided,
+            local_tz=now.tzinfo or PROVIDER_TIMEZONE,
+        ):
             rows.append(row)
 
     rows.sort(key=lambda row: (row["kickoff_at"] or "", row["row_type"], row["id"]))
@@ -121,10 +133,11 @@ def _row_is_date_eligible(
     *,
     window: DateWindow,
     include_voided: bool,
+    local_tz: timezone,
 ) -> bool:
     if row["state"] == "voided" and not include_voided:
         return False
-    kickoff_day = _parse_iso_date(row["kickoff_at"])
+    kickoff_day = _parse_iso_date(row["kickoff_at"], local_tz=local_tz)
     if kickoff_day is None:
         return False
     if window.start is not None and kickoff_day < window.start:
@@ -352,10 +365,13 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
-def _parse_iso_date(value: str | None) -> date | None:
+def _parse_iso_date(value: str | None, *, local_tz: timezone) -> date | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(local_tz).date()
