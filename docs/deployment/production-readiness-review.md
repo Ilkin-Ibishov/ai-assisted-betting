@@ -8,7 +8,7 @@ Scope: paper-only AI-assisted betting intelligence system for local and Railway 
 
 Status: conditionally ready for continuous paper-only staging.
 
-The project is deployed to Railway with a healthy API, Railway Postgres, public dashboard, and a dedicated cron-managed worker service. A Railway cron-triggered paper worker cycle completed against Railway Postgres and deployed `production-smoke` passes against the public API plus dashboard URL. It is not yet fully live-provider complete because the worker currently uses the deterministic Task 45 fixture instead of scheduled fresh public Misli snapshots.
+The project is deployed to Railway with a healthy API, Railway Postgres, public dashboard, a dedicated cron-managed worker service, and a scheduled public Misli snapshot producer. Railway cron-triggered paper worker cycles complete against Railway Postgres and deployed `production-smoke` passes against the public API plus dashboard URL. The 2026-05-28 post-audit live recommendation fix makes fresh Misli rows without local team history create cold-start predictions instead of `missing_prediction` recommendation records, rejects negative current-odds EV recommendations, and counts in-run recommendation records in guardrails.
 
 ## Safety Boundary
 
@@ -49,7 +49,7 @@ The final Task 62 completion report must include fresh command results from the 
 
 ## Deployed Railway Evidence
 
-Status: pending.
+Status: current as of 2026-05-28.
 
 Required after Railway service setup:
 
@@ -68,7 +68,7 @@ curl https://<api-service>.up.railway.app/api/live/recommendations?limit=5
 curl https://<api-service>.up.railway.app/api/reports/comparisons
 ```
 
-API, dashboard, and scheduled-worker deployment proof is complete for the current Railway services. Full live-provider proof still requires fresh public/user-provided snapshot generation.
+API, dashboard, scheduled-worker, and fresh public Misli snapshot-producer proof is complete for the current Railway services. Full daily-decision confidence still requires richer public/statistical football inputs beyond list-page odds.
 
 ## Readiness Checklist
 
@@ -77,7 +77,7 @@ API, dashboard, and scheduled-worker deployment proof is complete for the curren
 | Offline sample pipeline | Pass | CLI import, feature, prediction, paper-bet, settlement, evaluation flow exists and is tested. |
 | Historical replay and comparison | Pass | Football-Data import, replay, multi-bookmaker comparison, ranking, analysis, and dashboard reports are implemented. |
 | Dashboard | Pass | React/Vite dashboard includes report catalog, charts, process monitor, AI analyst, recommendations, and guardrails. |
-| Public Misli ingestion | Conditional | Public snapshot parser is validated and fail-closed, but rendered DOM dependency and inferred bare time-only rows remain risks. |
+| Public Misli ingestion | Conditional | Public snapshot parser is validated and fail-closed, fresh snapshots are scheduled, but rendered DOM dependency and inferred bare time-only rows remain risks. |
 | Live paper worker | Pass for staging setup | One-shot worker exists, refuses unsafe config, skips overlaps, and is monitored through worker status. |
 | Recommendations | Conditional | Deterministic recommendations and combinations exist, but risk model remains simplified and requires larger paper backtests. |
 | AI assistance | Pass for deterministic advisory mode | AI analysis records, prompt versions, eval gates, recommendation review, and backtest summaries exist. Optional LLM provider is not implemented. |
@@ -104,14 +104,14 @@ Before calling the system fully ready for continuous Railway staging:
 ## Residual Risks
 
 - Misli public snapshot parsing depends on rendered DOM structure.
-- Railway worker cron currently uses the deterministic Task 45 fixture until fresh public snapshot generation is scheduled safely.
-- Bare time-only Misli kickoff rows remain fail-closed until a safe date source is proven.
+- Fresh public Misli snapshot generation is scheduled, but rendered DOM shape remains a provider risk.
+- Bare time-only Misli kickoff rows resolve against trusted snapshot `scraped_at`, which remains less strong than explicit page date grouping.
 - Recommendation expected value uses simplified unit-stake arithmetic.
 - Combination correlation and exposure controls remain heuristic.
 - Odds movement is computed directly from snapshots instead of a dedicated summary table.
 - External alert destination is not selected yet.
 - Deployed Railway API and dashboard smoke evidence is captured.
-- Fresh public Misli snapshot generation is pending for live-provider coverage.
+- Cold-start live predictions use neutral team-form inputs until richer club, player, schedule, and historical data sources are added.
 
 ## Final Position
 

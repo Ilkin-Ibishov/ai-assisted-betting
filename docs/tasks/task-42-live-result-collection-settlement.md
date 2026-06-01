@@ -54,6 +54,7 @@ idempotent completed-match handling
 missing-match errors recorded in live_runs
 settle-results reuse after result collection
 settlement rerun safety
+scheduled worker settlement hook gated by SCHEDULED_SETTLEMENT_ENABLED=false by default
 ```
 
 Manual result JSON shape:
@@ -85,3 +86,4 @@ None for Task 43. Provider-native result collection remains out of scope.
 ## Technical Debt
 
 Manual result JSON is the only implemented result provider. Provider-native public result discovery is still future work.
+Automatic settlement is wired into the scheduled worker but remains disabled until reliable result ingestion is enabled.

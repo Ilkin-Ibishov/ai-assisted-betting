@@ -158,6 +158,8 @@ Task 60 added worker freshness monitoring, `/api/live/worker-status`, and produc
 
 Task 61 added operational guardrails, `operational-status`, `/api/operations/guardrails`, and a dashboard guardrails panel. It did not introduce new code debt. External alert destinations remain an open product/operations decision in `docs/agent/04_OPEN_QUESTIONS.md`; notification bots are intentionally out of scope until staging use proves the guardrail states.
 
+The 2026-05-28 post-audit fix tightened recommendation safety by rejecting current-odds negative-EV recommendations even when stored prediction edge is positive. It also fixed the recommendation-output guardrail to count recommendation records created during the latest worker run, not only records created after worker completion. No new technical debt was introduced; the broader simplified EV and cold-start input limitations remain tracked above.
+
 Task 62 added the final production readiness review. It did not introduce new code debt. The system is conditionally ready for monitored paper-only Railway staging, with deployed Railway smoke evidence still pending.
 
 Task 63 added Railway API config-as-code through `railway.json` and an explicit Dockerfile. It did not introduce new code debt. Railway agent tooling has been installed locally, but the restarted Codex session still does not expose a dedicated Railway MCP namespace; Railway operations are handled through the linked Railway CLI. The first Railpack config attempt built but crashed at runtime because dependencies such as `typer` were not visible in the runtime image; the Dockerfile is now the deployment source of truth. Commit `ad00259` deployed successfully to `https://ai-assisted-betting-production.up.railway.app`. Railway Postgres has been added and `DATABASE_URL` is set on the API service. The first Postgres-backed deploy exposed a SQLAlchemy driver-default issue: plain Railway `postgresql://...` URLs attempted to load `psycopg2`, so the DB engine now normalizes them to `postgresql+psycopg://...`. CLI database URL output is redacted for safer Railway logs. Commit `e129e8a` is healthy on Railway Postgres. A one-off scheduled paper worker has completed against Railway Postgres and deployed API `production-smoke` passes. Continuous readiness still needs a dedicated Railway scheduled worker service and dashboard service deployment.
@@ -333,6 +335,20 @@ The fresh Misli producer captures public list-page odds and match metadata. It d
 
 Resolution target:
 Add vetted public/statistical football data sources and incorporate them into recommendation scoring and AI review before calling the system product-complete for daily decision support.
+
+### P2 - Live Cold-Start Features Use Neutral Team Form
+
+Status: accepted
+Introduced: Post-audit live recommendation fix on 2026-05-28
+Area: live prediction quality
+
+Fresh Misli snapshots can contain clubs that do not yet have completed-match history in the local database. The live cycle now still creates auditable feature and prediction rows by using neutral team-form and goal values while preserving bookmaker-normalized probabilities and initial Elo ratings.
+
+Impact:
+This prevents fresh live cycles from producing only `missing_prediction` recommendation records, but it does not add real team-strength evidence. With current thresholds, cold-start recommendations should remain conservative and typically reject on low edge/confidence until richer inputs exist.
+
+Next:
+Treat cold-start predictions as a staging bridge. Replace or enrich them with vetted historical/team/stat sources before relying on the dashboard for stronger daily decision support.
 
 ### P1 - Snapshot Producer Railway Upload Stuck In Building
 
