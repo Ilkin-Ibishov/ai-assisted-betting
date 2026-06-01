@@ -409,6 +409,30 @@ def test_last_7_days_includes_seven_local_calendar_days(tmp_path: Path) -> None:
     assert [row["source_match_id"] for row in payload["rows"]] == ["last-window-included"]
 
 
+def test_last_30_days_includes_thirty_local_calendar_days(tmp_path: Path) -> None:
+    database_url = create_database(tmp_path)
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="last-30-window-excluded",
+        kickoff_time="2026-04-29T20:30:00+04:00",
+        selection="HOME",
+    )
+    seed_prediction_and_bet(
+        database_url,
+        source_match_id="last-30-window-included",
+        kickoff_time="2026-04-30T20:30:00+04:00",
+        selection="AWAY",
+    )
+
+    payload = BetLedgerService(database_url).ledger(
+        status="all",
+        date_range="last_30_days",
+        now=datetime(2026, 5, 29, 8, 0, tzinfo=timezone(timedelta(hours=4))),
+    )
+
+    assert [row["source_match_id"] for row in payload["rows"]] == ["last-30-window-included"]
+
+
 def test_tomorrow_ledger_uses_kickoff_local_calendar_day(tmp_path: Path) -> None:
     database_url = create_database(tmp_path)
     seed_recommendation(
