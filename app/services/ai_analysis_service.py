@@ -588,7 +588,11 @@ def _recommendation_review_input(engine: Engine, *, limit: int) -> dict[str, Any
     with session_scope(engine) as session:
         recommendations = session.scalars(
             select(PaperRecommendation)
-            .order_by(PaperRecommendation.created_at.desc(), PaperRecommendation.id.desc())
+            .order_by(
+                PaperRecommendation.latest_snapshot_time.desc(),
+                PaperRecommendation.created_at.desc(),
+                PaperRecommendation.id.desc(),
+            )
             .limit(max(1, min(limit, 200)))
         ).all()
         combinations = session.scalars(

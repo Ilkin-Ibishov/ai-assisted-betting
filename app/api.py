@@ -524,7 +524,11 @@ def _paper_recommendation_payloads(database_url: str, *, limit: int) -> list[dic
         with session_scope(engine) as session:
             recommendations = session.scalars(
                 select(PaperRecommendation)
-                .order_by(PaperRecommendation.created_at.desc(), PaperRecommendation.id.desc())
+                .order_by(
+                    PaperRecommendation.latest_snapshot_time.desc(),
+                    PaperRecommendation.created_at.desc(),
+                    PaperRecommendation.id.desc(),
+                )
                 .limit(max(1, min(limit, 500)))
             ).all()
             return [_paper_recommendation_payload(item) for item in recommendations]

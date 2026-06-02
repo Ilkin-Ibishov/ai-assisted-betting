@@ -4,7 +4,7 @@ from sqlalchemy import Engine, select
 
 from app.config import Settings
 from app.db.engine import session_scope
-from app.db.models import LiveRun, Prediction, utc_now_iso
+from app.db.models import LiveRun, Prediction
 from app.db.repositories import PaperRecommendationRepository
 from app.services.odds_movement_service import OddsMovementService
 from app.services.prediction_service import StepSummary
@@ -87,11 +87,7 @@ class RecommendationService:
                     latest_snapshot_time=latest_snapshot_time,
                 )
                 if existing is not None:
-                    repository.update(
-                        existing,
-                        **recommendation_values,
-                        created_at=utc_now_iso(),
-                    )
+                    repository.update(existing, **recommendation_values)
                     items_updated += 1
                     continue
 

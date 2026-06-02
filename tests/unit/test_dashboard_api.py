@@ -458,6 +458,25 @@ def test_live_recommendations_endpoint_lists_persisted_recommendations(tmp_path:
     assert payload[0]["source_match_id"] == "misli:football:2816300"
 
 
+def test_live_recommendations_endpoint_prefers_fresh_snapshot_over_refreshed_stale_row(
+    tmp_path: Path,
+) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_mixed_freshness_recommendation_database(database_url)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/recommendations?limit=2")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["source_match_id"] for item in payload] == [
+        "misli:football:fresh",
+        "misli:football:stale",
+    ]
+    assert payload[0]["latest_snapshot_time"] == "2026-06-02T17:02:32+00:00"
+    assert "stale_odds" not in payload[0]["risk_flags"]
+
+
 def test_live_bet_ledger_endpoint_returns_default_fresh_rows(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_recommendation_database(database_url)
@@ -1109,6 +1128,74 @@ def _seed_recommendation_database(database_url: str) -> None:
                 risk_flags_json='["no_current_risk_flags"]',
                 rationale="Positive edge is above recommendation threshold.",
             )
+        )
+    engine.dispose()
+
+
+def _seed_mixed_freshness_recommendation_database(database_url: str) -> None:
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        stale_match = MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:stale",
+            league="Sample Premier",
+            home_team="Old Home",
+            away_team="Old Away",
+            kickoff_time="2026-06-03T20:30:00+04:00",
+        )
+        fresh_match = MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:fresh",
+            league="Sample Premier",
+            home_team="Fresh Home",
+            away_team="Fresh Away",
+            kickoff_time="2026-06-03T22:30:00+04:00",
+        )
+        session.add_all(
+            [
+                PaperRecommendation(
+                    match_id=fresh_match.id,
+                    source_match_id=fresh_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="HOME",
+                    latest_snapshot_time="2026-06-02T17:02:32+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="watch",
+                    status="active",
+                    model_probability=0.58,
+                    implied_probability=0.5,
+                    edge=0.08,
+                    confidence_score=0.42,
+                    current_odds=2.0,
+                    expected_value=0.16,
+                    risk_flags_json='["low_confidence"]',
+                    rationale="Positive edge exists, but confidence is low.",
+                    created_at="2026-06-02T17:02:33+00:00",
+                ),
+                PaperRecommendation(
+                    match_id=stale_match.id,
+                    source_match_id=stale_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="HOME",
+                    latest_snapshot_time="2026-05-31T19:02:16+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="reject",
+                    status="rejected",
+                    model_probability=0.62,
+                    implied_probability=0.5,
+                    edge=0.12,
+                    confidence_score=0.72,
+                    current_odds=2.0,
+                    expected_value=0.24,
+                    risk_flags_json='["stale_odds"]',
+                    rationale="Rejected because live odds/provider state is not healthy enough.",
+                    created_at="2026-06-02T17:05:00+00:00",
+                ),
+            ]
         )
     engine.dispose()
 

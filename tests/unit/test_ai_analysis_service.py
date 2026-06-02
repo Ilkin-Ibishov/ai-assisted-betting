@@ -214,6 +214,23 @@ def test_ai_analysis_service_records_recommendation_review_advisory(tmp_path) ->
     engine.dispose()
 
 
+def test_ai_analysis_service_reviews_fresh_recommendations_before_refreshed_stale_rows(
+    tmp_path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'fresh-recommendation-review.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+    _seed_mixed_freshness_recommendation_review_inputs(engine)
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_review()
+
+    input_payload = json.loads(analysis.input_json)
+    assert [
+        item["source_match_id"] for item in input_payload["paper_recommendations"]
+    ] == ["fresh-match", "stale-match"]
+    engine.dispose()
+
+
 def test_ai_analysis_service_rejects_recommendation_review_without_inputs(tmp_path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'empty-recommendation-review.sqlite').as_posix()}"
     init_db(database_url)
@@ -470,6 +487,58 @@ def _seed_recommendation_review_inputs(engine) -> None:
                 risk_flags_json='["no_current_risk_flags"]',
                 rationale="Recommended paper combination with 2 legs.",
             )
+        )
+
+
+def _seed_mixed_freshness_recommendation_review_inputs(engine) -> None:
+    with session_scope(engine) as session:
+        fresh_match = _seed_match(session, source_match_id="fresh-match")
+        stale_match = _seed_match(session, source_match_id="stale-match")
+        session.add_all(
+            [
+                PaperRecommendation(
+                    match_id=fresh_match.id,
+                    source_match_id=fresh_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="HOME",
+                    latest_snapshot_time="2026-06-02T17:02:32+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="watch",
+                    status="active",
+                    model_probability=0.58,
+                    implied_probability=0.5,
+                    edge=0.08,
+                    confidence_score=0.42,
+                    current_odds=2.0,
+                    expected_value=0.16,
+                    risk_flags_json='["low_confidence"]',
+                    rationale="Positive edge exists, but confidence is low.",
+                    created_at="2026-06-02T17:02:33+00:00",
+                ),
+                PaperRecommendation(
+                    match_id=stale_match.id,
+                    source_match_id=stale_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="HOME",
+                    latest_snapshot_time="2026-05-31T19:02:16+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="reject",
+                    status="rejected",
+                    model_probability=0.62,
+                    implied_probability=0.5,
+                    edge=0.12,
+                    confidence_score=0.72,
+                    current_odds=2.0,
+                    expected_value=0.24,
+                    risk_flags_json='["stale_odds"]',
+                    rationale="Rejected because live odds/provider state is not healthy enough.",
+                    created_at="2026-06-02T17:05:00+00:00",
+                ),
+            ]
         )
 
 
