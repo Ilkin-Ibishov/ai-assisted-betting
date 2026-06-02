@@ -71,11 +71,11 @@ try {
   await expectMetric(desktop, 'ai-analyst-panel', 'AI-assisted advisory analysis')
   await expectMetric(desktop, 'recommendation-dashboard', expectedRecommendations.approvalLabel)
   await expectMetric(desktop, 'recommendation-ai-review', expectedRecommendations.reviewLabel)
-  const visibleRecommendation = recommendations.find((recommendation) =>
-    ['active', 'watch', 'recommended'].includes(recommendation.status),
-  )
+  const visibleRecommendation = recommendations.find(isDefaultVisibleRecommendation)
   if (visibleRecommendation) {
     await expectMetric(desktop, 'recommendation-table', visibleRecommendation.selection)
+  } else {
+    await expectVisibleText(desktop, 'No recommendations match the active filters.')
   }
   await expectMetric(desktop, 'live-process-monitor', expectedLive.statusLabel)
   await expectMetric(desktop, 'live-latest-run', expectedLive.latestRunLabel)
@@ -332,6 +332,25 @@ function buildExpectedRecommendationValues(recommendations, review) {
         ? 'No AI recommendation review yet'
         : 'No AI recommendation review yet'),
   }
+}
+
+function isDefaultVisibleRecommendation(recommendation) {
+  return (
+    recommendation.status === 'active' &&
+    ['recommended', 'lean'].includes(recommendation.grade) &&
+    (recommendation.expected_value ?? Number.NEGATIVE_INFINITY) > 0 &&
+    !recommendation.risk_flags.some((flag) =>
+      [
+        'negative_expected_value',
+        'missing_prediction',
+        'stale_odds',
+        'missing_outcome',
+        'provider_health_warning',
+        'edge_below_threshold',
+        'low_confidence',
+      ].includes(flag),
+    )
+  )
 }
 
 function statusLabel(status) {
