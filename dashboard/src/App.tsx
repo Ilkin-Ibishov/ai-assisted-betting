@@ -1020,7 +1020,7 @@ function RecommendationDashboardPanel({
   const [filters, setFilters] = useState<RecommendationFilters>({
     approvalState: 'all',
     confidence: 'all',
-    grade: 'actionable',
+    grade: 'watchlist',
     market: 'all',
   })
   const summary = useMemo(
@@ -1079,6 +1079,7 @@ function RecommendationDashboardPanel({
               unsafeOpenBetCount={paperBetGroups.unsafeOpenBets.length}
               recommendations={summary.rows}
               review={review}
+              watchlistCount={summary.watchlistCount}
             />
             <RecommendationFiltersBar
               filters={filters}
@@ -1121,6 +1122,7 @@ function DailyDecisionSummary({
   recommendations,
   review,
   unsafeOpenBetCount,
+  watchlistCount,
 }: {
   blockedCount: number
   combinationCount: number
@@ -1130,6 +1132,7 @@ function DailyDecisionSummary({
   recommendations: ReturnType<typeof buildRecommendationDashboardSummary>['rows']
   review?: AIAnalysisRun | null
   unsafeOpenBetCount: number
+  watchlistCount: number
 }) {
   const topRecommendation = recommendations[0]
   const showRecommendation = decisionState === 'candidate_ready' && topRecommendation
@@ -1150,7 +1153,9 @@ function DailyDecisionSummary({
                 topRecommendation.expected_value,
               )}`
             : blockedCount
-              ? `${blockedCount} blocked by EV, freshness, prediction, or provider risk.`
+              ? watchlistCount
+                ? `${watchlistCount} watchlist only; ${blockedCount} blocked by EV, freshness, prediction, or provider risk.`
+                : `${blockedCount} blocked by EV, freshness, prediction, or provider risk.`
               : 'No active paper singles yet.'
         }
       />
@@ -1186,7 +1191,7 @@ function RecommendationFiltersBar({
       <FilterSelect
         label="Grade"
         value={filters.grade}
-        options={['actionable', 'all', ...gradeOptions]}
+        options={['watchlist', 'actionable', 'all', ...gradeOptions]}
         onChange={(grade) => onChange({ ...filters, grade })}
       />
       <FilterSelect

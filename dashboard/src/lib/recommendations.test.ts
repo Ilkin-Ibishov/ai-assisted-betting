@@ -132,6 +132,43 @@ describe('recommendation dashboard helpers', () => {
     expect(summary.decisionState).toBe('blocked_by_risk')
   })
 
+  it('surfaces positive-EV low-confidence rows in the watchlist without making them actionable', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          confidence_score: 0.13,
+          expected_value: 0.03,
+          grade: 'watch',
+          risk_flags: ['low_confidence'],
+          status: 'active',
+        }),
+        recommendation({
+          id: 2,
+          expected_value: -0.04,
+          grade: 'reject',
+          risk_flags: ['negative_expected_value', 'low_confidence'],
+          status: 'rejected',
+        }),
+      ],
+      combinations: [],
+      movements: [],
+      review: review({ approval_state: 'reject' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'watchlist',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows.map((row) => row.id)).toEqual([1])
+    expect(summary.actionableCount).toBe(0)
+    expect(summary.watchlistCount).toBe(1)
+    expect(summary.blockedCount).toBe(2)
+    expect(summary.decisionState).toBe('blocked_by_risk')
+  })
+
   it('does not mark candidates ready when the AI review rejects them', () => {
     const summary = buildRecommendationDashboardSummary({
       recommendations: [

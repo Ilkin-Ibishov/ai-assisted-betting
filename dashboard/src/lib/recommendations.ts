@@ -27,6 +27,7 @@ export type RecommendationDashboardSummary = {
   approvalState: 'approve' | 'caution' | 'reject' | 'missing'
   topRiskFlags: string[]
   actionableCount: number
+  watchlistCount: number
   blockedCount: number
   decisionState: 'candidate_ready' | 'blocked_by_risk' | 'empty'
   latestRecommendationAt?: string
@@ -63,6 +64,7 @@ export function buildRecommendationDashboardSummary({
     }
   })
   const actionableRows = enrichedRows.filter(isActionableRecommendation)
+  const watchlistRows = enrichedRows.filter(isWatchlistRecommendation)
   const actionableIds = new Set(actionableRows.map((row) => row.id))
   const approvalAllowsCandidate = approvalState === 'approve' || approvalState === 'caution'
   const latestRecommendationAt = recommendations
@@ -92,6 +94,7 @@ export function buildRecommendationDashboardSummary({
     approvalState,
     topRiskFlags: review?.output.risk_flags ?? ['recommendation_review_missing'],
     actionableCount: actionableRows.length,
+    watchlistCount: watchlistRows.length,
     blockedCount: recommendations.length - actionableRows.length,
     decisionState: approvalAllowsCandidate && actionableRows.length
       ? 'candidate_ready'
@@ -141,6 +144,9 @@ export function riskBadgeTone(flag: string): 'neutral' | 'positive' | 'warning' 
 }
 
 function rowMatchesFilters(row: RecommendationRow, filters: RecommendationFilters) {
+  if (filters.grade === 'watchlist') {
+    return isWatchlistRecommendation(row)
+  }
   if (filters.grade === 'actionable') {
     if (!isActionableRecommendation(row)) {
       return false
@@ -163,6 +169,15 @@ function isActionableRecommendation(row: RecommendationRow) {
   )
 }
 
+function isWatchlistRecommendation(row: RecommendationRow) {
+  return (
+    row.status === 'active' &&
+    (row.expected_value ?? Number.NEGATIVE_INFINITY) > 0 &&
+    !isActionableRecommendation(row) &&
+    !row.risk_flags.some(isHardBlockingRiskFlag)
+  )
+}
+
 function isBlockingRiskFlag(flag: string) {
   return [
     'negative_expected_value',
@@ -172,6 +187,17 @@ function isBlockingRiskFlag(flag: string) {
     'provider_health_warning',
     'edge_below_threshold',
     'low_confidence',
+  ].includes(flag)
+}
+
+function isHardBlockingRiskFlag(flag: string) {
+  return [
+    'negative_expected_value',
+    'missing_prediction',
+    'stale_odds',
+    'missing_outcome',
+    'provider_health_warning',
+    'edge_below_threshold',
   ].includes(flag)
 }
 

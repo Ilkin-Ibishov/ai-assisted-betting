@@ -335,22 +335,48 @@ function buildExpectedRecommendationValues(recommendations, review) {
 }
 
 function isDefaultVisibleRecommendation(recommendation) {
+  return isWatchlistRecommendation(recommendation)
+}
+
+function isWatchlistRecommendation(recommendation) {
+  return (
+    recommendation.status === 'active' &&
+    (recommendation.expected_value ?? Number.NEGATIVE_INFINITY) > 0 &&
+    !isActionableRecommendation(recommendation) &&
+    !recommendation.risk_flags.some(isHardBlockingRiskFlag)
+  )
+}
+
+function isActionableRecommendation(recommendation) {
   return (
     recommendation.status === 'active' &&
     ['recommended', 'lean'].includes(recommendation.grade) &&
     (recommendation.expected_value ?? Number.NEGATIVE_INFINITY) > 0 &&
-    !recommendation.risk_flags.some((flag) =>
-      [
-        'negative_expected_value',
-        'missing_prediction',
-        'stale_odds',
-        'missing_outcome',
-        'provider_health_warning',
-        'edge_below_threshold',
-        'low_confidence',
-      ].includes(flag),
-    )
+    !recommendation.risk_flags.some(isBlockingRiskFlag)
   )
+}
+
+function isBlockingRiskFlag(flag) {
+  return [
+    'negative_expected_value',
+    'missing_prediction',
+    'stale_odds',
+    'missing_outcome',
+    'provider_health_warning',
+    'edge_below_threshold',
+    'low_confidence',
+  ].includes(flag)
+}
+
+function isHardBlockingRiskFlag(flag) {
+  return [
+    'negative_expected_value',
+    'missing_prediction',
+    'stale_odds',
+    'missing_outcome',
+    'provider_health_warning',
+    'edge_below_threshold',
+  ].includes(flag)
 }
 
 function statusLabel(status) {
