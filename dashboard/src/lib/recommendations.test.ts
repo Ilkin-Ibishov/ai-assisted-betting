@@ -72,15 +72,28 @@ describe('recommendation dashboard helpers', () => {
   it('defaults actionable rows to active positive-EV candidates only', () => {
     const summary = buildRecommendationDashboardSummary({
       recommendations: [
-        recommendation({ id: 1, expected_value: 0.12, grade: 'lean', status: 'active' }),
+        recommendation({
+          id: 1,
+          expected_value: 0.12,
+          grade: 'lean',
+          source_match_id: 'match-1',
+          status: 'active',
+        }),
         recommendation({
           id: 2,
           expected_value: -0.04,
           grade: 'watch',
           status: 'active',
           risk_flags: ['negative_expected_value'],
+          source_match_id: 'match-2',
         }),
-        recommendation({ id: 3, expected_value: 0.18, grade: 'reject', status: 'rejected' }),
+        recommendation({
+          id: 3,
+          expected_value: 0.18,
+          grade: 'reject',
+          source_match_id: 'match-3',
+          status: 'rejected',
+        }),
       ],
       combinations: [
         combination({ id: 1, leg_recommendation_ids: [1], rank: 2 }),
@@ -148,6 +161,7 @@ describe('recommendation dashboard helpers', () => {
           expected_value: -0.04,
           grade: 'reject',
           risk_flags: ['negative_expected_value', 'low_confidence'],
+          source_match_id: 'match-2',
           status: 'rejected',
         }),
       ],
@@ -167,6 +181,44 @@ describe('recommendation dashboard helpers', () => {
     expect(summary.watchlistCount).toBe(1)
     expect(summary.blockedCount).toBe(2)
     expect(summary.decisionState).toBe('blocked_by_risk')
+  })
+
+  it('uses only the latest recommendation snapshot for each market leg', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          current_odds: 2.2,
+          expected_value: 0.02,
+          grade: 'watch',
+          latest_snapshot_time: '2026-06-02T16:00:00+00:00',
+          risk_flags: ['low_confidence'],
+          status: 'active',
+        }),
+        recommendation({
+          id: 2,
+          current_odds: 2.4,
+          expected_value: 0.04,
+          grade: 'watch',
+          latest_snapshot_time: '2026-06-02T17:00:00+00:00',
+          risk_flags: ['low_confidence'],
+          status: 'active',
+        }),
+      ],
+      combinations: [],
+      movements: [],
+      review: review({ approval_state: 'reject' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'watchlist',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows.map((row) => row.id)).toEqual([2])
+    expect(summary.watchlistCount).toBe(1)
+    expect(summary.blockedCount).toBe(1)
   })
 
   it('does not mark candidates ready when the AI review rejects them', () => {

@@ -48,11 +48,12 @@ export function buildRecommendationDashboardSummary({
 }): RecommendationDashboardSummary {
   const approvalState = review?.output.approval_state ?? 'missing'
   const movementByKey = new Map(movements.map((movement) => [movementKey(movement), movement]))
-  const gradeOptions = uniqueSorted(recommendations.map((item) => item.grade))
-  const marketOptions = uniqueSorted(recommendations.map((item) => item.market))
+  const currentRecommendations = latestRecommendationsByMarketLeg(recommendations)
+  const gradeOptions = uniqueSorted(currentRecommendations.map((item) => item.grade))
+  const marketOptions = uniqueSorted(currentRecommendations.map((item) => item.market))
   const approvalMatches =
     filters.approvalState === 'all' || filters.approvalState === approvalState
-  const enrichedRows = recommendations.map((recommendation) => {
+  const enrichedRows = currentRecommendations.map((recommendation) => {
     const movement = movementByKey.get(recommendationKey(recommendation))
     return {
       ...recommendation,
@@ -67,7 +68,7 @@ export function buildRecommendationDashboardSummary({
   const watchlistRows = enrichedRows.filter(isWatchlistRecommendation)
   const actionableIds = new Set(actionableRows.map((row) => row.id))
   const approvalAllowsCandidate = approvalState === 'approve' || approvalState === 'caution'
-  const latestRecommendationAt = recommendations
+  const latestRecommendationAt = currentRecommendations
     .map((recommendation) => recommendation.created_at)
     .toSorted((a, b) => b.localeCompare(a))[0]
 
@@ -95,10 +96,10 @@ export function buildRecommendationDashboardSummary({
     topRiskFlags: review?.output.risk_flags ?? ['recommendation_review_missing'],
     actionableCount: actionableRows.length,
     watchlistCount: watchlistRows.length,
-    blockedCount: recommendations.length - actionableRows.length,
+    blockedCount: currentRecommendations.length - actionableRows.length,
     decisionState: approvalAllowsCandidate && actionableRows.length
       ? 'candidate_ready'
-      : recommendations.length
+      : currentRecommendations.length
         ? 'blocked_by_risk'
         : 'empty',
     latestRecommendationAt,
@@ -158,6 +159,29 @@ function rowMatchesFilters(row: RecommendationRow, filters: RecommendationFilter
     return false
   }
   return confidenceMatches(row.confidence_score, filters.confidence)
+}
+
+function latestRecommendationsByMarketLeg(recommendations: PaperRecommendation[]) {
+  const latestByKey = new Map<string, PaperRecommendation>()
+  for (const recommendation of recommendations) {
+    const key = recommendationKey(recommendation)
+    const current = latestByKey.get(key)
+    if (!current || compareRecommendationFreshness(recommendation, current) > 0) {
+      latestByKey.set(key, recommendation)
+    }
+  }
+  return Array.from(latestByKey.values())
+}
+
+function compareRecommendationFreshness(
+  left: PaperRecommendation,
+  right: PaperRecommendation,
+) {
+  const snapshotComparison = left.latest_snapshot_time.localeCompare(right.latest_snapshot_time)
+  if (snapshotComparison !== 0) {
+    return snapshotComparison
+  }
+  return left.created_at.localeCompare(right.created_at)
 }
 
 function isActionableRecommendation(row: RecommendationRow) {
