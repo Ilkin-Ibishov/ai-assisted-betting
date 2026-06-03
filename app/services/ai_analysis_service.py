@@ -675,6 +675,7 @@ def _evaluation_review_record(evaluation: EvaluationRun | None) -> dict[str, Any
 def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, Any]:
     recommendations = input_payload["paper_recommendations"]
     combinations = input_payload["paper_combinations"]
+    model_quality = _recommendation_model_quality(recommendations)
     risk_flags: list[str] = []
     concerns: list[str] = []
     next_checks = [
@@ -713,6 +714,17 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
     if low_confidence:
         risk_flags.append("low_confidence_recommendations")
         concerns.append("Some recommendation legs have confidence below the preferred review band.")
+    if model_quality["cold_start_confidence_ceiling"]:
+        risk_flags.append("cold_start_confidence_ceiling")
+        concerns.append(
+            "Positive-EV rows are watchlist-only because the baseline heuristic confidence "
+            "is capped by small probability adjustments."
+        )
+        next_checks.insert(
+            0,
+            "Calibrate baseline confidence or add richer team-strength inputs before "
+            "promoting watchlist rows.",
+        )
     if risky_combinations:
         risk_flags.append("combination_correlation_heuristic")
         concerns.append(
@@ -741,6 +753,7 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
         "risk_flags": risk_flags or ["no_current_risk_flags"],
         "recommended_next_actions": next_checks,
         "confidence": "medium" if risk_flags else "high",
+        "model_quality": model_quality,
         "source_record_ids": source_ids,
         "approval_state": approval_state,
         "concerns": concerns,
@@ -768,6 +781,61 @@ def _recommendation_confidence_explanation(
         f"Confidence is based on {len(recommendations)} deterministic recommendation "
         f"records and {len(combinations)} combination records with no current risk flags."
     )
+
+
+def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict[str, Any]:
+    hard_blocking_flags = {
+        "negative_expected_value",
+        "missing_prediction",
+        "stale_odds",
+        "missing_outcome",
+        "provider_health_warning",
+        "edge_below_threshold",
+    }
+    blocking_flags = hard_blocking_flags | {"low_confidence"}
+    confidence_values = [
+        float(item["confidence_score"])
+        for item in recommendations
+        if item["confidence_score"] is not None
+    ]
+    watchlist = [
+        item
+        for item in recommendations
+        if item["status"] == "active"
+        and float(item["expected_value"] or 0) > 0
+        and not set(item["risk_flags"]).intersection(hard_blocking_flags)
+    ]
+    actionable = [
+        item
+        for item in recommendations
+        if item["status"] == "active"
+        and item["grade"] in {"recommended", "lean"}
+        and float(item["expected_value"] or 0) > 0
+        and not set(item["risk_flags"]).intersection(blocking_flags)
+    ]
+    max_confidence = max(confidence_values) if confidence_values else None
+    return {
+        "recommendation_count": len(recommendations),
+        "watchlist_count": len(watchlist),
+        "actionable_count": len(actionable),
+        "low_confidence_count": len(
+            [
+                item
+                for item in recommendations
+                if item["confidence_score"] is not None
+                and float(item["confidence_score"]) < 0.65
+            ]
+        ),
+        "max_confidence_score": round(max_confidence, 6)
+        if max_confidence is not None
+        else None,
+        "cold_start_confidence_ceiling": (
+            bool(watchlist)
+            and not actionable
+            and max_confidence is not None
+            and max_confidence < 0.5
+        ),
+    }
 
 
 def _metric_value(value: Any) -> float | None:

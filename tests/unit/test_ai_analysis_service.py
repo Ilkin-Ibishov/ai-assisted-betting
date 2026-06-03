@@ -214,6 +214,26 @@ def test_ai_analysis_service_records_recommendation_review_advisory(tmp_path) ->
     engine.dispose()
 
 
+def test_ai_analysis_service_explains_cold_start_watchlist_without_actionable_rows(
+    tmp_path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'cold-start-review.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+    _seed_low_confidence_watchlist_review_inputs(engine)
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_review()
+
+    output = json.loads(analysis.output_json)
+    assert output["approval_state"] == "reject"
+    assert "cold_start_confidence_ceiling" in output["risk_flags"]
+    assert output["model_quality"]["watchlist_count"] == 2
+    assert output["model_quality"]["actionable_count"] == 0
+    assert output["model_quality"]["max_confidence_score"] == 0.133333
+    assert "Calibrate baseline confidence" in output["recommended_next_actions"][0]
+    engine.dispose()
+
+
 def test_ai_analysis_service_reviews_fresh_recommendations_before_refreshed_stale_rows(
     tmp_path,
 ) -> None:
@@ -537,6 +557,79 @@ def _seed_mixed_freshness_recommendation_review_inputs(engine) -> None:
                     risk_flags_json='["stale_odds"]',
                     rationale="Rejected because live odds/provider state is not healthy enough.",
                     created_at="2026-06-02T17:05:00+00:00",
+                ),
+            ]
+        )
+
+
+def _seed_low_confidence_watchlist_review_inputs(engine) -> None:
+    with session_scope(engine) as session:
+        first_match = _seed_match(session, source_match_id="watch-match-1")
+        second_match = _seed_match(session, source_match_id="watch-match-2")
+        rejected_match = _seed_match(session, source_match_id="reject-match")
+        session.add_all(
+            [
+                PaperRecommendation(
+                    match_id=first_match.id,
+                    source_match_id=first_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="HOME",
+                    latest_snapshot_time="2026-06-03T05:30:50+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="watch",
+                    status="active",
+                    model_probability=0.45507,
+                    implied_probability=0.438596,
+                    edge=0.02,
+                    confidence_score=0.133333,
+                    current_odds=2.28,
+                    expected_value=0.03756,
+                    risk_flags_json='["low_confidence"]',
+                    rationale="Positive edge exists, but confidence is low.",
+                ),
+                PaperRecommendation(
+                    match_id=second_match.id,
+                    source_match_id=second_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="HOME",
+                    latest_snapshot_time="2026-06-03T05:30:50+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="watch",
+                    status="active",
+                    model_probability=0.294899,
+                    implied_probability=0.215517,
+                    edge=0.02,
+                    confidence_score=0.133333,
+                    current_odds=4.64,
+                    expected_value=0.276334,
+                    risk_flags_json='["low_confidence"]',
+                    rationale="Positive edge exists, but confidence is low.",
+                ),
+                PaperRecommendation(
+                    match_id=rejected_match.id,
+                    source_match_id=rejected_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="AWAY",
+                    latest_snapshot_time="2026-06-03T05:30:50+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="reject",
+                    status="rejected",
+                    model_probability=0.3,
+                    implied_probability=0.35,
+                    edge=-0.02,
+                    confidence_score=0.133333,
+                    current_odds=2.8,
+                    expected_value=-0.16,
+                    risk_flags_json=(
+                        '["edge_below_threshold", "negative_expected_value", "low_confidence"]'
+                    ),
+                    rationale="Rejected because edge is below threshold.",
                 ),
             ]
         )
