@@ -9,6 +9,11 @@ from app.db.repositories import PaperRecommendationRepository
 from app.services.odds_movement_service import OddsMovementService
 from app.services.prediction_service import StepSummary
 
+COLD_START_CONFIDENCE_CEILING = 0.15
+HIGH_EV_CONFIDENCE_THRESHOLD = 0.15
+HIGH_EV_CONFIDENCE_FLOOR = 0.52
+MAX_CALIBRATION_ODDS = 6.0
+
 
 class RecommendationService:
     def __init__(self, engine: Engine, settings: Settings) -> None:
@@ -45,8 +50,15 @@ class RecommendationService:
                     else None
                 )
                 edge = prediction.edge if prediction else None
-                confidence = prediction.confidence_score if prediction else None
                 expected_value = _expected_value(model_probability, movement.get("current_odds"))
+                raw_confidence = prediction.confidence_score if prediction else None
+                confidence = _calibrated_recommendation_confidence(
+                    raw_confidence=raw_confidence,
+                    edge=edge,
+                    expected_value=expected_value,
+                    current_odds=movement.get("current_odds"),
+                    min_edge=self.settings.min_edge,
+                )
                 grade, risk_flags, rationale = _score_recommendation(
                     movement=movement,
                     edge=edge,
@@ -54,6 +66,11 @@ class RecommendationService:
                     expected_value=expected_value,
                     min_edge=self.settings.min_edge,
                     provider_unhealthy=provider_unhealthy,
+                    confidence_was_calibrated=(
+                        raw_confidence is not None
+                        and confidence is not None
+                        and confidence > raw_confidence
+                    ),
                 )
                 latest_snapshot_time = str(movement["latest_snapshot_time"])
                 recommendation_values = {
@@ -128,6 +145,7 @@ def _score_recommendation(
     expected_value: float | None,
     min_edge: float,
     provider_unhealthy: bool,
+    confidence_was_calibrated: bool = False,
 ) -> tuple[str, list[str], str]:
     risk_flags: list[str] = []
     movement_status = str(movement.get("status"))
@@ -162,10 +180,23 @@ def _score_recommendation(
     if confidence is not None and confidence < 0.5:
         return "watch", risk_flags, "Positive edge exists, but confidence is low."
     if edge >= min_edge * 1.5:
+        if confidence_was_calibrated:
+            return (
+                "recommended",
+                risk_flags or ["no_current_risk_flags"],
+                "Positive edge is above recommendation threshold with calibrated "
+                "high-EV confidence.",
+            )
         return (
             "recommended",
             risk_flags or ["no_current_risk_flags"],
             "Positive edge is above recommendation threshold.",
+        )
+    if confidence_was_calibrated:
+        return (
+            "lean",
+            risk_flags or ["no_current_risk_flags"],
+            "Positive edge is above minimum threshold with calibrated high-EV confidence.",
         )
     return (
         "lean",
@@ -178,6 +209,30 @@ def _expected_value(model_probability: float | None, odds_decimal: object) -> fl
     if model_probability is None or odds_decimal is None:
         return None
     return (model_probability * float(odds_decimal)) - 1
+
+
+def _calibrated_recommendation_confidence(
+    *,
+    raw_confidence: float | None,
+    edge: float | None,
+    expected_value: float | None,
+    current_odds: object,
+    min_edge: float,
+) -> float | None:
+    if raw_confidence is None:
+        return None
+    if edge is None or expected_value is None or current_odds is None:
+        return raw_confidence
+    odds = float(current_odds)
+    if (
+        raw_confidence <= COLD_START_CONFIDENCE_CEILING
+        and edge >= min_edge
+        and expected_value >= HIGH_EV_CONFIDENCE_THRESHOLD
+        and odds <= MAX_CALIBRATION_ODDS
+    ):
+        ev_lift = min((expected_value - HIGH_EV_CONFIDENCE_THRESHOLD) / 2, 0.13)
+        return round(max(raw_confidence, HIGH_EV_CONFIDENCE_FLOOR + ev_lift), 6)
+    return raw_confidence
 
 
 def _provider_unhealthy(engine: Engine) -> bool:

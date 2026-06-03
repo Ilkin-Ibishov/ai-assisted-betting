@@ -84,6 +84,32 @@ def test_recommendation_service_marks_low_confidence_candidate_as_watch(tmp_path
     assert "low_confidence" in json.loads(recommendation.risk_flags_json)
 
 
+def test_recommendation_service_calibrates_cold_start_confidence_for_high_ev_candidate(
+    tmp_path,
+) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'recs.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_candidate(
+        engine,
+        edge=0.08,
+        confidence=0.133333,
+        odds_decimal=4.64,
+    )
+
+    RecommendationService(engine, _settings()).generate(stale_after_minutes=100000)
+
+    with session_scope(engine) as session:
+        recommendation = session.scalar(select(PaperRecommendation))
+
+    assert recommendation is not None
+    assert recommendation.grade == "lean"
+    assert recommendation.status == "active"
+    assert recommendation.confidence_score is not None
+    assert recommendation.confidence_score >= 0.5
+    assert "low_confidence" not in json.loads(recommendation.risk_flags_json)
+    assert "calibrated" in recommendation.rationale
+
+
 def test_recommendation_service_rejects_negative_current_odds_ev(tmp_path) -> None:
     engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'recs.sqlite').as_posix()}")
     Base.metadata.create_all(engine)
@@ -172,6 +198,7 @@ def _seed_candidate(
     *,
     edge: float,
     confidence: float,
+    odds_decimal: float = 2.0,
     snapshot_time: str = "2026-05-19T12:00:00+00:00",
     model_probability: float | None = None,
     prediction_bookmaker_probability: float | None = None,
@@ -185,7 +212,6 @@ def _seed_candidate(
             away_team="Eastport Athletic",
             kickoff_time="2026-05-19T20:30:00+04:00",
         )
-        odds_decimal = 2.0
         OddsSnapshotRepository(session).add(
             match_id=match.id,
             source="misli_public",
