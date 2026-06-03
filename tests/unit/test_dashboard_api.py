@@ -456,6 +456,9 @@ def test_live_recommendations_endpoint_lists_persisted_recommendations(tmp_path:
     assert payload[0]["grade"] == "recommended"
     assert payload[0]["risk_flags"] == ["no_current_risk_flags"]
     assert payload[0]["source_match_id"] == "misli:football:2816300"
+    assert payload[0]["model_confidence_score"] == 0.42
+    assert payload[0]["recommendation_confidence_score"] == 0.72
+    assert payload[0]["confidence_adjustment_reason"] == "high_ev_confidence_calibration"
 
 
 def test_live_recommendations_endpoint_prefers_fresh_snapshot_over_refreshed_stale_row(
@@ -938,7 +941,8 @@ def test_ai_recommendation_review_latest_endpoint_returns_latest_review(
     assert response.status_code == 200
     payload = response.json()
     assert payload["analysis_type"] == "recommendation_review"
-    assert payload["output"]["approval_state"] == "approve"
+    assert payload["output"]["approval_state"] == "caution"
+    assert "confidence_calibrated_recommendations" in payload["output"]["risk_flags"]
     assert payload["output"]["source_record_ids"] == ["paper_recommendation:1"]
 
 
@@ -1142,6 +1146,9 @@ def _seed_recommendation_database(database_url: str) -> None:
                 implied_probability=0.5,
                 edge=0.12,
                 confidence_score=0.72,
+                model_confidence_score=0.42,
+                recommendation_confidence_score=0.72,
+                confidence_adjustment_reason="high_ev_confidence_calibration",
                 current_odds=2.0,
                 expected_value=0.24,
                 risk_flags_json='["no_current_risk_flags"]',

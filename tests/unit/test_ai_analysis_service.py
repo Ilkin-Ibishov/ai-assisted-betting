@@ -234,6 +234,26 @@ def test_ai_analysis_service_explains_cold_start_watchlist_without_actionable_ro
     engine.dispose()
 
 
+def test_ai_analysis_service_flags_calibrated_actionable_confidence(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'calibrated-review.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+    _seed_calibrated_recommendation_review_inputs(engine)
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_review()
+
+    input_payload = json.loads(analysis.input_json)
+    output = json.loads(analysis.output_json)
+    reviewed = input_payload["paper_recommendations"][0]
+    assert reviewed["model_confidence_score"] == 0.133333
+    assert reviewed["recommendation_confidence_score"] == 0.52
+    assert reviewed["confidence_adjustment_reason"] == "high_ev_confidence_calibration"
+    assert output["model_quality"]["confidence_adjusted_count"] == 1
+    assert "confidence_calibrated_recommendations" in output["risk_flags"]
+    assert any("calibrated" in concern.lower() for concern in output["concerns"])
+    engine.dispose()
+
+
 def test_ai_analysis_service_reviews_fresh_recommendations_before_refreshed_stale_rows(
     tmp_path,
 ) -> None:
@@ -632,6 +652,36 @@ def _seed_low_confidence_watchlist_review_inputs(engine) -> None:
                     rationale="Rejected because edge is below threshold.",
                 ),
             ]
+        )
+
+
+def _seed_calibrated_recommendation_review_inputs(engine) -> None:
+    with session_scope(engine) as session:
+        match = _seed_match(session, source_match_id="calibrated-match")
+        session.add(
+            PaperRecommendation(
+                match_id=match.id,
+                source_match_id=match.source_match_id,
+                bookmaker="Misli.az",
+                market="1X2",
+                selection="HOME",
+                latest_snapshot_time="2026-06-03T05:30:50+00:00",
+                model_name="baseline_heuristic",
+                model_version="v0",
+                grade="lean",
+                status="active",
+                model_probability=0.294899,
+                implied_probability=0.215517,
+                edge=0.08,
+                confidence_score=0.52,
+                model_confidence_score=0.133333,
+                recommendation_confidence_score=0.52,
+                confidence_adjustment_reason="high_ev_confidence_calibration",
+                current_odds=4.64,
+                expected_value=0.276334,
+                risk_flags_json='["no_current_risk_flags"]',
+                rationale="Positive edge is above minimum threshold with calibrated confidence.",
+            )
         )
 
 

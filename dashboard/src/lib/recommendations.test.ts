@@ -69,6 +69,37 @@ describe('recommendation dashboard helpers', () => {
     expect(summary.marketOptions).toEqual(['1X2', 'TOTALS'])
   })
 
+  it('uses recommendation confidence for dashboard confidence filters', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          confidence_score: 0.72,
+          model_confidence_score: 0.133333,
+          recommendation_confidence_score: 0.72,
+          confidence_adjustment_reason: 'high_ev_confidence_calibration',
+          grade: 'lean',
+        }),
+      ],
+      combinations: [],
+      movements: [],
+      review: review({ approval_state: 'caution' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'high',
+        grade: 'all',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows.map((row) => row.id)).toEqual([1])
+    expect(summary.rows[0].model_confidence_score).toBe(0.133333)
+    expect(summary.rows[0].recommendation_confidence_score).toBe(0.72)
+    expect(summary.rows[0].confidence_adjustment_reason).toBe(
+      'high_ev_confidence_calibration',
+    )
+  })
+
   it('defaults actionable rows to active positive-EV candidates only', () => {
     const summary = buildRecommendationDashboardSummary({
       recommendations: [
@@ -383,6 +414,9 @@ function recommendation(overrides: Partial<PaperRecommendation>): PaperRecommend
     implied_probability: 0.5,
     edge: 0.12,
     confidence_score: 0.7,
+    model_confidence_score: null,
+    recommendation_confidence_score: 0.7,
+    confidence_adjustment_reason: null,
     current_odds: 2,
     expected_value: 0.2,
     risk_flags: ['no_current_risk_flags'],

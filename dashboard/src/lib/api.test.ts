@@ -103,6 +103,9 @@ describe('recommendation API helpers', () => {
             implied_probability: 0.5,
             edge: 0.12,
             confidence_score: 0.72,
+            model_confidence_score: 0.133333,
+            recommendation_confidence_score: 0.72,
+            confidence_adjustment_reason: 'high_ev_confidence_calibration',
             current_odds: 2,
             expected_value: 0.24,
             risk_flags: ['no_current_risk_flags'],
@@ -119,6 +122,11 @@ describe('recommendation API helpers', () => {
 
       expect(recommendations[0].grade).toBe('recommended')
       expect(recommendations[0].risk_flags).toEqual(['no_current_risk_flags'])
+      expect(recommendations[0].model_confidence_score).toBe(0.133333)
+      expect(recommendations[0].recommendation_confidence_score).toBe(0.72)
+      expect(recommendations[0].confidence_adjustment_reason).toBe(
+        'high_ev_confidence_calibration',
+      )
     } finally {
       globalThis.fetch = originalFetch
     }

@@ -59,6 +59,10 @@ class RecommendationService:
                     current_odds=movement.get("current_odds"),
                     min_edge=self.settings.min_edge,
                 )
+                confidence_adjustment_reason = _confidence_adjustment_reason(
+                    raw_confidence=raw_confidence,
+                    recommendation_confidence=confidence,
+                )
                 grade, risk_flags, rationale = _score_recommendation(
                     movement=movement,
                     edge=edge,
@@ -90,6 +94,9 @@ class RecommendationService:
                     "implied_probability": implied_probability,
                     "edge": edge,
                     "confidence_score": confidence,
+                    "model_confidence_score": raw_confidence,
+                    "recommendation_confidence_score": confidence,
+                    "confidence_adjustment_reason": confidence_adjustment_reason,
                     "current_odds": movement.get("current_odds"),
                     "expected_value": expected_value,
                     "risk_flags_json": json.dumps(risk_flags),
@@ -233,6 +240,20 @@ def _calibrated_recommendation_confidence(
         ev_lift = min((expected_value - HIGH_EV_CONFIDENCE_THRESHOLD) / 2, 0.13)
         return round(max(raw_confidence, HIGH_EV_CONFIDENCE_FLOOR + ev_lift), 6)
     return raw_confidence
+
+
+def _confidence_adjustment_reason(
+    *,
+    raw_confidence: float | None,
+    recommendation_confidence: float | None,
+) -> str | None:
+    if (
+        raw_confidence is not None
+        and recommendation_confidence is not None
+        and recommendation_confidence > raw_confidence
+    ):
+        return "high_ev_confidence_calibration"
+    return None
 
 
 def _provider_unhealthy(engine: Engine) -> bool:

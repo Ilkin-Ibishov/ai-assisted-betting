@@ -193,6 +193,9 @@ export type PaperRecommendation = {
   implied_probability: number | null
   edge: number | null
   confidence_score: number | null
+  model_confidence_score: number | null
+  recommendation_confidence_score: number | null
+  confidence_adjustment_reason: string | null
   current_odds: number | null
   expected_value: number | null
   risk_flags: string[]

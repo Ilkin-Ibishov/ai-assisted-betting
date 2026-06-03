@@ -179,6 +179,9 @@ class PaperRecommendation(Base):
     implied_probability: Mapped[float | None]
     edge: Mapped[float | None]
     confidence_score: Mapped[float | None]
+    model_confidence_score: Mapped[float | None]
+    recommendation_confidence_score: Mapped[float | None]
+    confidence_adjustment_reason: Mapped[str | None] = mapped_column(String)
     current_odds: Mapped[float | None]
     expected_value: Mapped[float | None]
     risk_flags_json: Mapped[str] = mapped_column(Text, nullable=False)

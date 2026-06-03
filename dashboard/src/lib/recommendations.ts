@@ -169,7 +169,7 @@ function rowMatchesFilters(row: RecommendationRow, filters: RecommendationFilter
   if (filters.market !== 'all' && row.market !== filters.market) {
     return false
   }
-  return confidenceMatches(row.confidence_score, filters.confidence)
+  return confidenceMatches(recommendationConfidence(row), filters.confidence)
 }
 
 function latestRecommendationsByMarketLeg(recommendations: PaperRecommendation[]) {
@@ -250,6 +250,10 @@ function confidenceMatches(value: number | null, filter: RecommendationFilters['
     return value >= 0.6 && value < 0.7
   }
   return value < 0.6
+}
+
+function recommendationConfidence(row: RecommendationRow) {
+  return row.recommendation_confidence_score ?? row.confidence_score
 }
 
 function recommendationKey(recommendation: PaperRecommendation) {

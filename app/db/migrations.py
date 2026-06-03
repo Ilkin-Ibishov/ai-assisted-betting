@@ -10,6 +10,7 @@ MIGRATION_NAMES = [
     "006_create_paper_combinations",
     "007_create_live_snapshots",
     "008_create_result_fetch_jobs",
+    "009_add_recommendation_confidence_audit_columns",
 ]
 
 
@@ -27,6 +28,11 @@ def run_migrations(engine) -> None:
         _create_schema_migrations(connection)
         if connection.dialect.name != "sqlite":
             _record_noop_migrations_for_model_managed_database(connection)
+            _run_migration(
+                connection,
+                "009_add_recommendation_confidence_audit_columns",
+                _add_recommendation_confidence_audit_columns,
+            )
             return
         _run_migration(
             connection,
@@ -68,9 +74,32 @@ def run_migrations(engine) -> None:
             "008_create_result_fetch_jobs",
             _create_result_fetch_jobs,
         )
+        _run_migration(
+            connection,
+            "009_add_recommendation_confidence_audit_columns",
+            _add_recommendation_confidence_audit_columns,
+        )
 
 
 def _run_migration(connection, migration_name: str, migration) -> None:
+    if connection.dialect.name != "sqlite":
+        already_applied = connection.exec_driver_sql(
+            "SELECT 1 FROM schema_migrations WHERE migration_name = %(migration_name)s",
+            {"migration_name": migration_name},
+        ).fetchone()
+        if already_applied:
+            return
+
+        migration(connection)
+        connection.exec_driver_sql(
+            """
+            INSERT INTO schema_migrations (migration_name, applied_at)
+            VALUES (%(migration_name)s, CURRENT_TIMESTAMP)
+            """,
+            {"migration_name": migration_name},
+        )
+        return
+
     already_applied = connection.exec_driver_sql(
         "SELECT 1 FROM schema_migrations WHERE migration_name = ?",
         (migration_name,),
@@ -114,6 +143,8 @@ def _create_schema_migrations(connection) -> None:
 
 def _record_noop_migrations_for_model_managed_database(connection) -> None:
     for migration_name in MIGRATION_NAMES:
+        if migration_name == "009_add_recommendation_confidence_audit_columns":
+            continue
         connection.exec_driver_sql(
             """
             INSERT INTO schema_migrations (migration_name, applied_at)
@@ -284,6 +315,9 @@ def _create_paper_recommendations(connection) -> None:
             implied_probability REAL,
             edge REAL,
             confidence_score REAL,
+            model_confidence_score REAL,
+            recommendation_confidence_score REAL,
+            confidence_adjustment_reason TEXT,
             current_odds REAL,
             expected_value REAL,
             risk_flags_json TEXT NOT NULL,
@@ -433,3 +467,62 @@ def _create_result_fetch_jobs(connection) -> None:
         ON result_fetch_jobs (source_match_id)
         """
     )
+
+
+def _add_recommendation_confidence_audit_columns(connection) -> None:
+    table_names = _table_names(connection)
+    if "paper_recommendations" not in table_names:
+        return
+
+    column_names = _column_names(connection, "paper_recommendations")
+    if "model_confidence_score" not in column_names:
+        connection.exec_driver_sql(
+            "ALTER TABLE paper_recommendations ADD COLUMN model_confidence_score REAL"
+        )
+    if "recommendation_confidence_score" not in column_names:
+        connection.exec_driver_sql(
+            "ALTER TABLE paper_recommendations ADD COLUMN recommendation_confidence_score REAL"
+        )
+    if "confidence_adjustment_reason" not in column_names:
+        connection.exec_driver_sql(
+            "ALTER TABLE paper_recommendations ADD COLUMN confidence_adjustment_reason TEXT"
+        )
+
+
+def _table_names(connection) -> set[str]:
+    if connection.dialect.name == "sqlite":
+        return {
+            row[0]
+            for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+    return {
+        row[0]
+        for row in connection.exec_driver_sql(
+            """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            """
+        ).fetchall()
+    }
+
+
+def _column_names(connection, table_name: str) -> set[str]:
+    if connection.dialect.name == "sqlite":
+        return {
+            row[1]
+            for row in connection.exec_driver_sql(f"PRAGMA table_info({table_name})").fetchall()
+        }
+    return {
+        row[0]
+        for row in connection.exec_driver_sql(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %(table_name)s
+            """,
+            {"table_name": table_name},
+        ).fetchall()
+    }

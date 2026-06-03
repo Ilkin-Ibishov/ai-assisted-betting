@@ -110,6 +110,31 @@ def test_recommendation_service_calibrates_cold_start_confidence_for_high_ev_can
     assert "calibrated" in recommendation.rationale
 
 
+def test_recommendation_service_preserves_raw_confidence_when_calibrated(
+    tmp_path,
+) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'recs.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_candidate(
+        engine,
+        edge=0.08,
+        confidence=0.133333,
+        odds_decimal=4.64,
+    )
+
+    RecommendationService(engine, _settings()).generate(stale_after_minutes=100000)
+
+    with session_scope(engine) as session:
+        recommendation = session.scalar(select(PaperRecommendation))
+
+    assert recommendation is not None
+    assert recommendation.model_confidence_score == 0.133333
+    assert recommendation.recommendation_confidence_score == recommendation.confidence_score
+    assert recommendation.recommendation_confidence_score is not None
+    assert recommendation.recommendation_confidence_score >= 0.5
+    assert recommendation.confidence_adjustment_reason == "high_ev_confidence_calibration"
+
+
 def test_recommendation_service_rejects_negative_current_odds_ev(tmp_path) -> None:
     engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'recs.sqlite').as_posix()}")
     Base.metadata.create_all(engine)

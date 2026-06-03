@@ -134,6 +134,7 @@ def test_init_db_upgrades_old_database_with_missing_elo_feature_columns(tmp_path
         ("006_create_paper_combinations",),
         ("007_create_live_snapshots",),
         ("008_create_result_fetch_jobs",),
+        ("009_add_recommendation_confidence_audit_columns",),
     ]
 
 
@@ -223,6 +224,7 @@ def test_init_db_upgrades_old_database_with_identity_uniqueness_indexes(tmp_path
         ("006_create_paper_combinations",),
         ("007_create_live_snapshots",),
         ("008_create_result_fetch_jobs",),
+        ("009_add_recommendation_confidence_audit_columns",),
     ]
 
 
@@ -288,6 +290,7 @@ def test_init_db_upgrades_old_database_with_live_run_registry(tmp_path) -> None:
         ("006_create_paper_combinations",),
         ("007_create_live_snapshots",),
         ("008_create_result_fetch_jobs",),
+        ("009_add_recommendation_confidence_audit_columns",),
     ]
 
 
@@ -350,7 +353,62 @@ def test_init_db_upgrades_old_database_with_ai_analysis_runs(tmp_path) -> None:
         ("006_create_paper_combinations",),
         ("007_create_live_snapshots",),
         ("008_create_result_fetch_jobs",),
+        ("009_add_recommendation_confidence_audit_columns",),
     ]
+
+
+def test_init_db_upgrades_old_recommendations_with_confidence_audit_columns(tmp_path) -> None:
+    db_path = tmp_path / "old-recommendations.sqlite"
+    database_url = f"sqlite:///{db_path.as_posix()}"
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE paper_recommendations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                match_id INTEGER NOT NULL,
+                prediction_id INTEGER,
+                source_run_id TEXT,
+                source_match_id TEXT NOT NULL,
+                bookmaker TEXT NOT NULL,
+                market TEXT NOT NULL,
+                selection TEXT NOT NULL,
+                latest_snapshot_time TEXT NOT NULL,
+                model_name TEXT NOT NULL,
+                model_version TEXT NOT NULL,
+                grade TEXT NOT NULL,
+                status TEXT NOT NULL,
+                model_probability REAL,
+                implied_probability REAL,
+                edge REAL,
+                confidence_score REAL,
+                current_odds REAL,
+                expected_value REAL,
+                risk_flags_json TEXT NOT NULL,
+                rationale TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+    init_db(database_url)
+    init_db(database_url)
+
+    with sqlite3.connect(db_path) as connection:
+        column_names = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(paper_recommendations)").fetchall()
+        }
+        migration_rows = connection.execute(
+            "SELECT migration_name FROM schema_migrations ORDER BY migration_name"
+        ).fetchall()
+
+    assert {
+        "model_confidence_score",
+        "recommendation_confidence_score",
+        "confidence_adjustment_reason",
+    }.issubset(column_names)
+    assert ("009_add_recommendation_confidence_audit_columns",) in migration_rows
 
 
 def test_match_repository_inserts_match_and_rejects_duplicate_source_id(tmp_path) -> None:

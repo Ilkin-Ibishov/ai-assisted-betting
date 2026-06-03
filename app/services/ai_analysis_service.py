@@ -634,6 +634,9 @@ def _recommendation_review_record(recommendation: PaperRecommendation) -> dict[s
         "implied_probability": recommendation.implied_probability,
         "edge": recommendation.edge,
         "confidence_score": recommendation.confidence_score,
+        "model_confidence_score": recommendation.model_confidence_score,
+        "recommendation_confidence_score": recommendation.recommendation_confidence_score,
+        "confidence_adjustment_reason": recommendation.confidence_adjustment_reason,
         "current_odds": recommendation.current_odds,
         "expected_value": recommendation.expected_value,
         "risk_flags": json.loads(recommendation.risk_flags_json),
@@ -693,7 +696,11 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
     low_confidence = [
         item
         for item in recommendations
-        if item["confidence_score"] is not None and float(item["confidence_score"]) < 0.65
+        if _recommendation_confidence(item) is not None
+        and float(_recommendation_confidence(item) or 0) < 0.65
+    ]
+    calibrated_recommendations = [
+        item for item in recommendations if item.get("confidence_adjustment_reason")
     ]
     risky_combinations = [
         item
@@ -724,6 +731,15 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
             0,
             "Calibrate baseline confidence or add richer team-strength inputs before "
             "promoting watchlist rows.",
+        )
+    if calibrated_recommendations:
+        risk_flags.append("confidence_calibrated_recommendations")
+        concerns.append(
+            "Some actionable recommendation confidence values were calibrated above raw "
+            "model confidence; keep them paper-only until backtests validate the lift."
+        )
+        next_checks.append(
+            "Compare raw-confidence and calibrated-confidence recommendation outcomes."
         )
     if risky_combinations:
         risk_flags.append("combination_correlation_heuristic")
@@ -794,9 +810,9 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
     }
     blocking_flags = hard_blocking_flags | {"low_confidence"}
     confidence_values = [
-        float(item["confidence_score"])
+        float(confidence)
         for item in recommendations
-        if item["confidence_score"] is not None
+        if (confidence := _recommendation_confidence(item)) is not None
     ]
     watchlist = [
         item
@@ -822,9 +838,12 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
             [
                 item
                 for item in recommendations
-                if item["confidence_score"] is not None
-                and float(item["confidence_score"]) < 0.65
+                if _recommendation_confidence(item) is not None
+                and float(_recommendation_confidence(item) or 0) < 0.65
             ]
+        ),
+        "confidence_adjusted_count": len(
+            [item for item in recommendations if item.get("confidence_adjustment_reason")]
         ),
         "max_confidence_score": round(max_confidence, 6)
         if max_confidence is not None
@@ -836,6 +855,15 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
             and max_confidence < 0.5
         ),
     }
+
+
+def _recommendation_confidence(item: dict[str, Any]) -> float | None:
+    value = item.get("recommendation_confidence_score")
+    if value is None:
+        value = item.get("confidence_score")
+    if value is None:
+        return None
+    return float(value)
 
 
 def _metric_value(value: Any) -> float | None:

@@ -1328,7 +1328,16 @@ function RecommendationTable({ rows }: { rows: ReturnType<typeof buildRecommenda
                 {formatOptionalPercent(row.edge)}
               </td>
               <td className="px-3 py-3 text-slate-900">
-                {formatOptionalPercent(row.confidence_score)}
+                <div>{formatOptionalPercent(recommendationConfidence(row))}</div>
+                {hasConfidenceAudit(row) ? (
+                  <div
+                    className="mt-1 text-xs text-slate-500"
+                    title={row.confidence_adjustment_reason ?? undefined}
+                  >
+                    raw {formatOptionalPercent(row.model_confidence_score)} to rec{' '}
+                    {formatOptionalPercent(row.recommendation_confidence_score)}
+                  </div>
+                ) : null}
               </td>
               <td className="px-3 py-3">
                 <div className="flex flex-wrap gap-1">
@@ -1342,6 +1351,22 @@ function RecommendationTable({ rows }: { rows: ReturnType<typeof buildRecommenda
         </tbody>
       </table>
     </div>
+  )
+}
+
+function recommendationConfidence(
+  row: ReturnType<typeof buildRecommendationDashboardSummary>['rows'][number],
+) {
+  return row.recommendation_confidence_score ?? row.confidence_score
+}
+
+function hasConfidenceAudit(
+  row: ReturnType<typeof buildRecommendationDashboardSummary>['rows'][number],
+) {
+  return (
+    row.model_confidence_score !== null ||
+    row.recommendation_confidence_score !== null ||
+    row.confidence_adjustment_reason !== null
   )
 }
 

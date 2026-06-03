@@ -404,15 +404,16 @@ Task 71 added `RecommendationQualityService`, `GET /api/live/recommendation-qual
 
 ### P1 - Recommendation Confidence Blends Raw Model Signal And Calibration
 
-Status: accepted
+Status: resolved
 Introduced: High-EV confidence calibration on 2026-06-03
+Resolved by: Task 72 - Raw Versus Calibrated Recommendation Confidence
 Owner: Task 72 - Raw Versus Calibrated Recommendation Confidence
 Area: recommendation scoring
 
 The calibrated recommendation score unlocked paper actionable candidates, but the same `confidence_score` field now carries a recommendation-level score rather than the untouched raw model confidence.
 
-Resolution target:
-Expose raw model confidence, recommendation confidence, and confidence adjustment reason separately so calibration stays auditable.
+Resolution:
+Task 72 added nullable confidence-audit columns, preserved raw prediction confidence in `model_confidence_score`, kept `confidence_score` as the compatibility recommendation confidence, exposed `recommendation_confidence_score` and `confidence_adjustment_reason` through API/dashboard surfaces, and made AI recommendation review flag calibrated rows explicitly.
 
 ### P1 - High-EV Confidence Calibration Needs Backtest Proof
 

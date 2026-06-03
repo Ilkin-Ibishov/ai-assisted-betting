@@ -223,7 +223,7 @@ Build live recommendation work in this order:
 8. Task 66 - Daily Decision Dashboard Simplification, completed
 9. Task 67 - Fresh Snapshot Worker Input, completed
 10. Task 71 - Recommendation Quality Cycle Report, completed
-11. Task 72 - Raw Versus Calibrated Recommendation Confidence
+11. Task 72 - Raw Versus Calibrated Recommendation Confidence, completed
 12. Task 73 - Confidence Calibration Backtest Scenarios
 13. Task 74 - Richer Team Strength Feature Inputs
 14. Task 75 - Daily Paper Trading Journal
@@ -235,7 +235,7 @@ Build live recommendation work in this order:
 The live paper loop is operationally healthy, but the model and review layer are still early. Build maturity in this order:
 
 1. Implemented: Task 71 makes every worker cycle auditable through one quality report.
-2. Task 72 - separate raw model confidence from calibrated recommendation confidence.
+2. Implemented: Task 72 separates raw model confidence from calibrated recommendation confidence.
 3. Task 73 - prove whether high-EV confidence calibration improves historical paper results.
 4. Task 74 - add richer team-strength and match-context features.
 5. Task 75 - create a daily paper trading journal so decisions become a learning record.
