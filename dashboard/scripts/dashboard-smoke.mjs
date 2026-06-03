@@ -71,7 +71,7 @@ try {
   await expectMetric(desktop, 'ai-analyst-panel', 'AI-assisted advisory analysis')
   await expectMetric(desktop, 'recommendation-dashboard', expectedRecommendations.approvalLabel)
   await expectMetric(desktop, 'recommendation-ai-review', expectedRecommendations.reviewLabel)
-  const visibleRecommendation = recommendations.find(isDefaultVisibleRecommendation)
+  const visibleRecommendation = defaultVisibleRecommendation(recommendations)
   if (visibleRecommendation) {
     await expectMetric(desktop, 'recommendation-table', visibleRecommendation.selection)
   } else {
@@ -334,8 +334,11 @@ function buildExpectedRecommendationValues(recommendations, review) {
   }
 }
 
-function isDefaultVisibleRecommendation(recommendation) {
-  return isWatchlistRecommendation(recommendation)
+function defaultVisibleRecommendation(recommendations) {
+  return (
+    recommendations.find(isActionableRecommendation) ??
+    recommendations.find(isWatchlistRecommendation)
+  )
 }
 
 function isWatchlistRecommendation(recommendation) {

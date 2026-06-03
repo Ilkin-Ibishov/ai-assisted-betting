@@ -67,6 +67,15 @@ export function buildRecommendationDashboardSummary({
   const actionableRows = enrichedRows.filter(isActionableRecommendation)
   const watchlistRows = enrichedRows.filter(isWatchlistRecommendation)
   const actionableIds = new Set(actionableRows.map((row) => row.id))
+  const effectiveFilters = {
+    ...filters,
+    grade:
+      filters.grade === 'auto'
+        ? actionableRows.length
+          ? 'actionable'
+          : 'watchlist'
+        : filters.grade,
+  }
   const approvalAllowsCandidate = approvalState === 'approve' || approvalState === 'caution'
   const latestRecommendationAt = currentRecommendations
     .map((recommendation) => recommendation.created_at)
@@ -74,7 +83,7 @@ export function buildRecommendationDashboardSummary({
 
   const rows = approvalMatches
     ? enrichedRows
-        .filter((row) => rowMatchesFilters(row, filters))
+        .filter((row) => rowMatchesFilters(row, effectiveFilters))
         .toSorted((a, b) => {
           const bValue = b.expected_value ?? Number.NEGATIVE_INFINITY
           const aValue = a.expected_value ?? Number.NEGATIVE_INFINITY
@@ -86,7 +95,9 @@ export function buildRecommendationDashboardSummary({
     rows,
     combinations: approvalMatches
       ? combinations
-          .filter((combination) => combinationMatchesFilters(combination, filters, actionableIds))
+          .filter((combination) =>
+            combinationMatchesFilters(combination, effectiveFilters, actionableIds),
+          )
           .toSorted((a, b) => a.rank - b.rank)
       : [],
     gradeOptions,

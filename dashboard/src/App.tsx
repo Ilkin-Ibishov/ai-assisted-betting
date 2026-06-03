@@ -1020,7 +1020,7 @@ function RecommendationDashboardPanel({
   const [filters, setFilters] = useState<RecommendationFilters>({
     approvalState: 'all',
     confidence: 'all',
-    grade: 'watchlist',
+    grade: 'auto',
     market: 'all',
   })
   const summary = useMemo(
@@ -1191,7 +1191,7 @@ function RecommendationFiltersBar({
       <FilterSelect
         label="Grade"
         value={filters.grade}
-        options={['watchlist', 'actionable', 'all', ...gradeOptions]}
+        options={['auto', 'actionable', 'watchlist', 'all', ...gradeOptions]}
         onChange={(grade) => onChange({ ...filters, grade })}
       />
       <FilterSelect

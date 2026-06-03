@@ -116,6 +116,67 @@ describe('recommendation dashboard helpers', () => {
     expect(summary.decisionState).toBe('candidate_ready')
   })
 
+  it('auto grade mode shows actionable rows before watchlist rows', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          expected_value: 0.12,
+          grade: 'recommended',
+          source_match_id: 'match-1',
+          status: 'active',
+        }),
+        recommendation({
+          id: 2,
+          confidence_score: 0.13,
+          expected_value: 0.08,
+          grade: 'watch',
+          risk_flags: ['low_confidence'],
+          source_match_id: 'match-2',
+          status: 'active',
+        }),
+      ],
+      combinations: [],
+      movements: [],
+      review: review({ approval_state: 'caution' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'auto',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows.map((row) => row.id)).toEqual([1])
+  })
+
+  it('auto grade mode falls back to watchlist when no actionable rows exist', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          confidence_score: 0.13,
+          expected_value: 0.08,
+          grade: 'watch',
+          risk_flags: ['low_confidence'],
+          source_match_id: 'match-1',
+          status: 'active',
+        }),
+      ],
+      combinations: [],
+      movements: [],
+      review: review({ approval_state: 'reject' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'auto',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows.map((row) => row.id)).toEqual([1])
+  })
+
   it('does not mark watch or low-confidence rows as actionable candidates', () => {
     const summary = buildRecommendationDashboardSummary({
       recommendations: [
