@@ -130,6 +130,29 @@ export type OperationalGuardrailStatus = {
   }
 }
 
+export type RecommendationQuality = {
+  overall_state: string
+  summary: {
+    total_recommendations: number
+    actionable_count: number
+    watchlist_count: number
+    rejected_count: number
+    created_since_latest_worker: number
+    fresh_snapshot_count: number
+    latest_snapshot_time?: string | null
+  }
+  ai_review: {
+    id?: number | null
+    approval_state: string
+    risk_flags?: string[]
+    created_at?: string | null
+    short_summary?: string
+    model_quality?: unknown
+  }
+  risk_flags?: Record<string, number>
+  distributions?: Record<string, Record<string, number>>
+}
+
 export type OddsMovementSummary = {
   match_id: number
   source: string
@@ -351,6 +374,10 @@ export async function fetchResultJobs(): Promise<ResultFetchJobsResponse> {
 
 export async function fetchOperationalGuardrails(): Promise<OperationalGuardrailStatus> {
   return getJson('/api/operations/guardrails')
+}
+
+export async function fetchRecommendationQuality(): Promise<RecommendationQuality> {
+  return getJson('/api/live/recommendation-quality')
 }
 
 export async function fetchOddsMovement(): Promise<OddsMovementSummary[]> {

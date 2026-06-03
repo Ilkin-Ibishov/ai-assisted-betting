@@ -30,6 +30,7 @@ from app.services.recommendation_backtest_service import (
     RecommendationBacktestRequest,
     RecommendationBacktestService,
 )
+from app.services.recommendation_quality_service import RecommendationQualityService
 from app.services.recommendation_service import RecommendationService
 from app.services.replay_service import ReplayService
 from app.services.scheduled_worker_service import (
@@ -399,6 +400,29 @@ def operational_status(
     for guardrail in report["guardrails"]:
         typer.echo(f"{guardrail['name']}={guardrail['severity']}:{guardrail['state']}")
     typer.echo("operational-status: finished")
+
+
+@app.command("recommendation-quality")
+def recommendation_quality(
+    fresh_after_minutes: int = typer.Option(
+        90,
+        help="Minutes before recommendation snapshots are treated as stale.",
+    ),
+    limit: int = typer.Option(500, help="Maximum recommendations and combinations to inspect."),
+) -> None:
+    settings = load_settings()
+    report = RecommendationQualityService(settings.database_url).report(
+        fresh_after_minutes=fresh_after_minutes,
+        limit=limit,
+    )
+    typer.echo("recommendation-quality: started")
+    typer.echo(f"overall_state={report['overall_state']}")
+    typer.echo(f"actionable_count={report['summary']['actionable_count']}")
+    typer.echo(f"watchlist_count={report['summary']['watchlist_count']}")
+    typer.echo(f"rejected_count={report['summary']['rejected_count']}")
+    typer.echo(f"fresh_snapshot_count={report['summary']['fresh_snapshot_count']}")
+    typer.echo(f"ai_approval_state={report['ai_review']['approval_state']}")
+    typer.echo("recommendation-quality: finished")
 
 
 def _split_csv_option(value: str) -> list[str]:

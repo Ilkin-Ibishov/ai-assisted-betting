@@ -47,6 +47,7 @@ import {
   fetchPaperBets,
   fetchPaperCombinations,
   fetchPaperRecommendations,
+  fetchRecommendationQuality,
 } from '@/lib/api'
 import type {
   AIAnalysisRun,
@@ -62,6 +63,7 @@ import type {
   PaperBet,
   PaperCombination,
   PaperRecommendation,
+  RecommendationQuality,
   ResultFetchJobsResponse,
 } from '@/lib/api'
 import { buildAIAdvisorySummary } from '@/lib/ai'
@@ -141,6 +143,11 @@ function App() {
   const guardrails = useQuery({
     queryKey: ['operational-guardrails'],
     queryFn: fetchOperationalGuardrails,
+  })
+
+  const recommendationQuality = useQuery({
+    queryKey: ['recommendation-quality'],
+    queryFn: fetchRecommendationQuality,
   })
 
   const aiAnalysis = useQuery({
@@ -300,15 +307,18 @@ function App() {
                 paperBets.isError ||
                 combinations.isError ||
                 oddsMovement.isError ||
-                recommendationReview.isError
+                recommendationReview.isError ||
+                recommendationQuality.isError
               }
               recommendationLoading={
                 recommendations.isLoading ||
                 paperBets.isLoading ||
                 combinations.isLoading ||
                 oddsMovement.isLoading ||
-                recommendationReview.isLoading
+                recommendationReview.isLoading ||
+                recommendationQuality.isLoading
               }
+              recommendationQuality={recommendationQuality.data}
               recommendationReview={recommendationReview.data}
               recommendations={recommendations.data ?? []}
               runs={rankedRuns}
@@ -370,6 +380,7 @@ type DashboardContentProps = {
   paperBets: PaperBet[]
   recommendationError: boolean
   recommendationLoading: boolean
+  recommendationQuality?: RecommendationQuality
   recommendationReview?: AIAnalysisRun | null
   recommendations: PaperRecommendation[]
   runs: RankedComparisonRun[]
@@ -414,6 +425,7 @@ function DashboardContent({
   paperBets,
   recommendationError,
   recommendationLoading,
+  recommendationQuality,
   recommendationReview,
   recommendations,
   runs,
@@ -463,6 +475,7 @@ function DashboardContent({
         loading={recommendationLoading}
         movements={oddsMovement}
         paperBets={paperBets}
+        quality={recommendationQuality}
         recommendations={recommendations}
         review={recommendationReview}
       />
@@ -1006,6 +1019,7 @@ function RecommendationDashboardPanel({
   loading,
   movements,
   paperBets,
+  quality,
   recommendations,
   review,
 }: {
@@ -1014,6 +1028,7 @@ function RecommendationDashboardPanel({
   loading: boolean
   movements: OddsMovementSummary[]
   paperBets: PaperBet[]
+  quality?: RecommendationQuality
   recommendations: PaperRecommendation[]
   review?: AIAnalysisRun | null
 }) {
@@ -1078,6 +1093,7 @@ function RecommendationDashboardPanel({
               openBetCount={paperBetGroups.validOpenBets.length}
               unsafeOpenBetCount={paperBetGroups.unsafeOpenBets.length}
               recommendations={summary.rows}
+              quality={quality}
               review={review}
               watchlistCount={summary.watchlistCount}
             />
@@ -1100,6 +1116,14 @@ function RecommendationDashboardPanel({
                 label="Next check"
                 value={review?.output.next_checks?.[0] ?? 'Run analyze-recommendations.'}
               />
+              <InfoBlock
+                label="Cycle quality"
+                value={
+                  quality
+                    ? `${quality.overall_state} / ${quality.summary.actionable_count} actionable / ${quality.summary.fresh_snapshot_count} fresh`
+                    : 'No quality cycle report yet'
+                }
+              />
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">
@@ -1120,6 +1144,7 @@ function DailyDecisionSummary({
   latestRecommendationAt,
   openBetCount,
   recommendations,
+  quality,
   review,
   unsafeOpenBetCount,
   watchlistCount,
@@ -1130,6 +1155,7 @@ function DailyDecisionSummary({
   latestRecommendationAt?: string
   openBetCount: number
   recommendations: ReturnType<typeof buildRecommendationDashboardSummary>['rows']
+  quality?: RecommendationQuality
   review?: AIAnalysisRun | null
   unsafeOpenBetCount: number
   watchlistCount: number
@@ -1168,8 +1194,12 @@ function DailyDecisionSummary({
         }
       />
       <InfoBlock
-        label="AI position"
-        value={`${review?.output.approval_state ?? 'missing'} / ${openBetCount} valid open / ${unsafeOpenBetCount} hidden / ${combinationCount} combinations`}
+        label="Cycle report"
+        value={
+          quality
+            ? `${quality.summary.actionable_count} actionable / ${quality.summary.watchlist_count} watch / ${quality.summary.rejected_count} reject / ${combinationCount} combinations`
+            : `${review?.output.approval_state ?? 'missing'} / ${openBetCount} valid open / ${unsafeOpenBetCount} hidden / ${combinationCount} combinations`
+        }
       />
     </div>
   )

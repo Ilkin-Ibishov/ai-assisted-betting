@@ -960,6 +960,76 @@ def test_operational_status_command_reports_guardrails(tmp_path) -> None:
     assert "operational-status: finished" in result.output
 
 
+def test_recommendation_quality_command_reports_cycle_counts(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "recommendation-quality.sqlite"
+    env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}
+    runner.invoke(app, ["init-db"], env=env)
+    engine = create_engine(f"sqlite:///{db_path.as_posix()}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO live_runs (
+                    run_id, run_type, provider, status, started_at, finished_at,
+                    items_read, items_created, items_updated, items_skipped,
+                    errors_count, model_name, created_at
+                ) VALUES (
+                    'worker-quality', 'scheduled_paper_worker', 'misli_public', 'completed',
+                    '2026-06-03T13:00:00+00:00', '2026-06-03T13:01:00+00:00',
+                    1, 1, 0, 0, 0, 'baseline_heuristic',
+                    '2026-06-03T13:00:00+00:00'
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO matches (
+                    source, source_match_id, league, home_team, away_team, kickoff_time,
+                    status, created_at, updated_at
+                ) VALUES (
+                    'misli_public', 'match-quality', 'Sample Premier', 'Home', 'Away',
+                    '2026-06-03T20:00:00+04:00', 'scheduled',
+                    '2026-06-03T13:00:00+00:00', '2026-06-03T13:00:00+00:00'
+                )
+                """
+            )
+        )
+        match_id = connection.execute(
+            text("SELECT id FROM matches WHERE source_match_id = 'match-quality'")
+        ).scalar_one()
+        connection.execute(
+            text(
+                """
+                INSERT INTO paper_recommendations (
+                    match_id, source_match_id, bookmaker, market, selection,
+                    latest_snapshot_time, model_name, model_version, grade, status,
+                    model_probability, implied_probability, edge, confidence_score,
+                    current_odds, expected_value, risk_flags_json, rationale, created_at
+                ) VALUES (
+                    :match_id, 'match-quality', 'Misli.az', '1X2', 'HOME',
+                    '2026-06-03T13:00:00+00:00', 'baseline_heuristic', 'v0',
+                    'recommended', 'active', 0.6, 0.5, 0.1, 0.7,
+                    2.0, 0.2, '["no_current_risk_flags"]', 'Seed recommendation',
+                    '2026-06-03T13:00:10+00:00'
+                )
+                """
+            ),
+            {"match_id": match_id},
+        )
+
+    result = runner.invoke(app, ["recommendation-quality"], env=env)
+
+    assert result.exit_code == 0
+    assert "recommendation-quality: started" in result.output
+    assert "overall_state=actionable_present" in result.output
+    assert "actionable_count=1" in result.output
+    assert "fresh_snapshot_count=1" in result.output
+    assert "recommendation-quality: finished" in result.output
+
+
 def test_analyze_recommendation_backtest_command_persists_ai_summary(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "backtest-ai-cli.sqlite"

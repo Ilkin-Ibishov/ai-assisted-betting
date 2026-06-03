@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   buildApiUrl,
   fetchBetLedger,
+  fetchRecommendationQuality,
   fetchOperationalGuardrails,
   fetchLatestRecommendationReview,
   fetchOddsMovement,
@@ -224,6 +225,41 @@ describe('fetchOperationalGuardrails', () => {
 
       expect(status.overall_status).toBe('warning')
       expect(status.guardrails[0].name).toBe('worker_freshness')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+})
+
+describe('fetchRecommendationQuality', () => {
+  it('reads recommendation quality status from the API', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string) => {
+      expect(url).toBe('/api/live/recommendation-quality')
+      return new Response(
+        JSON.stringify({
+          overall_state: 'actionable_present',
+          summary: {
+            total_recommendations: 3,
+            actionable_count: 1,
+            watchlist_count: 1,
+            rejected_count: 1,
+            created_since_latest_worker: 1,
+            fresh_snapshot_count: 3,
+            latest_snapshot_time: '2026-06-03T13:00:00Z',
+          },
+          ai_review: { approval_state: 'caution' },
+        }),
+        { status: 200 },
+      )
+    }) as typeof fetch
+
+    try {
+      const quality = await fetchRecommendationQuality()
+
+      expect(quality.overall_state).toBe('actionable_present')
+      expect(quality.summary.actionable_count).toBe(1)
+      expect(quality.ai_review.approval_state).toBe('caution')
     } finally {
       globalThis.fetch = originalFetch
     }

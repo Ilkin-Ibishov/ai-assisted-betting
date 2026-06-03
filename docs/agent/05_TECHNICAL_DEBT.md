@@ -391,15 +391,16 @@ The producer now writes JSON to stdout only when it is not posting to the API an
 
 ### P1 - Recommendation Cycles Need One Auditable Quality Report
 
-Status: accepted
+Status: resolved
 Introduced: Post-deployment audit on 2026-06-03
+Resolved by: Task 71 - Recommendation Quality Cycle Report
 Owner: Task 71 - Recommendation Quality Cycle Report
 Area: recommendation quality and observability
 
 Production audits currently require joining worker status, recommendations, combinations, guardrails, AI review, and logs by hand. This makes the system harder to reason about after several cron cycles.
 
-Resolution target:
-Create a deterministic per-cycle recommendation quality report that explains actionable, watchlist, rejected, blocked, deduped, and AI-reviewed states from one API/CLI/dashboard surface.
+Resolution:
+Task 71 added `RecommendationQualityService`, `GET /api/live/recommendation-quality`, a `recommendation-quality` CLI command, and dashboard daily-card cycle quality counts. The report explains actionable, watchlist, rejected, blocked, deduped-fresh, and AI-reviewed states from one surface.
 
 ### P1 - Recommendation Confidence Blends Raw Model Signal And Calibration
 

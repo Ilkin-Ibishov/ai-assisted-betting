@@ -25,6 +25,7 @@ from app.services.misli_result_service import result_jobs_payload
 from app.services.odds_movement_service import OddsMovementService
 from app.services.operational_guardrail_service import OperationalGuardrailService
 from app.services.paper_bet_maintenance_service import PaperBetMaintenanceService
+from app.services.recommendation_quality_service import RecommendationQualityService
 from app.services.worker_monitoring_service import WorkerMonitoringService
 
 SNAPSHOT_BODY = Body(...)
@@ -156,6 +157,19 @@ def create_api(
     @api.get("/api/live/recommendations")
     def list_live_recommendations(limit: int = 100) -> list[dict[str, Any]]:
         return _paper_recommendation_payloads(live_database_url, limit=limit)
+
+    @api.get("/api/live/recommendation-quality")
+    def get_live_recommendation_quality(
+        limit: int = 500,
+        fresh_after_minutes: int = 90,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        _parse_optional_query_datetime(now, parameter="now")
+        return RecommendationQualityService(live_database_url).report(
+            now_iso=now,
+            fresh_after_minutes=fresh_after_minutes,
+            limit=limit,
+        )
 
     @api.get("/api/live/paper-bets")
     def list_live_paper_bets(limit: int = 100) -> list[dict[str, Any]]:

@@ -1,6 +1,6 @@
 # Task 71 - Recommendation Quality Cycle Report
 
-Status: planned
+Status: completed
 
 ## Goal
 
@@ -24,22 +24,29 @@ Add an auditable per-cycle quality report for the live recommendation loop so ev
 
 ## Implementation Notes
 
-- Prefer a deterministic service that consumes persisted recommendations, combinations, latest worker status, and latest AI review.
-- Keep the report paper-only and advisory.
-- Avoid adding real-money readiness language.
-- Treat the report as a diagnostic product surface, not as a betting command.
+Implemented in Task 71:
+
+- Added `RecommendationQualityService` to build a deterministic cycle report from persisted recommendations, combinations, latest worker status, and latest AI recommendation review.
+- Added `GET /api/live/recommendation-quality`.
+- Added `recommendation-quality` CLI command for local or production database audits.
+- Added dashboard data fetching and daily card display for cycle quality counts.
+- Covered actionable, watchlist-only, all-blocked, and deduped-fresh snapshot cases.
+- Kept the report paper-only and advisory.
 
 ## Verification
 
+Completed:
+
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/unit
-.\.venv\Scripts\python.exe -m ruff check app tests
+python -m pytest tests/unit/test_recommendation_quality_service.py tests/unit/test_dashboard_api.py::test_live_recommendation_quality_endpoint_reports_cycle_summary tests/integration/test_cli.py::test_recommendation_quality_command_reports_cycle_counts -q
+python -m ruff check app tests
 cd dashboard
-npm run test
+npm run test -- api.test.ts --run
 npm run lint
 npm run build
-npm run smoke
 ```
+
+Full production verification is completed after Railway API/dashboard deployment and dashboard smoke.
 
 ## Next
 
@@ -47,8 +54,8 @@ Task 72 - Raw Versus Calibrated Recommendation Confidence.
 
 ## Blockers
 
-No implementation blocker is known. The report should be designed before additional model changes so later calibration work has a stable measurement surface.
+No implementation blocker remains.
 
 ## Technical Debt
 
-Current production audits require reading worker status, recommendations, guardrails, AI review, and logs separately. This task consolidates those views but does not improve model quality by itself.
+This report consolidates production audit facts but does not improve model quality by itself. Task 72 should make confidence sources more explicit inside the report.

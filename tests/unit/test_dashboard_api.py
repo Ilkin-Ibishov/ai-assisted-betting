@@ -477,6 +477,25 @@ def test_live_recommendations_endpoint_prefers_fresh_snapshot_over_refreshed_sta
     assert "stale_odds" not in payload[0]["risk_flags"]
 
 
+def test_live_recommendation_quality_endpoint_reports_cycle_summary(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    _seed_recommendation_database(database_url)
+    _seed_live_status_database(database_url)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get(
+        "/api/live/recommendation-quality",
+        params={"now": "2026-05-18T08:05:00+00:00"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["total_recommendations"] >= 1
+    assert payload["summary"]["actionable_count"] >= 1
+    assert payload["top_actionable"][0]["grade"] == "recommended"
+    assert "expected_value" in payload["distributions"]
+
+
 def test_live_bet_ledger_endpoint_returns_default_fresh_rows(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_recommendation_database(database_url)
