@@ -388,3 +388,87 @@ The first successful scheduled producer run emitted the full snapshot JSON to Ra
 
 Resolution:
 The producer now writes JSON to stdout only when it is not posting to the API and no `--out` path is provided. Cron producer runs still emit the concise `snapshot_posted=<url>` stderr line.
+
+### P1 - Recommendation Cycles Need One Auditable Quality Report
+
+Status: accepted
+Introduced: Post-deployment audit on 2026-06-03
+Owner: Task 71 - Recommendation Quality Cycle Report
+Area: recommendation quality and observability
+
+Production audits currently require joining worker status, recommendations, combinations, guardrails, AI review, and logs by hand. This makes the system harder to reason about after several cron cycles.
+
+Resolution target:
+Create a deterministic per-cycle recommendation quality report that explains actionable, watchlist, rejected, blocked, deduped, and AI-reviewed states from one API/CLI/dashboard surface.
+
+### P1 - Recommendation Confidence Blends Raw Model Signal And Calibration
+
+Status: accepted
+Introduced: High-EV confidence calibration on 2026-06-03
+Owner: Task 72 - Raw Versus Calibrated Recommendation Confidence
+Area: recommendation scoring
+
+The calibrated recommendation score unlocked paper actionable candidates, but the same `confidence_score` field now carries a recommendation-level score rather than the untouched raw model confidence.
+
+Resolution target:
+Expose raw model confidence, recommendation confidence, and confidence adjustment reason separately so calibration stays auditable.
+
+### P1 - High-EV Confidence Calibration Needs Backtest Proof
+
+Status: accepted
+Introduced: High-EV confidence calibration on 2026-06-03
+Owner: Task 73 - Confidence Calibration Backtest Scenarios
+Area: model evaluation
+
+The calibration change improved live paper candidate visibility, but it could still be confidence theater unless settled outcomes and historical backtests show better behavior.
+
+Resolution target:
+Compare raw-confidence and calibrated-confidence recommendation scenarios with ROI, calibration, drawdown, edge buckets, odds buckets, confidence buckets, and sample-size warnings.
+
+### P2 - Team Strength Inputs Are Still Thin
+
+Status: accepted
+Introduced: Post-deployment audit on 2026-06-03
+Owner: Task 74 - Richer Team Strength Feature Inputs
+Area: prediction quality
+
+The system is operationally stable, but the baseline model still relies heavily on bookmaker probabilities, shallow form, neutral cold-start features, and small heuristic adjustments.
+
+Resolution target:
+Add richer team and match context such as home/away split, opponent-adjusted form, league strength, rest days, goal-difference trend, odds movement velocity, overround normalization, and closing-line movement tracking.
+
+### P2 - Daily Learning Narrative Is Missing
+
+Status: accepted
+Introduced: Post-deployment audit on 2026-06-03
+Owner: Task 75 - Daily Paper Trading Journal
+Area: product learning loop
+
+The dashboard shows live facts, but there is not yet a durable daily journal explaining what the system would have picked, what AI rejected, what settled, and what should be learned.
+
+Resolution target:
+Create deterministic daily paper-only journal entries that connect recommendations, AI review, paper bets, settled outcomes, and threshold observations.
+
+### P2 - Combinations Are Premature For Primary Decisions
+
+Status: accepted
+Introduced: Post-deployment audit on 2026-06-03
+Owner: Task 76 - Combination Risk Quarantine
+Area: recommendation risk
+
+Combinations are generated and reviewed, but deeper dependency, exposure, and correlation modeling is still not strong enough for primary decision support.
+
+Resolution target:
+Keep combinations experimental, quarantine them from primary candidate readiness unless explicitly enabled, and add stronger exposure/correlation risk flags.
+
+### P2 - Settled Outcomes Do Not Yet Drive Threshold Review
+
+Status: accepted
+Introduced: Post-deployment audit on 2026-06-03
+Owner: Task 77 - Outcome Learning And Threshold Review Loop
+Area: learning loop
+
+The system records settled paper outcomes and can backtest, but it does not yet turn those results into recurring advice about whether thresholds should be kept, tightened, loosened, or disabled.
+
+Resolution target:
+Add a conservative threshold review loop driven by settled recommendation outcomes, calibration drift, and sample-size-aware metrics. Keep all changes advisory until a human applies them.
