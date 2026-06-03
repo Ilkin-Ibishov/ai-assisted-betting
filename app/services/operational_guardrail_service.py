@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
@@ -25,7 +26,10 @@ class OperationalGuardrailService:
         )
         with _guardrail_session(self.database_url) as session:
             latest_ai_failure = _latest_ai_failure(session)
-            recommendation_count = _recommendation_count_since_latest_worker(session)
+            recommendation_count = _fresh_recommendation_count(
+                session,
+                fresh_after_minutes=worker_fresh_after_minutes,
+            )
             consecutive_failures = _consecutive_worker_failures(session)
             latest_provider_failure = _latest_provider_failure(session)
 
@@ -208,7 +212,7 @@ def _analysis_risk_flags(analysis: AIAnalysisRun) -> list[str]:
     return [str(flag) for flag in risk_flags]
 
 
-def _recommendation_count_since_latest_worker(session) -> int:
+def _fresh_recommendation_count(session, *, fresh_after_minutes: int) -> int:
     latest_worker = session.scalar(
         select(LiveRun)
         .where(LiveRun.run_type == "scheduled_paper_worker")
@@ -217,9 +221,20 @@ def _recommendation_count_since_latest_worker(session) -> int:
     )
     query = select(func.count()).select_from(PaperRecommendation)
     if latest_worker is not None:
-        query = query.where(PaperRecommendation.created_at >= latest_worker.started_at)
+        cutoff = _iso_minus_minutes(latest_worker.started_at, fresh_after_minutes)
+        query = query.where(
+            (PaperRecommendation.created_at >= latest_worker.started_at)
+            | (PaperRecommendation.latest_snapshot_time >= cutoff)
+        )
     count = session.scalar(query)
     return int(count or 0)
+
+
+def _iso_minus_minutes(value: str, minutes: int) -> str:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return (parsed.astimezone(UTC) - timedelta(minutes=minutes)).isoformat()
 
 
 def _consecutive_worker_failures(session) -> int:

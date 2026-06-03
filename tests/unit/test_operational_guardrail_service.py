@@ -155,6 +155,36 @@ def test_guardrails_count_recommendations_created_during_latest_worker_run(tmp_p
     assert _guardrail(status, "recommendation_output")["observed_value"] == 1
 
 
+def test_guardrails_count_recent_snapshot_recommendations_when_worker_dedupes(
+    tmp_path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'guardrails-deduped-recs.sqlite').as_posix()}"
+    engine = create_engine_from_url(database_url)
+    Base.metadata.create_all(engine)
+    _seed_worker_run(
+        engine,
+        run_id="worker-fresh-deduped-recs",
+        status="completed",
+        started_at="2026-06-03T06:00:00+00:00",
+        finished_at="2026-06-03T06:01:00+00:00",
+    )
+    _seed_recommendation(
+        engine,
+        created_at="2026-06-03T05:31:14+00:00",
+        latest_snapshot_time="2026-06-03T05:30:50Z",
+    )
+
+    status = OperationalGuardrailService(database_url).status(
+        now_iso="2026-06-03T06:05:00+00:00",
+        worker_fresh_after_minutes=90,
+    )
+
+    assert status["overall_status"] == "ok"
+    guardrail = _guardrail(status, "recommendation_output")
+    assert guardrail["severity"] == "ok"
+    assert guardrail["observed_value"] == 1
+
+
 def _guardrail(status: dict, name: str) -> dict:
     return next(item for item in status["guardrails"] if item["name"] == name)
 
@@ -190,7 +220,12 @@ def _seed_worker_run(
         live_run.finished_at = finished_at
 
 
-def _seed_recommendation(engine, *, created_at: str) -> None:
+def _seed_recommendation(
+    engine,
+    *,
+    created_at: str,
+    latest_snapshot_time: str | None = None,
+) -> None:
     with session_scope(engine) as session:
         match = MatchRepository(session).add(
             source="misli_public",
@@ -206,7 +241,7 @@ def _seed_recommendation(engine, *, created_at: str) -> None:
             bookmaker="Misli.az",
             market="1X2",
             selection="HOME",
-            latest_snapshot_time=created_at,
+            latest_snapshot_time=latest_snapshot_time or created_at,
             model_name="baseline_heuristic",
             model_version="v0",
             grade="recommended",
