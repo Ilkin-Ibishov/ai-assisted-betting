@@ -35,6 +35,14 @@ class RecommendationBacktestService:
         combinations_metrics = _metrics(combination_bets)
         calibration_scenarios = _calibration_scenarios(eligible_singles)
         combination_quarantine = _combination_quarantine_report(combinations)
+        threshold_sensitivity = _threshold_sensitivity(eligible_singles)
+        calibration_comparison = _calibration_comparison(calibration_scenarios)
+        threshold_advice = _threshold_advice(
+            singles_metrics=singles_metrics,
+            combinations_metrics=combinations_metrics,
+            threshold_sensitivity=threshold_sensitivity,
+            calibration_comparison=calibration_comparison,
+        )
         return {
             "metadata": {
                 "report_type": "recommendation_backtest",
@@ -63,9 +71,10 @@ class RecommendationBacktestService:
             ),
             "odds_buckets": _bucket_metrics(single_bets, _odds_bucket),
             "confidence_buckets": _bucket_metrics(single_bets, _confidence_bucket),
-            "threshold_sensitivity": _threshold_sensitivity(eligible_singles),
+            "threshold_sensitivity": threshold_sensitivity,
             "calibration_scenarios": calibration_scenarios,
-            "calibration_comparison": _calibration_comparison(calibration_scenarios),
+            "calibration_comparison": calibration_comparison,
+            "threshold_advice": threshold_advice,
         }
 
     def export(
@@ -363,6 +372,190 @@ def _calibration_comparison(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _threshold_advice(
+    *,
+    singles_metrics: dict[str, Any],
+    combinations_metrics: dict[str, Any],
+    threshold_sensitivity: list[dict[str, Any]],
+    calibration_comparison: dict[str, Any],
+) -> dict[str, Any]:
+    settled = int(singles_metrics.get("settled_bets") or 0)
+    risk_flags: list[str] = []
+    if settled < 300:
+        risk_flags.append("small_threshold_review_sample")
+    if _metric_value(singles_metrics.get("roi")) is not None and float(singles_metrics["roi"]) < 0:
+        risk_flags.append("negative_singles_roi")
+    if _threshold_metrics_conflict(singles_metrics, calibration_comparison):
+        risk_flags.append("conflicting_threshold_metrics")
+
+    confidence_decision = _confidence_floor_decision(
+        settled=settled,
+        singles_metrics=singles_metrics,
+        calibration_comparison=calibration_comparison,
+    )
+    edge_decision = _edge_threshold_decision(
+        settled=settled,
+        singles_metrics=singles_metrics,
+        threshold_sensitivity=threshold_sensitivity,
+        conflicting="conflicting_threshold_metrics" in risk_flags,
+    )
+    combination_decision = _combination_enablement_decision(
+        combinations_metrics=combinations_metrics
+    )
+    decisions = {
+        "minimum_edge": edge_decision,
+        "minimum_expected_value": edge_decision,
+        "confidence_floor": confidence_decision,
+        "odds_cap": _odds_cap_decision(
+            settled=settled,
+            singles_metrics=singles_metrics,
+            conflicting="conflicting_threshold_metrics" in risk_flags,
+        ),
+        "combination_enablement": combination_decision,
+    }
+    return {
+        "sample_size": settled,
+        "minimum_sample_size": 300,
+        "overall_decision": _overall_threshold_decision(decisions, risk_flags),
+        "risk_flags": risk_flags or ["no_current_risk_flags"],
+        "decisions": decisions,
+    }
+
+
+def _edge_threshold_decision(
+    *,
+    settled: int,
+    singles_metrics: dict[str, Any],
+    threshold_sensitivity: list[dict[str, Any]],
+    conflicting: bool,
+) -> dict[str, Any]:
+    if settled < 300:
+        return _threshold_decision("keep", "Sample is too small for threshold changes.")
+    if conflicting:
+        return _threshold_decision("keep", "ROI and calibration metrics conflict.")
+    roi = _metric_value(singles_metrics.get("roi"))
+    stricter = [
+        scenario
+        for scenario in threshold_sensitivity
+        if float(scenario.get("min_edge") or 0) > 0
+        and int(scenario.get("settled_bets") or 0) >= 30
+    ]
+    stricter_roi_values = [
+        value
+        for scenario in stricter
+        if (value := _metric_value(scenario.get("roi"))) is not None
+    ]
+    best_stricter_roi = max(stricter_roi_values, default=None)
+    if roi is not None and roi < 0 and best_stricter_roi is not None:
+        if best_stricter_roi > roi:
+            return _threshold_decision(
+                "tighten",
+                "Negative ROI improves under stricter edge/confidence scenarios.",
+            )
+    if roi is not None and roi > 0.08:
+        return _threshold_decision("keep", "Current edge threshold has positive ROI.")
+    return _threshold_decision("keep", "No threshold scenario justifies a change.")
+
+
+def _confidence_floor_decision(
+    *,
+    settled: int,
+    singles_metrics: dict[str, Any],
+    calibration_comparison: dict[str, Any],
+) -> dict[str, Any]:
+    if settled < 300:
+        return _threshold_decision("keep", "Sample is too small for confidence changes.")
+    if _calibration_improved(calibration_comparison):
+        return _threshold_decision(
+            "loosen",
+            "Calibrated confidence improves ROI and probability quality metrics.",
+        )
+    if _metric_value(singles_metrics.get("roi")) is not None and float(singles_metrics["roi"]) < 0:
+        return _threshold_decision("tighten", "Negative ROI argues for a higher confidence floor.")
+    return _threshold_decision("keep", "Confidence evidence is not strong enough to change.")
+
+
+def _odds_cap_decision(
+    *,
+    settled: int,
+    singles_metrics: dict[str, Any],
+    conflicting: bool,
+) -> dict[str, Any]:
+    if settled < 300:
+        return _threshold_decision("keep", "Sample is too small for odds-cap changes.")
+    if conflicting:
+        return _threshold_decision("keep", "Do not change odds cap while metrics conflict.")
+    average_odds = _metric_value(singles_metrics.get("average_odds"))
+    roi = _metric_value(singles_metrics.get("roi"))
+    if roi is not None and roi < 0 and average_odds is not None and average_odds > 3.5:
+        return _threshold_decision("tighten", "Negative ROI is paired with high average odds.")
+    return _threshold_decision("keep", "Odds-cap evidence is not strong enough to change.")
+
+
+def _combination_enablement_decision(*, combinations_metrics: dict[str, Any]) -> dict[str, Any]:
+    settled = int(combinations_metrics.get("settled_bets") or 0)
+    roi = _metric_value(combinations_metrics.get("roi"))
+    if settled < 100:
+        return _threshold_decision(
+            "disable",
+            "Combination sample is too small; keep combinations research-only.",
+        )
+    if roi is not None and roi < 0:
+        return _threshold_decision("disable", "Combination ROI is negative.")
+    return _threshold_decision("keep", "Combination sample is adequate but still paper-only.")
+
+
+def _threshold_decision(decision: str, rationale: str) -> dict[str, str]:
+    return {"decision": decision, "rationale": rationale}
+
+
+def _overall_threshold_decision(
+    decisions: dict[str, dict[str, str]],
+    risk_flags: list[str],
+) -> str:
+    if "small_threshold_review_sample" in risk_flags:
+        return "fail_closed"
+    decision_values = {item["decision"] for item in decisions.values()}
+    if "disable" in decision_values:
+        return "disable"
+    if "tighten" in decision_values:
+        return "tighten"
+    if "loosen" in decision_values:
+        return "loosen"
+    return "keep"
+
+
+def _calibration_improved(calibration_comparison: dict[str, Any]) -> bool:
+    roi_delta = _metric_value(calibration_comparison.get("roi_delta"))
+    brier_delta = _metric_value(calibration_comparison.get("brier_score_delta"))
+    log_loss_delta = _metric_value(calibration_comparison.get("log_loss_delta"))
+    hit_rate_delta = _metric_value(calibration_comparison.get("hit_rate_delta"))
+    improved = [
+        roi_delta is not None and roi_delta > 0,
+        brier_delta is not None and brier_delta < 0,
+        log_loss_delta is not None and log_loss_delta < 0,
+        hit_rate_delta is not None and hit_rate_delta >= 0,
+    ]
+    return sum(improved) >= 3
+
+
+def _threshold_metrics_conflict(
+    singles_metrics: dict[str, Any],
+    calibration_comparison: dict[str, Any],
+) -> bool:
+    roi = _metric_value(singles_metrics.get("roi"))
+    brier_delta = _metric_value(calibration_comparison.get("brier_score_delta"))
+    log_loss_delta = _metric_value(calibration_comparison.get("log_loss_delta"))
+    return bool(
+        roi is not None
+        and roi > 0
+        and (
+            (brier_delta is not None and brier_delta > 0)
+            or (log_loss_delta is not None and log_loss_delta > 0)
+        )
+    )
+
+
 def _metric_delta(
     calibrated: dict[str, Any],
     raw: dict[str, Any],
@@ -376,6 +569,15 @@ def _metric_delta(
     if metric == "settled_bets":
         return int(delta)
     return round(delta, 6)
+
+
+def _metric_value(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _scenario_name(

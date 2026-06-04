@@ -1234,7 +1234,7 @@ function DailyJournalSummary({ journal }: { journal?: DailyPaperJournal }) {
 
   return (
     <div
-      className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm md:grid-cols-4"
+      className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm md:grid-cols-5"
       data-testid="daily-journal-summary"
     >
       <InfoBlock
@@ -1248,6 +1248,12 @@ function DailyJournalSummary({ journal }: { journal?: DailyPaperJournal }) {
       <InfoBlock
         label="Learning"
         value={`${journal.summary.settled_count} settled / ${journal.summary.open_paper_bet_count} open`}
+      />
+      <InfoBlock
+        label="Thresholds"
+        value={`${journal.threshold_review?.overall_decision ?? 'missing'} / ${
+          journal.threshold_review?.risk_flags?.length ?? 0
+        } flags`}
       />
       <InfoBlock
         label="Traceability"

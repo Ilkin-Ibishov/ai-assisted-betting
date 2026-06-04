@@ -340,6 +340,33 @@ def test_ai_analysis_service_records_recommendation_backtest_advisory(tmp_path) 
                     {"min_edge": 0.0, "min_confidence": 0.0, "settled_bets": 20, "roi": -0.1},
                     {"min_edge": 0.1, "min_confidence": 0.7, "settled_bets": 8, "roi": 0.05},
                 ],
+                "threshold_advice": {
+                    "sample_size": 20,
+                    "overall_decision": "fail_closed",
+                    "risk_flags": ["small_threshold_review_sample"],
+                    "decisions": {
+                        "minimum_edge": {
+                            "decision": "keep",
+                            "rationale": "Sample is too small.",
+                        },
+                        "minimum_expected_value": {
+                            "decision": "keep",
+                            "rationale": "Sample is too small.",
+                        },
+                        "confidence_floor": {
+                            "decision": "keep",
+                            "rationale": "Sample is too small.",
+                        },
+                        "odds_cap": {
+                            "decision": "keep",
+                            "rationale": "Sample is too small.",
+                        },
+                        "combination_enablement": {
+                            "decision": "disable",
+                            "rationale": "Combination sample is too small.",
+                        },
+                    },
+                },
             }
         ),
         encoding="utf-8",
@@ -354,6 +381,9 @@ def test_ai_analysis_service_records_recommendation_backtest_advisory(tmp_path) 
     output = json.loads(analysis.output_json)
     assert "negative_singles_roi" in output["risk_flags"]
     assert "combination_underperformance" in output["risk_flags"]
+    assert "small_threshold_review_sample" in output["risk_flags"]
+    assert output["threshold_advice"]["overall_decision"] == "fail_closed"
+    assert any("unchanged" in action for action in output["recommended_next_actions"])
     assert output["source_record_ids"] == ["pytest_rec"]
     assert "real-money" not in " ".join(output["recommended_next_actions"]).lower()
     engine.dispose()

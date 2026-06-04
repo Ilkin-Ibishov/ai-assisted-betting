@@ -446,6 +446,7 @@ def _recommendation_backtest_input(report_path: Path) -> dict[str, Any]:
         "threshold_sensitivity": report.get("threshold_sensitivity", []),
         "calibration_scenarios": report.get("calibration_scenarios", []),
         "calibration_comparison": report.get("calibration_comparison", {}),
+        "threshold_advice": report.get("threshold_advice", {}),
     }
 
 
@@ -454,6 +455,7 @@ def _recommendation_backtest_output(input_payload: dict[str, Any]) -> dict[str, 
     combinations = input_payload["combinations"]
     threshold_sensitivity = input_payload["threshold_sensitivity"]
     calibration_comparison = input_payload.get("calibration_comparison", {})
+    threshold_advice = input_payload.get("threshold_advice", {})
     singles_roi = _metric_value(singles.get("roi"))
     combinations_roi = _metric_value(combinations.get("roi"))
     calibration_decision, calibration_flags, calibration_action = _calibration_decision(
@@ -487,6 +489,18 @@ def _recommendation_backtest_output(input_payload: dict[str, Any]) -> dict[str, 
         recommended_actions.append(
             "Compare stricter edge and confidence thresholds in the next replay batch."
         )
+    if threshold_advice:
+        risk_flags.extend(
+            [
+                flag
+                for flag in threshold_advice.get("risk_flags", [])
+                if flag != "no_current_risk_flags"
+            ]
+        )
+        recommended_actions.insert(
+            0,
+            _threshold_advice_action(threshold_advice),
+        )
     risk_flags.extend(calibration_flags)
     if calibration_action is not None:
         recommended_actions.insert(0, calibration_action)
@@ -507,7 +521,21 @@ def _recommendation_backtest_output(input_payload: dict[str, Any]) -> dict[str, 
         "confidence": "medium" if risk_flags else "high",
         "source_record_ids": [input_payload["report_name"]],
         "calibration_decision": calibration_decision,
+        "threshold_advice": threshold_advice,
     }
+
+
+def _threshold_advice_action(threshold_advice: dict[str, Any]) -> str:
+    decision = threshold_advice.get("overall_decision", "keep")
+    if decision == "fail_closed":
+        return "Keep current thresholds unchanged until the settled sample is large enough."
+    if decision == "tighten":
+        return "Design a paper-only threshold-tightening experiment before applying changes."
+    if decision == "loosen":
+        return "Review a paper-only confidence-loosening experiment before applying changes."
+    if decision == "disable":
+        return "Keep disabled or research-only areas out of primary decisions."
+    return "Keep current thresholds and continue collecting settled outcomes."
 
 
 def _calibration_decision(

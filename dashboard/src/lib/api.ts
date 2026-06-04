@@ -181,6 +181,12 @@ export type DailyPaperJournal = {
     risk_flags?: string[]
     short_summary?: string
   }
+  threshold_review?: {
+    overall_decision: string
+    risk_flags?: string[]
+    decisions?: Record<string, { decision: string; rationale?: string }>
+    short_summary?: string
+  }
   settled_since_previous_journal: Array<Record<string, unknown>>
   open_paper_bets: Array<Record<string, unknown>>
   source_ids: string[]

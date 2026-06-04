@@ -228,7 +228,7 @@ Build live recommendation work in this order:
 13. Task 74 - Richer Team Strength Feature Inputs, completed
 14. Task 75 - Daily Paper Trading Journal, completed
 15. Task 76 - Combination Risk Quarantine, completed
-16. Task 77 - Outcome Learning And Threshold Review Loop
+16. Task 77 - Outcome Learning And Threshold Review Loop, completed
 
 ## Recommendation Maturity Phase Order
 
@@ -240,7 +240,7 @@ The live paper loop is operationally healthy, but the model and review layer are
 4. Implemented: Task 74 adds deterministic local feature enrichment tiers, provenance, rest days, goal-difference trend, odds velocity, enriched-only prediction adjustments, and AI odds-only/actionable flags.
 5. Implemented: Task 75 creates deterministic daily paper journal entries with source ids, AI slate state, recommendation quality counts, settled outcomes, CLI/API access, and dashboard visibility.
 6. Implemented: Task 76 keeps combinations experimental, flags exposure/correlation risk, labels API/AI/dashboard rows, and excludes experimental combinations from primary daily decisions.
-7. Task 77 - turn settled outcomes into conservative threshold review advice.
+7. Implemented: Task 77 turns settled recommendation backtests into conservative threshold advice and surfaces the latest review in the daily journal/dashboard.
 
 ## Do Not Jump Ahead
 

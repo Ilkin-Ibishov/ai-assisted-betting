@@ -294,6 +294,10 @@ describe('fetchLatestDailyJournal', () => {
           },
           quality_snapshot: { overall_state: 'actionable_present' },
           ai_review: { approval_state: 'approve' },
+          threshold_review: {
+            overall_decision: 'fail_closed',
+            risk_flags: ['small_threshold_review_sample'],
+          },
           settled_since_previous_journal: [],
           open_paper_bets: [],
           source_ids: ['paper_recommendation:1'],
@@ -308,6 +312,7 @@ describe('fetchLatestDailyJournal', () => {
       expect(journal.journal_date).toBe('2026-06-04')
       expect(journal.decision_state).toBe('candidate_ready')
       expect(journal.summary.candidate_count).toBe(1)
+      expect(journal.threshold_review?.overall_decision).toBe('fail_closed')
       expect(journal.source_ids).toEqual(['paper_recommendation:1'])
     } finally {
       globalThis.fetch = originalFetch

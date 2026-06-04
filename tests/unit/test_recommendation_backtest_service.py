@@ -6,6 +6,7 @@ from app.db.models import Base, Match, PaperCombination, PaperRecommendation
 from app.services.recommendation_backtest_service import (
     RecommendationBacktestRequest,
     RecommendationBacktestService,
+    _threshold_advice,
 )
 
 
@@ -32,8 +33,70 @@ def test_recommendation_backtest_reports_singles_and_combinations(tmp_path: Path
     assert report["combination_quarantine"]["risk_flag_counts"] == {
         "experimental_combination": 1
     }
+    assert report["threshold_advice"]["overall_decision"] == "fail_closed"
+    assert report["threshold_advice"]["decisions"]["combination_enablement"]["decision"] == (
+        "disable"
+    )
     assert report["market_buckets"]["1X2"]["settled_bets"] == 3
     assert report["model_provider_splits"]["baseline_heuristic/Misli.az"]["settled_bets"] == 3
+
+
+def test_threshold_advice_tightens_after_supported_negative_roi() -> None:
+    advice = _threshold_advice(
+        singles_metrics={
+            "settled_bets": 320,
+            "roi": -0.12,
+            "average_odds": 4.2,
+        },
+        combinations_metrics={"settled_bets": 120, "roi": -0.04},
+        threshold_sensitivity=[
+            {"min_edge": 0.05, "settled_bets": 160, "roi": -0.02},
+            {"min_edge": 0.1, "settled_bets": 80, "roi": 0.03},
+        ],
+        calibration_comparison={},
+    )
+
+    assert advice["overall_decision"] == "disable"
+    assert advice["decisions"]["minimum_edge"]["decision"] == "tighten"
+    assert advice["decisions"]["minimum_expected_value"]["decision"] == "tighten"
+    assert advice["decisions"]["confidence_floor"]["decision"] == "tighten"
+    assert advice["decisions"]["odds_cap"]["decision"] == "tighten"
+    assert advice["decisions"]["combination_enablement"]["decision"] == "disable"
+
+
+def test_threshold_advice_can_loosen_confidence_after_improved_calibration() -> None:
+    advice = _threshold_advice(
+        singles_metrics={"settled_bets": 320, "roi": 0.04, "average_odds": 2.1},
+        combinations_metrics={"settled_bets": 120, "roi": 0.03},
+        threshold_sensitivity=[],
+        calibration_comparison={
+            "roi_delta": 0.05,
+            "hit_rate_delta": 0.01,
+            "brier_score_delta": -0.02,
+            "log_loss_delta": -0.03,
+        },
+    )
+
+    assert advice["overall_decision"] == "loosen"
+    assert advice["decisions"]["confidence_floor"]["decision"] == "loosen"
+    assert advice["risk_flags"] == ["no_current_risk_flags"]
+
+
+def test_threshold_advice_keeps_thresholds_when_metrics_conflict() -> None:
+    advice = _threshold_advice(
+        singles_metrics={"settled_bets": 320, "roi": 0.08, "average_odds": 2.4},
+        combinations_metrics={"settled_bets": 120, "roi": 0.02},
+        threshold_sensitivity=[{"min_edge": 0.1, "settled_bets": 120, "roi": 0.1}],
+        calibration_comparison={
+            "roi_delta": 0.04,
+            "brier_score_delta": 0.03,
+            "log_loss_delta": 0.02,
+        },
+    )
+
+    assert advice["overall_decision"] == "keep"
+    assert "conflicting_threshold_metrics" in advice["risk_flags"]
+    assert advice["decisions"]["minimum_edge"]["decision"] == "keep"
 
 
 def test_recommendation_backtest_thresholds_change_selected_candidates(

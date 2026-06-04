@@ -25,6 +25,7 @@ class DailyPaperJournalService:
             previous = _previous_journal(session, date_value)
             recommendations = _recommendations(session)
             ai_review = _latest_ai_review(session)
+            threshold_review = _latest_threshold_review(session)
             settled = _settled_since_previous_journal(
                 session,
                 previous.created_at if previous is not None else None,
@@ -37,6 +38,7 @@ class DailyPaperJournalService:
                 open_bets=open_bets,
             )
             source_ids = _source_ids(recommendations, ai_review, settled)
+            source_ids = _journal_source_ids(source_ids, threshold_review)
             decision_state = _decision_state(summary)
             payload = {
                 "journal_date": date_value,
@@ -44,6 +46,7 @@ class DailyPaperJournalService:
                 "summary": summary,
                 "quality_snapshot": _quality_snapshot(summary),
                 "ai_review": _ai_review_payload(ai_review),
+                "threshold_review": _threshold_review_payload(threshold_review),
                 "settled_since_previous_journal": settled,
                 "open_paper_bets": [_paper_bet_row(item) for item in open_bets],
                 "source_ids": source_ids,
@@ -87,6 +90,7 @@ class DailyPaperJournalService:
 
 def _entry_payload(entry: PaperJournalEntry) -> dict[str, Any]:
     payload = json.loads(entry.summary_json)
+    payload.setdefault("threshold_review", _threshold_review_payload(None))
     payload["id"] = entry.id
     payload["created_at"] = entry.created_at
     payload["updated_at"] = entry.updated_at
@@ -120,6 +124,15 @@ def _latest_ai_review(session) -> AIAnalysisRun | None:
     return session.scalar(
         select(AIAnalysisRun)
         .where(AIAnalysisRun.analysis_type == "recommendation_review")
+        .order_by(AIAnalysisRun.created_at.desc(), AIAnalysisRun.id.desc())
+        .limit(1)
+    )
+
+
+def _latest_threshold_review(session) -> AIAnalysisRun | None:
+    return session.scalar(
+        select(AIAnalysisRun)
+        .where(AIAnalysisRun.analysis_type == "recommendation_backtest_summary")
         .order_by(AIAnalysisRun.created_at.desc(), AIAnalysisRun.id.desc())
         .limit(1)
     )
@@ -285,6 +298,30 @@ def _ai_review_payload(review: AIAnalysisRun | None) -> dict[str, Any]:
     }
 
 
+def _threshold_review_payload(review: AIAnalysisRun | None) -> dict[str, Any]:
+    if review is None:
+        return {
+            "id": None,
+            "overall_decision": "missing",
+            "risk_flags": ["threshold_review_missing"],
+            "decisions": {},
+            "short_summary": "No threshold review has been generated yet.",
+        }
+    try:
+        output = json.loads(review.output_json)
+    except json.JSONDecodeError:
+        output = {}
+    advice = output.get("threshold_advice") or {}
+    return {
+        "id": review.id,
+        "overall_decision": advice.get("overall_decision", "missing"),
+        "risk_flags": advice.get("risk_flags", []),
+        "decisions": advice.get("decisions", {}),
+        "short_summary": output.get("short_summary", "Threshold review available."),
+        "created_at": review.created_at,
+    }
+
+
 def _source_ids(
     recommendations: list[PaperRecommendation],
     ai_review: AIAnalysisRun | None,
@@ -295,6 +332,15 @@ def _source_ids(
         ids.append(f"ai_analysis:{ai_review.id}")
     ids.extend([f"paper_bet:{item['paper_bet_id']}" for item in settled[:50]])
     return ids
+
+
+def _journal_source_ids(
+    source_ids: list[str],
+    threshold_review: AIAnalysisRun | None,
+) -> list[str]:
+    if threshold_review is None:
+        return source_ids
+    return [*source_ids, f"ai_analysis:{threshold_review.id}"]
 
 
 def _recommendation_row(item: PaperRecommendation) -> dict[str, Any]:

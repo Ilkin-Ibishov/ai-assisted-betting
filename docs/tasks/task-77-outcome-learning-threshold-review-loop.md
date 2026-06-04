@@ -1,6 +1,6 @@
 # Task 77 - Outcome Learning And Threshold Review Loop
 
-Status: planned
+Status: completed
 
 ## Goal
 
@@ -31,11 +31,15 @@ Close the paper-learning loop by turning settled outcomes into threshold and cal
 - Build from recommendation backtests and daily journal entries.
 - Do not auto-change production environment variables or strategy settings.
 - Treat threshold advice as experiment design, not execution.
+- Added structured `threshold_advice` to recommendation backtest reports.
+- Added sample-size-aware decisions for minimum edge, minimum expected value, confidence floor, odds cap, and combination enablement.
+- AI recommendation backtest summaries now carry threshold advice and advisory next actions.
+- Daily paper journals and the dashboard journal summary now surface the latest threshold review.
 
 ## Verification
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/unit/test_recommendation_backtest_service.py tests/unit/test_ai_analysis_service.py
+.\.venv\Scripts\python.exe -m pytest tests/unit/test_recommendation_backtest_service.py tests/unit/test_ai_analysis_service.py tests/unit/test_daily_paper_journal_service.py tests/unit/test_dashboard_api.py -q
 .\.venv\Scripts\python.exe -m ruff check app tests
 cd dashboard
 npm run test
@@ -53,4 +57,4 @@ Requires a meaningful number of settled paper recommendations. The task can ship
 
 ## Technical Debt
 
-The current system records outcomes and can backtest, but it does not yet turn those results into a recurring threshold review.
+The system now records conservative threshold advice from backtests and carries it into the daily journal. Larger settled samples are still required before any threshold changes should be applied by a human.

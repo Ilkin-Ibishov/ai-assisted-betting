@@ -49,6 +49,21 @@ def test_daily_journal_distinguishes_ai_rejected_slate(tmp_path) -> None:
     assert entry["ai_review"]["risk_flags"] == ["low_confidence_recommendations"]
 
 
+def test_daily_journal_surfaces_latest_threshold_review(tmp_path) -> None:
+    engine = _engine(tmp_path, "threshold-review.sqlite")
+    _seed_recommendation(engine, grade="recommended", risk_flags=["no_current_risk_flags"])
+    _seed_ai_review(engine, approval_state="approve")
+    _seed_threshold_review(engine)
+
+    entry = DailyPaperJournalService(engine).generate(journal_date="2026-06-04")
+
+    assert entry["threshold_review"]["overall_decision"] == "fail_closed"
+    assert entry["threshold_review"]["decisions"]["combination_enablement"]["decision"] == (
+        "disable"
+    )
+    assert "ai_analysis:2" in entry["source_ids"]
+
+
 def test_daily_journal_links_settled_results_since_previous_journal(tmp_path) -> None:
     engine = _engine(tmp_path, "settled.sqlite")
     _seed_recommendation(engine, grade="recommended", risk_flags=["no_current_risk_flags"])
@@ -145,6 +160,37 @@ def _seed_ai_review(
                 prompt_version="ai-recommendation-review-v1",
                 status="completed",
                 created_at="2026-06-04T09:02:00+00:00",
+            )
+        )
+
+
+def _seed_threshold_review(engine) -> None:
+    with session_scope(engine) as session:
+        session.add(
+            AIAnalysisRun(
+                analysis_type="recommendation_backtest_summary",
+                source_type="recommendation_backtest_report",
+                source_id="pytest_threshold_review",
+                input_json="{}",
+                output_json=json.dumps(
+                    {
+                        "short_summary": "Recommendation backtest reviewed.",
+                        "threshold_advice": {
+                            "overall_decision": "fail_closed",
+                            "risk_flags": ["small_threshold_review_sample"],
+                            "decisions": {
+                                "combination_enablement": {
+                                    "decision": "disable",
+                                    "rationale": "Combination sample is too small.",
+                                }
+                            },
+                        },
+                    }
+                ),
+                model_name="deterministic_ai_fallback",
+                prompt_version="ai-recommendation-backtest-v1",
+                status="completed",
+                created_at="2026-06-04T09:03:00+00:00",
             )
         )
 

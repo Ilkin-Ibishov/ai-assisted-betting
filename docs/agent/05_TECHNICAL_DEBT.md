@@ -471,12 +471,12 @@ Task 76 keeps combinations experimental, excludes them from actionable daily das
 
 ### P2 - Settled Outcomes Do Not Yet Drive Threshold Review
 
-Status: accepted
+Status: resolved
 Introduced: Post-deployment audit on 2026-06-03
 Owner: Task 77 - Outcome Learning And Threshold Review Loop
 Area: learning loop
 
 The system records settled paper outcomes and can backtest, but it does not yet turn those results into recurring advice about whether thresholds should be kept, tightened, loosened, or disabled.
 
-Resolution target:
-Add a conservative threshold review loop driven by settled recommendation outcomes, calibration drift, and sample-size-aware metrics. Keep all changes advisory until a human applies them.
+Resolution:
+Task 77 adds conservative threshold advice to recommendation backtests, propagates it through AI backtest summaries, and surfaces the latest advice in daily paper journals and the dashboard. Advice remains paper-only and advisory; applying threshold changes still requires a human decision and larger settled samples.
