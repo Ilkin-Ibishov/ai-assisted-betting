@@ -34,6 +34,7 @@ class RecommendationBacktestService:
         singles_metrics = _metrics(single_bets)
         combinations_metrics = _metrics(combination_bets)
         calibration_scenarios = _calibration_scenarios(eligible_singles)
+        combination_quarantine = _combination_quarantine_report(combinations)
         return {
             "metadata": {
                 "report_type": "recommendation_backtest",
@@ -53,6 +54,7 @@ class RecommendationBacktestService:
             },
             "singles": singles_metrics,
             "combinations": combinations_metrics,
+            "combination_quarantine": combination_quarantine,
             "edge_buckets": _bucket_metrics(single_bets, _edge_bucket),
             "market_buckets": _bucket_metrics(single_bets, lambda bet: bet["market"]),
             "model_provider_splits": _bucket_metrics(
@@ -182,6 +184,42 @@ def _combination_backtest_bet(
         "grade": combination.grade,
         "confidence_score": combination.confidence_score,
     }
+
+
+def _combination_quarantine_report(combinations: list[PaperCombination]) -> dict[str, Any]:
+    flag_counts: dict[str, int] = {}
+    experimental = 0
+    quarantined = 0
+    for combination in combinations:
+        risk_flags = json.loads(combination.risk_flags_json)
+        if combination.leg_count > 1:
+            experimental += 1
+        if combination.leg_count > 1 or _has_combination_quarantine_flag(risk_flags):
+            quarantined += 1
+        for flag in risk_flags:
+            flag_counts[flag] = flag_counts.get(flag, 0) + 1
+    return {
+        "total": len(combinations),
+        "experimental_count": experimental,
+        "quarantined_count": quarantined,
+        "risk_flag_counts": dict(sorted(flag_counts.items())),
+    }
+
+
+def _has_combination_quarantine_flag(risk_flags: list[str]) -> bool:
+    return bool(
+        set(risk_flags).intersection(
+            {
+                "experimental_combination",
+                "same_match_exposure",
+                "duplicate_team_exposure",
+                "same_league_exposure",
+                "correlated_market_exposure",
+                "higher_leg_count",
+                "negative_combined_ev",
+            }
+        )
+    )
 
 
 def _metrics(bets: list[dict[str, Any]]) -> dict[str, Any]:

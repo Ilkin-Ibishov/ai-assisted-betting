@@ -11,9 +11,36 @@ from app.services.combination_service import CombinationService
 def test_combination_service_generates_ranked_single_and_multi_leg_sets(tmp_path) -> None:
     engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'combos.sqlite').as_posix()}")
     Base.metadata.create_all(engine)
-    _seed_recommendation(engine, source_match_id="match-1", selection="HOME", odds=2.0, ev=0.2)
-    _seed_recommendation(engine, source_match_id="match-2", selection="AWAY", odds=1.9, ev=0.18)
-    _seed_recommendation(engine, source_match_id="match-3", selection="DRAW", odds=3.2, ev=0.05)
+    _seed_recommendation(
+        engine,
+        source_match_id="match-1",
+        selection="HOME",
+        odds=2.0,
+        ev=0.2,
+        league="League A",
+        home_team="Alpha",
+        away_team="Beta",
+    )
+    _seed_recommendation(
+        engine,
+        source_match_id="match-2",
+        selection="AWAY",
+        odds=1.9,
+        ev=0.18,
+        league="League B",
+        home_team="Gamma",
+        away_team="Delta",
+    )
+    _seed_recommendation(
+        engine,
+        source_match_id="match-3",
+        selection="DRAW",
+        odds=3.2,
+        ev=0.05,
+        league="League C",
+        home_team="Echo",
+        away_team="Foxtrot",
+    )
 
     summary = CombinationService(engine).generate(max_legs=2, min_leg_confidence=0.6)
 
@@ -24,13 +51,13 @@ def test_combination_service_generates_ranked_single_and_multi_leg_sets(tmp_path
             session.scalars(select(PaperCombination).order_by(PaperCombination.rank.asc()))
         )
 
-    assert combinations[0].grade == "recommended"
+    assert combinations[0].grade == "research"
     assert combinations[0].leg_count == 2
-    assert json.loads(combinations[0].risk_flags_json) == ["no_current_risk_flags"]
+    assert json.loads(combinations[0].risk_flags_json) == ["experimental_combination"]
     assert combinations[0].combined_expected_value > combinations[-1].combined_expected_value
 
 
-def test_combination_service_rejects_duplicate_event_exposure(tmp_path) -> None:
+def test_combination_service_quarantines_same_match_exposure(tmp_path) -> None:
     engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'combos.sqlite').as_posix()}")
     Base.metadata.create_all(engine)
     _seed_recommendation(engine, source_match_id="match-1", selection="HOME", odds=2.0, ev=0.2)
@@ -41,8 +68,76 @@ def test_combination_service_rejects_duplicate_event_exposure(tmp_path) -> None:
     with session_scope(engine) as session:
         combinations = list(session.scalars(select(PaperCombination)))
 
-    assert len(combinations) == 2
-    assert all(combination.leg_count == 1 for combination in combinations)
+    same_match = [combination for combination in combinations if combination.leg_count == 2]
+    assert len(same_match) == 1
+    assert "same_match_exposure" in json.loads(same_match[0].risk_flags_json)
+    assert same_match[0].grade == "reject"
+
+
+def test_combination_service_quarantines_duplicate_team_exposure(tmp_path) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'team-exposure.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_recommendation(
+        engine,
+        source_match_id="match-1",
+        selection="HOME",
+        odds=2.0,
+        ev=0.2,
+        home_team="Shared FC",
+        away_team="Beta",
+    )
+    _seed_recommendation(
+        engine,
+        source_match_id="match-2",
+        selection="AWAY",
+        odds=2.1,
+        ev=0.18,
+        home_team="Gamma",
+        away_team="Shared FC",
+    )
+
+    CombinationService(engine).generate(max_legs=2, min_leg_confidence=0.6)
+
+    with session_scope(engine) as session:
+        multi_leg = session.scalar(
+            select(PaperCombination).where(PaperCombination.leg_count == 2)
+        )
+
+    assert multi_leg is not None
+    assert "duplicate_team_exposure" in json.loads(multi_leg.risk_flags_json)
+    assert multi_leg.grade == "research"
+
+
+def test_combination_service_quarantines_same_league_exposure(tmp_path) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'league-exposure.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_recommendation(
+        engine,
+        source_match_id="match-1",
+        selection="HOME",
+        odds=2.0,
+        ev=0.2,
+        league="Shared League",
+    )
+    _seed_recommendation(
+        engine,
+        source_match_id="match-2",
+        selection="AWAY",
+        odds=2.1,
+        ev=0.18,
+        league="Shared League",
+    )
+
+    CombinationService(engine).generate(max_legs=2, min_leg_confidence=0.6)
+
+    with session_scope(engine) as session:
+        multi_leg = session.scalar(
+            select(PaperCombination).where(PaperCombination.leg_count == 2)
+        )
+
+    assert multi_leg is not None
+    assert "same_league_exposure" in json.loads(multi_leg.risk_flags_json)
+    assert multi_leg.grade == "research"
 
 
 def test_combination_service_filters_rejected_stale_and_low_confidence_legs(tmp_path) -> None:
@@ -127,11 +222,47 @@ def test_combination_service_enforces_max_risk_flags(tmp_path) -> None:
         combinations = list(session.scalars(select(PaperCombination)))
 
     assert combinations
-    assert max(combination.leg_count for combination in combinations) == 2
+    assert max(combination.leg_count for combination in combinations) == 1
     assert all(
         json.loads(combination.risk_flags_json) == ["no_current_risk_flags"]
         for combination in combinations
     )
+
+
+def test_combination_service_marks_valid_independent_multi_leg_as_research(tmp_path) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'independent.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_recommendation(
+        engine,
+        source_match_id="match-1",
+        selection="HOME",
+        odds=2.0,
+        ev=0.2,
+        league="League A",
+        home_team="Alpha",
+        away_team="Beta",
+    )
+    _seed_recommendation(
+        engine,
+        source_match_id="match-2",
+        selection="AWAY",
+        odds=2.1,
+        ev=0.18,
+        league="League B",
+        home_team="Gamma",
+        away_team="Delta",
+    )
+
+    CombinationService(engine).generate(max_legs=2, min_leg_confidence=0.6)
+
+    with session_scope(engine) as session:
+        multi_leg = session.scalar(
+            select(PaperCombination).where(PaperCombination.leg_count == 2)
+        )
+
+    assert multi_leg is not None
+    assert multi_leg.grade == "research"
+    assert json.loads(multi_leg.risk_flags_json) == ["experimental_combination"]
 
 
 def _seed_recommendation(
@@ -145,6 +276,9 @@ def _seed_recommendation(
     status: str = "active",
     confidence: float = 0.7,
     risk_flags: list[str] | None = None,
+    league: str = "Sample Premier",
+    home_team: str | None = None,
+    away_team: str | None = None,
 ) -> None:
     with session_scope(engine) as session:
         matches = MatchRepository(session)
@@ -153,9 +287,9 @@ def _seed_recommendation(
             match = matches.add(
                 source="misli_public",
                 source_match_id=source_match_id,
-                league="Sample Premier",
-                home_team=f"{source_match_id} Home",
-                away_team=f"{source_match_id} Away",
+                league=league,
+                home_team=home_team or f"{source_match_id} Home",
+                away_team=away_team or f"{source_match_id} Away",
                 kickoff_time="2026-05-19T20:30:00+04:00",
             )
         recommendation = PaperRecommendation(

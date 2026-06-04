@@ -1077,7 +1077,7 @@ function RecommendationDashboardPanel({
               </span>
             </CardTitle>
             <CardDescription>
-              Best paper singles, ranked combinations, risk flags, odds movement, and AI review.
+              Best paper singles, experimental combinations, risk flags, odds movement, and AI review.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1434,7 +1434,7 @@ function CombinationList({ combinations }: { combinations: PaperCombination[] })
     <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
         <Filter className="h-4 w-4" />
-        Ranked combinations
+        Experimental combinations
       </div>
       <div className="mt-3 grid gap-2" data-testid="combination-list">
         {combinations.length ? (

@@ -380,6 +380,7 @@ export type PaperCombination = {
   id: number
   leg_recommendation_ids: number[]
   leg_count: number
+  decision_weight: 'single' | 'experimental'
   model_name: string
   model_version: string
   grade: string

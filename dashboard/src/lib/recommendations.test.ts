@@ -127,8 +127,13 @@ describe('recommendation dashboard helpers', () => {
         }),
       ],
       combinations: [
-        combination({ id: 1, leg_recommendation_ids: [1], rank: 2 }),
-        combination({ id: 2, leg_recommendation_ids: [1, 2], rank: 1 }),
+        combination({ id: 1, leg_count: 1, leg_recommendation_ids: [1], rank: 2 }),
+        combination({
+          id: 2,
+          leg_recommendation_ids: [1, 2],
+          rank: 1,
+          risk_flags: ['experimental_combination'],
+        }),
       ],
       movements: [],
       review: review({ approval_state: 'caution' }),
@@ -144,6 +149,46 @@ describe('recommendation dashboard helpers', () => {
     expect(summary.combinations.map((item) => item.id)).toEqual([1])
     expect(summary.actionableCount).toBe(1)
     expect(summary.blockedCount).toBe(2)
+    expect(summary.decisionState).toBe('candidate_ready')
+  })
+
+  it('keeps experimental combinations out of actionable daily decisions', () => {
+    const summary = buildRecommendationDashboardSummary({
+      recommendations: [
+        recommendation({
+          id: 1,
+          expected_value: 0.12,
+          grade: 'recommended',
+          status: 'active',
+        }),
+        recommendation({
+          id: 2,
+          expected_value: 0.1,
+          grade: 'lean',
+          source_match_id: 'match-2',
+          status: 'active',
+        }),
+      ],
+      combinations: [
+        combination({
+          id: 1,
+          leg_recommendation_ids: [1, 2],
+          leg_count: 2,
+          risk_flags: ['experimental_combination'],
+        }),
+      ],
+      movements: [],
+      review: review({ approval_state: 'caution' }),
+      filters: {
+        approvalState: 'all',
+        confidence: 'all',
+        grade: 'actionable',
+        market: 'all',
+      },
+    })
+
+    expect(summary.rows.map((row) => row.id)).toEqual([1, 2])
+    expect(summary.combinations).toEqual([])
     expect(summary.decisionState).toBe('candidate_ready')
   })
 
@@ -391,6 +436,8 @@ describe('recommendation dashboard helpers', () => {
     expect(riskBadgeTone('no_current_risk_flags')).toBe('positive')
     expect(riskBadgeTone('provider_health_warning')).toBe('danger')
     expect(riskBadgeTone('combination_correlation_heuristic')).toBe('warning')
+    expect(riskBadgeTone('experimental_combination')).toBe('warning')
+    expect(riskBadgeTone('same_match_exposure')).toBe('warning')
     expect(riskBadgeTone('manual_review')).toBe('neutral')
   })
 })
@@ -431,6 +478,7 @@ function combination(overrides: Partial<PaperCombination>): PaperCombination {
     id: 1,
     leg_recommendation_ids: [1, 2],
     leg_count: 2,
+    decision_weight: 'experimental',
     model_name: 'baseline_heuristic',
     model_version: 'v0',
     grade: 'recommended',

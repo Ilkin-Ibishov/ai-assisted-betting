@@ -27,6 +27,11 @@ def test_recommendation_backtest_reports_singles_and_combinations(tmp_path: Path
     assert report["combinations"]["settled_bets"] == 1
     assert report["combinations"]["wins"] == 1
     assert report["combinations"]["roi"] == 2.8
+    assert report["combination_quarantine"]["experimental_count"] == 1
+    assert report["combination_quarantine"]["quarantined_count"] == 1
+    assert report["combination_quarantine"]["risk_flag_counts"] == {
+        "experimental_combination": 1
+    }
     assert report["market_buckets"]["1X2"]["settled_bets"] == 3
     assert report["model_provider_splits"]["baseline_heuristic/Misli.az"]["settled_bets"] == 3
 
@@ -151,7 +156,7 @@ def _seed_backtest_dataset(engine) -> None:
                 estimated_probability=0.36,
                 combined_expected_value=0.368,
                 confidence_score=0.715,
-                risk_flags_json='["no_current_risk_flags"]',
+                risk_flags_json='["experimental_combination"]',
                 rationale="Seed combination",
             )
         )

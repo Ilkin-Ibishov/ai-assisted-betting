@@ -128,6 +128,7 @@ function combinationMatchesFilters(
       combination.leg_recommendation_ids.length > 0 &&
       combination.leg_recommendation_ids.every((id) => actionableIds.has(id)) &&
       combination.combined_expected_value > 0 &&
+      !isQuarantinedCombination(combination) &&
       !combination.risk_flags.some(isBlockingRiskFlag)
     )
   }
@@ -152,7 +153,32 @@ export function riskBadgeTone(flag: string): 'neutral' | 'positive' | 'warning' 
   if (flag.includes('low') || flag.includes('heuristic') || flag.includes('stale')) {
     return 'warning'
   }
+  if (
+    flag.includes('experimental') ||
+    flag.includes('combination') ||
+    flag.includes('exposure') ||
+    flag.includes('correlated')
+  ) {
+    return 'warning'
+  }
   return 'neutral'
+}
+
+function isQuarantinedCombination(combination: PaperCombination) {
+  return (
+    combination.leg_count > 1 ||
+    combination.risk_flags.some((flag) =>
+      [
+        'experimental_combination',
+        'same_match_exposure',
+        'duplicate_team_exposure',
+        'same_league_exposure',
+        'correlated_market_exposure',
+        'higher_leg_count',
+        'negative_combined_ev',
+      ].includes(flag),
+    )
+  )
 }
 
 function rowMatchesFilters(row: RecommendationRow, filters: RecommendationFilters) {

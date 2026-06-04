@@ -459,15 +459,15 @@ Task 75 added deterministic daily paper-only journal entries that connect recomm
 
 ### P2 - Combinations Are Premature For Primary Decisions
 
-Status: accepted
+Status: resolved
 Introduced: Post-deployment audit on 2026-06-03
 Owner: Task 76 - Combination Risk Quarantine
 Area: recommendation risk
 
 Combinations are generated and reviewed, but deeper dependency, exposure, and correlation modeling is still not strong enough for primary decision support.
 
-Resolution target:
-Keep combinations experimental, quarantine them from primary candidate readiness unless explicitly enabled, and add stronger exposure/correlation risk flags.
+Resolution:
+Task 76 keeps combinations experimental, excludes them from actionable daily dashboard decisions, labels API/AI/dashboard combination rows, adds same-match, duplicate-team, same-league, correlated-market, high-leg, and negative-EV risk flags, and adds combination quarantine counts to recommendation backtests. Deeper dependency and bankroll modelling remains future model maturity work, but combinations no longer drive primary candidate readiness.
 
 ### P2 - Settled Outcomes Do Not Yet Drive Threshold Review
 

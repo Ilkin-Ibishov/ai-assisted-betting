@@ -737,10 +737,16 @@ def _recommendation_review_record(
 
 
 def _combination_review_record(combination: PaperCombination) -> dict[str, Any]:
+    risk_flags = json.loads(combination.risk_flags_json)
     return {
         "id": combination.id,
         "leg_recommendation_ids": json.loads(combination.leg_recommendation_ids_json),
         "leg_count": combination.leg_count,
+        "decision_weight": (
+            "experimental"
+            if combination.leg_count > 1 or _is_quarantined_combination_flags(risk_flags)
+            else "single"
+        ),
         "grade": combination.grade,
         "status": combination.status,
         "rank": combination.rank,
@@ -748,7 +754,7 @@ def _combination_review_record(combination: PaperCombination) -> dict[str, Any]:
         "estimated_probability": combination.estimated_probability,
         "combined_expected_value": combination.combined_expected_value,
         "confidence_score": combination.confidence_score,
-        "risk_flags": json.loads(combination.risk_flags_json),
+        "risk_flags": risk_flags,
         "rationale": combination.rationale,
     }
 
@@ -771,6 +777,7 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
     recommendations = input_payload["paper_recommendations"]
     combinations = input_payload["paper_combinations"]
     model_quality = _recommendation_model_quality(recommendations)
+    combination_quality = _combination_model_quality(combinations)
     risk_flags: list[str] = []
     concerns: list[str] = []
     next_checks = [
@@ -855,6 +862,11 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
         concerns.append(
             "Multi-leg combinations rely on heuristic independence and exposure assumptions."
         )
+    if combination_quality["quarantined_count"]:
+        risk_flags.append("combination_quarantined")
+        concerns.append(
+            "Combination rows are labelled experimental and excluded from primary daily decisions."
+        )
 
     approval_state = "approve"
     if risk_flags:
@@ -879,6 +891,7 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
         "recommended_next_actions": next_checks,
         "confidence": "medium" if risk_flags else "high",
         "model_quality": model_quality,
+        "combination_quality": combination_quality,
         "source_record_ids": source_ids,
         "approval_state": approval_state,
         "concerns": concerns,
@@ -971,6 +984,45 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
             and max_confidence < 0.5
         ),
     }
+
+
+def _combination_model_quality(combinations: list[dict[str, Any]]) -> dict[str, Any]:
+    quarantined = [
+        item
+        for item in combinations
+        if item["leg_count"] > 1 or _is_quarantined_combination_flags(item["risk_flags"])
+    ]
+    actionable_research = [
+        item
+        for item in combinations
+        if item["status"] == "active"
+        and item["grade"] in {"single", "recommended", "lean"}
+        and item["leg_count"] == 1
+        and not _is_quarantined_combination_flags(item["risk_flags"])
+        and float(item["combined_expected_value"] or 0) > 0
+    ]
+    return {
+        "combination_count": len(combinations),
+        "experimental_count": len([item for item in combinations if item["leg_count"] > 1]),
+        "quarantined_count": len(quarantined),
+        "actionable_research_count": len(actionable_research),
+    }
+
+
+def _is_quarantined_combination_flags(risk_flags: list[str]) -> bool:
+    return bool(
+        set(risk_flags).intersection(
+            {
+                "experimental_combination",
+                "same_match_exposure",
+                "duplicate_team_exposure",
+                "same_league_exposure",
+                "correlated_market_exposure",
+                "higher_leg_count",
+                "negative_combined_ev",
+            }
+        )
+    )
 
 
 def _is_actionable_recommendation(

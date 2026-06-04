@@ -650,8 +650,8 @@ def generate_combinations(
         help="Minimum confidence score required for each leg.",
     ),
     max_risk_flags: int = typer.Option(
-        1,
-        help="Maximum non-neutral risk flags allowed on a persisted combination.",
+        6,
+        help="Maximum non-neutral risk flags allowed on a persisted research combination.",
     ),
     max_combinations: int = typer.Option(100, help="Maximum combinations to persist."),
 ) -> None:

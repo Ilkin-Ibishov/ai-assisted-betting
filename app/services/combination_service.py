@@ -5,7 +5,7 @@ import math
 from sqlalchemy import Engine, select
 
 from app.db.engine import session_scope
-from app.db.models import PaperRecommendation
+from app.db.models import Match, PaperRecommendation
 from app.db.repositories import PaperCombinationRepository
 from app.services.prediction_service import StepSummary
 
@@ -19,7 +19,7 @@ class CombinationService:
         *,
         max_legs: int = 3,
         min_leg_confidence: float = 0.6,
-        max_risk_flags: int = 1,
+        max_risk_flags: int = 6,
         max_combinations: int = 100,
     ) -> StepSummary:
         max_legs = max(1, min(max_legs, 6))
@@ -73,8 +73,9 @@ def _eligible_recommendations(
 ) -> list[PaperRecommendation]:
     with session_scope(engine) as session:
         recommendations = list(
-            session.scalars(
-                select(PaperRecommendation)
+            session.execute(
+                select(PaperRecommendation, Match)
+                .join(Match, PaperRecommendation.match_id == Match.id)
                 .where(
                     PaperRecommendation.status == "active",
                     PaperRecommendation.grade.in_(["recommended", "lean", "watch"]),
@@ -82,9 +83,15 @@ def _eligible_recommendations(
                 .order_by(PaperRecommendation.expected_value.desc())
             )
         )
+        enriched = []
+        for recommendation, match in recommendations:
+            recommendation._match_league = match.league
+            recommendation._match_home_team = match.home_team
+            recommendation._match_away_team = match.away_team
+            enriched.append(recommendation)
         return [
             recommendation
-            for recommendation in recommendations
+            for recommendation in enriched
             if _leg_is_eligible(recommendation, min_leg_confidence)
         ]
 
@@ -110,14 +117,8 @@ def _generate_combinations(
     combinations = []
     for leg_count in range(1, max_legs + 1):
         for legs in itertools.combinations(candidates, leg_count):
-            if _has_duplicate_event_exposure(legs):
-                continue
             combinations.append(_build_combination(legs))
     return combinations
-
-
-def _has_duplicate_event_exposure(legs: tuple[PaperRecommendation, ...]) -> bool:
-    return len({leg.source_match_id for leg in legs}) != len(legs)
 
 
 def _build_combination(legs: tuple[PaperRecommendation, ...]) -> dict:
@@ -144,6 +145,28 @@ def _combination_risk_flags(
     combined_expected_value: float,
 ) -> list[str]:
     risk_flags: list[str] = []
+    if len(legs) > 1:
+        risk_flags.append("experimental_combination")
+    if len({leg.source_match_id for leg in legs}) != len(legs):
+        risk_flags.append("same_match_exposure")
+    teams = [
+        team
+        for leg in legs
+        for team in (
+            getattr(leg, "_match_home_team", None),
+            getattr(leg, "_match_away_team", None),
+        )
+        if team
+    ]
+    if len(set(teams)) != len(teams):
+        risk_flags.append("duplicate_team_exposure")
+    leagues = [getattr(leg, "_match_league", None) for leg in legs]
+    leagues = [league for league in leagues if league]
+    if len(legs) > 1 and len(set(leagues)) < len(leagues):
+        risk_flags.append("same_league_exposure")
+    match_markets = [(leg.source_match_id, leg.market) for leg in legs]
+    if len(legs) > 1 and len(set(match_markets)) < len(match_markets):
+        risk_flags.append("correlated_market_exposure")
     if len(legs) > 2:
         risk_flags.append("higher_leg_count")
     if combined_expected_value < 0:
@@ -157,13 +180,11 @@ def _combination_grade(
     leg_count: int,
     risk_flags: list[str],
 ) -> str:
-    if "negative_combined_ev" in risk_flags:
+    if "negative_combined_ev" in risk_flags or "same_match_exposure" in risk_flags:
         return "reject"
     if leg_count == 1:
         return "single"
-    if combined_expected_value >= 0.15 and confidence_score >= 0.65 and leg_count <= 2:
-        return "recommended"
-    return "lean"
+    return "research"
 
 
 def _combination_rationale(grade: str, leg_count: int, expected_value: float) -> str:

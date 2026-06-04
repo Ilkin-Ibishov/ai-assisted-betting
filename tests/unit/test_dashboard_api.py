@@ -816,8 +816,9 @@ def test_live_combinations_endpoint_lists_ranked_paper_combinations(tmp_path: Pa
     payload = response.json()
     assert payload[0]["rank"] == 1
     assert payload[0]["grade"] == "recommended"
+    assert payload[0]["decision_weight"] == "experimental"
     assert payload[0]["leg_recommendation_ids"] == [1, 2]
-    assert payload[0]["risk_flags"] == ["no_current_risk_flags"]
+    assert payload[0]["risk_flags"] == ["experimental_combination"]
     assert payload[0]["combined_expected_value"] == 0.19
 
 
@@ -1311,7 +1312,7 @@ def _seed_combination_database(database_url: str) -> None:
                 confidence_score=0.7,
                 current_odds=2.0,
                 expected_value=0.2,
-                risk_flags_json='["no_current_risk_flags"]',
+                risk_flags_json='["experimental_combination"]',
                 rationale="Seed recommendation",
             )
             session.add(recommendation)
@@ -1330,7 +1331,7 @@ def _seed_combination_database(database_url: str) -> None:
                 estimated_probability=0.313,
                 combined_expected_value=0.19,
                 confidence_score=0.7,
-                risk_flags_json='["no_current_risk_flags"]',
+                risk_flags_json='["experimental_combination"]',
                 rationale="Seed combination",
             )
         )

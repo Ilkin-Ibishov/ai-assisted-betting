@@ -775,10 +775,17 @@ def _paper_combination_payloads(database_url: str, *, limit: int) -> list[dict[s
 
 
 def _paper_combination_payload(combination: PaperCombination) -> dict[str, Any]:
+    risk_flags = json.loads(combination.risk_flags_json)
     return {
         "id": combination.id,
         "leg_recommendation_ids": json.loads(combination.leg_recommendation_ids_json),
         "leg_count": combination.leg_count,
+        "decision_weight": (
+            "experimental"
+            if combination.leg_count > 1
+            or _has_combination_quarantine_flag(risk_flags)
+            else "single"
+        ),
         "model_name": combination.model_name,
         "model_version": combination.model_version,
         "grade": combination.grade,
@@ -788,7 +795,23 @@ def _paper_combination_payload(combination: PaperCombination) -> dict[str, Any]:
         "estimated_probability": combination.estimated_probability,
         "combined_expected_value": combination.combined_expected_value,
         "confidence_score": combination.confidence_score,
-        "risk_flags": json.loads(combination.risk_flags_json),
+        "risk_flags": risk_flags,
         "rationale": combination.rationale,
         "created_at": combination.created_at,
     }
+
+
+def _has_combination_quarantine_flag(risk_flags: list[str]) -> bool:
+    return bool(
+        set(risk_flags).intersection(
+            {
+                "experimental_combination",
+                "same_match_exposure",
+                "duplicate_team_exposure",
+                "same_league_exposure",
+                "correlated_market_exposure",
+                "higher_leg_count",
+                "negative_combined_ev",
+            }
+        )
+    )
