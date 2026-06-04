@@ -1030,6 +1030,31 @@ def test_recommendation_quality_command_reports_cycle_counts(tmp_path) -> None:
     assert "recommendation-quality: finished" in result.output
 
 
+def test_daily_paper_journal_command_persists_entry(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "daily-journal.sqlite"
+    env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}
+    runner.invoke(app, ["init-db"], env=env)
+
+    result = runner.invoke(
+        app,
+        ["daily-paper-journal", "--journal-date", "2026-06-04"],
+        env=env,
+    )
+
+    assert result.exit_code == 0
+    assert "daily-paper-journal: started" in result.output
+    assert "journal_date=2026-06-04" in result.output
+    assert "decision_state=no_candidates" in result.output
+    assert "candidate_count=0" in result.output
+    assert "daily-paper-journal: finished" in result.output
+    with create_engine(f"sqlite:///{db_path.as_posix()}").connect() as connection:
+        row = connection.execute(
+            text("SELECT journal_date, decision_state FROM paper_journal_entries")
+        ).one()
+    assert row == ("2026-06-04", "no_candidates")
+
+
 def test_analyze_recommendation_backtest_command_persists_ai_summary(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "backtest-ai-cli.sqlite"

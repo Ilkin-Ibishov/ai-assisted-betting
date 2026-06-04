@@ -226,7 +226,7 @@ Build live recommendation work in this order:
 11. Task 72 - Raw Versus Calibrated Recommendation Confidence, completed
 12. Task 73 - Confidence Calibration Backtest Scenarios, completed
 13. Task 74 - Richer Team Strength Feature Inputs, completed
-14. Task 75 - Daily Paper Trading Journal
+14. Task 75 - Daily Paper Trading Journal, completed
 15. Task 76 - Combination Risk Quarantine
 16. Task 77 - Outcome Learning And Threshold Review Loop
 
@@ -238,7 +238,7 @@ The live paper loop is operationally healthy, but the model and review layer are
 2. Implemented: Task 72 separates raw model confidence from calibrated recommendation confidence.
 3. Implemented: Task 73 compares raw and calibrated confidence scenarios in recommendation backtests and makes the AI summary give a provisional keep/disable calibration decision.
 4. Implemented: Task 74 adds deterministic local feature enrichment tiers, provenance, rest days, goal-difference trend, odds velocity, enriched-only prediction adjustments, and AI odds-only/actionable flags.
-5. Task 75 - create a daily paper trading journal so decisions become a learning record.
+5. Implemented: Task 75 creates deterministic daily paper journal entries with source ids, AI slate state, recommendation quality counts, settled outcomes, CLI/API access, and dashboard visibility.
 6. Task 76 - keep combinations quarantined until correlation and exposure risk are better modeled.
 7. Task 77 - turn settled outcomes into conservative threshold review advice.
 

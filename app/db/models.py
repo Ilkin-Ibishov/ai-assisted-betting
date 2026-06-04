@@ -226,6 +226,27 @@ class PaperCombination(Base):
     created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
 
 
+class PaperJournalEntry(Base):
+    __tablename__ = "paper_journal_entries"
+    __table_args__ = (
+        UniqueConstraint("journal_date", name="uq_paper_journal_entries_date"),
+        Index("idx_paper_journal_entries_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    journal_date: Mapped[str] = mapped_column(String, nullable=False)
+    decision_state: Mapped[str] = mapped_column(String, nullable=False)
+    summary_json: Mapped[str] = mapped_column(Text, nullable=False)
+    source_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
+    updated_at: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default=utc_now_iso,
+        onupdate=utc_now_iso,
+    )
+
+
 class DecisionLog(Base):
     __tablename__ = "decision_logs"
     __table_args__ = (Index("idx_decision_logs_match_stage", "match_id", "stage"),)

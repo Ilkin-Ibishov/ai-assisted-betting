@@ -446,15 +446,16 @@ External league table, opponent-adjusted, lineup, injury, and closing-line sourc
 
 ### P2 - Daily Learning Narrative Is Missing
 
-Status: accepted
+Status: resolved
 Introduced: Post-deployment audit on 2026-06-03
+Resolved by: Task 75 - Daily Paper Trading Journal
 Owner: Task 75 - Daily Paper Trading Journal
 Area: product learning loop
 
 The dashboard shows live facts, but there is not yet a durable daily journal explaining what the system would have picked, what AI rejected, what settled, and what should be learned.
 
-Resolution target:
-Create deterministic daily paper-only journal entries that connect recommendations, AI review, paper bets, settled outcomes, and threshold observations.
+Resolution:
+Task 75 added deterministic daily paper-only journal entries that connect recommendations, AI review, paper bets, settled outcomes, recommendation quality state, calibration observations, and traceable source ids. Journal entries are available through CLI, API, and the dashboard daily card.
 
 ### P2 - Combinations Are Premature For Primary Decisions
 

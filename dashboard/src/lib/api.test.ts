@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   buildApiUrl,
   fetchBetLedger,
+  fetchLatestDailyJournal,
   fetchRecommendationQuality,
   fetchOperationalGuardrails,
   fetchLatestRecommendationReview,
@@ -268,6 +269,46 @@ describe('fetchRecommendationQuality', () => {
       expect(quality.overall_state).toBe('actionable_present')
       expect(quality.summary.actionable_count).toBe(1)
       expect(quality.ai_review.approval_state).toBe('caution')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+})
+
+describe('fetchLatestDailyJournal', () => {
+  it('reads the latest daily paper journal from the API', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string) => {
+      expect(url).toBe('/api/live/daily-journal/latest')
+      return new Response(
+        JSON.stringify({
+          journal_date: '2026-06-04',
+          decision_state: 'candidate_ready',
+          summary: {
+            candidate_count: 1,
+            watchlist_count: 0,
+            blocked_count: 2,
+            open_paper_bet_count: 1,
+            settled_count: 0,
+            ai_approval_state: 'approve',
+          },
+          quality_snapshot: { overall_state: 'actionable_present' },
+          ai_review: { approval_state: 'approve' },
+          settled_since_previous_journal: [],
+          open_paper_bets: [],
+          source_ids: ['paper_recommendation:1'],
+        }),
+        { status: 200 },
+      )
+    }) as typeof fetch
+
+    try {
+      const journal = await fetchLatestDailyJournal()
+
+      expect(journal.journal_date).toBe('2026-06-04')
+      expect(journal.decision_state).toBe('candidate_ready')
+      expect(journal.summary.candidate_count).toBe(1)
+      expect(journal.source_ids).toEqual(['paper_recommendation:1'])
     } finally {
       globalThis.fetch = originalFetch
     }

@@ -12,6 +12,7 @@ from app.services.analysis_service import ComparisonAnalysisError, ComparisonAna
 from app.services.collection_service import CollectionService
 from app.services.combination_service import CombinationService
 from app.services.comparison_service import ReplayComparisonRequest, ReplayComparisonService
+from app.services.daily_paper_journal_service import DailyPaperJournalService
 from app.services.evaluation_service import EvaluationService, format_evaluation_report
 from app.services.football_data_service import FootballDataImportRequest, FootballDataImportService
 from app.services.live_collection_service import LiveCollectionRequest, LiveCollectionService
@@ -423,6 +424,29 @@ def recommendation_quality(
     typer.echo(f"fresh_snapshot_count={report['summary']['fresh_snapshot_count']}")
     typer.echo(f"ai_approval_state={report['ai_review']['approval_state']}")
     typer.echo("recommendation-quality: finished")
+
+
+@app.command("daily-paper-journal")
+def daily_paper_journal(
+    journal_date: str | None = typer.Option(
+        None,
+        help="Journal date in YYYY-MM-DD format. Defaults to today.",
+    ),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    try:
+        journal = DailyPaperJournalService(engine).generate(journal_date=journal_date)
+    finally:
+        engine.dispose()
+    typer.echo("daily-paper-journal: started")
+    typer.echo(f"journal_date={journal['journal_date']}")
+    typer.echo(f"decision_state={journal['decision_state']}")
+    typer.echo(f"candidate_count={journal['summary']['candidate_count']}")
+    typer.echo(f"watchlist_count={journal['summary']['watchlist_count']}")
+    typer.echo(f"settled_count={journal['summary']['settled_count']}")
+    typer.echo(f"ai_approval_state={journal['summary']['ai_approval_state']}")
+    typer.echo("daily-paper-journal: finished")
 
 
 def _split_csv_option(value: str) -> list[str]:

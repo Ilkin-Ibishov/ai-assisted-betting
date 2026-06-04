@@ -6,7 +6,14 @@ from sqlalchemy import text
 
 from app.api import create_api
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import AIAnalysisRun, Base, PaperCombination, PaperRecommendation, ResultFetchJob
+from app.db.models import (
+    AIAnalysisRun,
+    Base,
+    PaperCombination,
+    PaperJournalEntry,
+    PaperRecommendation,
+    ResultFetchJob,
+)
 from app.db.repositories import (
     LiveRunRepository,
     MatchRepository,
@@ -956,6 +963,54 @@ def test_ai_recommendation_review_latest_endpoint_returns_404_when_missing(
 
     assert response.status_code == 404
     assert response.json()["detail"] == "AI recommendation review not found"
+
+
+def test_live_daily_journal_latest_endpoint_returns_latest(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        session.add(
+            PaperJournalEntry(
+                journal_date="2026-06-04",
+                decision_state="candidate_ready",
+                summary_json=json.dumps(
+                    {
+                        "journal_date": "2026-06-04",
+                        "decision_state": "candidate_ready",
+                        "summary": {"candidate_count": 1},
+                        "quality_snapshot": {"overall_state": "actionable_present"},
+                        "ai_review": {"approval_state": "approve"},
+                        "settled_since_previous_journal": [],
+                        "open_paper_bets": [],
+                        "source_ids": ["paper_recommendation:1"],
+                    }
+                ),
+                source_ids_json='["paper_recommendation:1"]',
+                created_at="2026-06-04T10:00:00+00:00",
+                updated_at="2026-06-04T10:00:00+00:00",
+            )
+        )
+    engine.dispose()
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/daily-journal/latest")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["journal_date"] == "2026-06-04"
+    assert payload["decision_state"] == "candidate_ready"
+    assert payload["summary"]["candidate_count"] == 1
+    assert payload["source_ids"] == ["paper_recommendation:1"]
+
+
+def test_live_daily_journal_latest_endpoint_returns_404_when_missing(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/daily-journal/latest")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "daily journal entry not found"
 
 
 def test_ai_analysis_runs_endpoint_lists_recent_advisories(tmp_path: Path) -> None:

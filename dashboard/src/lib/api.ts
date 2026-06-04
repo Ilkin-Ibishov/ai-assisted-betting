@@ -153,6 +153,41 @@ export type RecommendationQuality = {
   distributions?: Record<string, Record<string, number>>
 }
 
+export type DailyPaperJournal = {
+  id?: number
+  journal_date: string
+  decision_state: 'no_candidates' | 'candidate_ready' | 'ai_rejected' | 'settled_learning'
+  summary: {
+    candidate_count: number
+    watchlist_count: number
+    blocked_count: number
+    open_paper_bet_count: number
+    settled_count: number
+    ai_approval_state: string
+    ai_summary?: string
+    calibration_observations?: {
+      confidence_adjusted_count: number
+      adjustment_reasons: string[]
+    }
+  }
+  quality_snapshot: {
+    overall_state: string
+    actionable_count?: number
+    watchlist_count?: number
+    blocked_count?: number
+  }
+  ai_review: {
+    approval_state: string
+    risk_flags?: string[]
+    short_summary?: string
+  }
+  settled_since_previous_journal: Array<Record<string, unknown>>
+  open_paper_bets: Array<Record<string, unknown>>
+  source_ids: string[]
+  created_at?: string
+  updated_at?: string
+}
+
 export type OddsMovementSummary = {
   match_id: number
   source: string
@@ -381,6 +416,10 @@ export async function fetchOperationalGuardrails(): Promise<OperationalGuardrail
 
 export async function fetchRecommendationQuality(): Promise<RecommendationQuality> {
   return getJson('/api/live/recommendation-quality')
+}
+
+export async function fetchLatestDailyJournal(): Promise<DailyPaperJournal> {
+  return getJson('/api/live/daily-journal/latest')
 }
 
 export async function fetchOddsMovement(): Promise<OddsMovementSummary[]> {

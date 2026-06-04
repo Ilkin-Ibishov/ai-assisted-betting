@@ -136,6 +136,7 @@ def test_init_db_upgrades_old_database_with_missing_elo_feature_columns(tmp_path
         ("008_create_result_fetch_jobs",),
         ("009_add_recommendation_confidence_audit_columns",),
         ("010_add_feature_enrichment_columns",),
+        ("011_create_paper_journal_entries",),
     ]
 
 
@@ -227,6 +228,7 @@ def test_init_db_upgrades_old_database_with_identity_uniqueness_indexes(tmp_path
         ("008_create_result_fetch_jobs",),
         ("009_add_recommendation_confidence_audit_columns",),
         ("010_add_feature_enrichment_columns",),
+        ("011_create_paper_journal_entries",),
     ]
 
 
@@ -294,6 +296,7 @@ def test_init_db_upgrades_old_database_with_live_run_registry(tmp_path) -> None:
         ("008_create_result_fetch_jobs",),
         ("009_add_recommendation_confidence_audit_columns",),
         ("010_add_feature_enrichment_columns",),
+        ("011_create_paper_journal_entries",),
     ]
 
 
@@ -358,6 +361,7 @@ def test_init_db_upgrades_old_database_with_ai_analysis_runs(tmp_path) -> None:
         ("008_create_result_fetch_jobs",),
         ("009_add_recommendation_confidence_audit_columns",),
         ("010_add_feature_enrichment_columns",),
+        ("011_create_paper_journal_entries",),
     ]
 
 
@@ -465,6 +469,47 @@ def test_init_db_upgrades_old_database_with_feature_enrichment_columns(tmp_path)
         "odds_movement_velocity",
     }.issubset(feature_columns)
     assert ("010_add_feature_enrichment_columns",) in migration_rows
+
+
+def test_init_db_creates_paper_journal_entries(tmp_path) -> None:
+    db_path = tmp_path / "journal.sqlite"
+    database_url = f"sqlite:///{db_path.as_posix()}"
+
+    init_db(database_url)
+    init_db(database_url)
+
+    with sqlite3.connect(db_path) as connection:
+        table_names = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        column_names = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(paper_journal_entries)"
+            ).fetchall()
+        }
+        indexes = {
+            row[1]
+            for row in connection.execute("PRAGMA index_list(paper_journal_entries)")
+        }
+        migration_rows = connection.execute(
+            "SELECT migration_name FROM schema_migrations ORDER BY migration_name"
+        ).fetchall()
+
+    assert "paper_journal_entries" in table_names
+    assert {
+        "journal_date",
+        "decision_state",
+        "summary_json",
+        "source_ids_json",
+        "created_at",
+        "updated_at",
+    }.issubset(column_names)
+    assert "uq_paper_journal_entries_date" in indexes
+    assert ("011_create_paper_journal_entries",) in migration_rows
 
 
 def test_match_repository_inserts_match_and_rejects_duplicate_source_id(tmp_path) -> None:

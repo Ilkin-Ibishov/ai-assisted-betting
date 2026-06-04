@@ -19,6 +19,7 @@ from app.db.models import (
 )
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.bet_ledger_service import BetLedgerService, DateRange, LedgerStatus
+from app.services.daily_paper_journal_service import DailyPaperJournalService
 from app.services.live_snapshot_service import LiveSnapshotService
 from app.services.live_status_service import LiveStatusService
 from app.services.misli_result_service import result_jobs_payload
@@ -170,6 +171,17 @@ def create_api(
             fresh_after_minutes=fresh_after_minutes,
             limit=limit,
         )
+
+    @api.get("/api/live/daily-journal/latest")
+    def get_live_daily_journal_latest() -> dict[str, Any]:
+        engine = create_engine_from_url(live_database_url)
+        try:
+            journal = DailyPaperJournalService(engine).latest()
+        finally:
+            engine.dispose()
+        if journal is None:
+            raise HTTPException(status_code=404, detail="daily journal entry not found")
+        return journal
 
     @api.get("/api/live/paper-bets")
     def list_live_paper_bets(limit: int = 100) -> list[dict[str, Any]]:

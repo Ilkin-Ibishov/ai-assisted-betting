@@ -38,6 +38,7 @@ import {
   fetchComparisonDetail,
   fetchComparisons,
   fetchLatestAIAnalysis,
+  fetchLatestDailyJournal,
   fetchLatestRecommendationReview,
   fetchLiveStatus,
   fetchOddsMovement,
@@ -57,6 +58,7 @@ import type {
   ComparisonReport,
   ComparisonRun,
   ComparisonSummary,
+  DailyPaperJournal,
   LiveStatus,
   OddsMovementSummary,
   OperationalGuardrailStatus,
@@ -148,6 +150,12 @@ function App() {
   const recommendationQuality = useQuery({
     queryKey: ['recommendation-quality'],
     queryFn: fetchRecommendationQuality,
+  })
+
+  const dailyJournal = useQuery({
+    queryKey: ['daily-paper-journal-latest'],
+    queryFn: fetchLatestDailyJournal,
+    retry: false,
   })
 
   const aiAnalysis = useQuery({
@@ -318,6 +326,7 @@ function App() {
                 recommendationReview.isLoading ||
                 recommendationQuality.isLoading
               }
+              dailyJournal={dailyJournal.data}
               recommendationQuality={recommendationQuality.data}
               recommendationReview={recommendationReview.data}
               recommendations={recommendations.data ?? []}
@@ -378,6 +387,7 @@ type DashboardContentProps = {
   combinations: PaperCombination[]
   oddsMovement: OddsMovementSummary[]
   paperBets: PaperBet[]
+  dailyJournal?: DailyPaperJournal
   recommendationError: boolean
   recommendationLoading: boolean
   recommendationQuality?: RecommendationQuality
@@ -423,6 +433,7 @@ function DashboardContent({
   combinations,
   oddsMovement,
   paperBets,
+  dailyJournal,
   recommendationError,
   recommendationLoading,
   recommendationQuality,
@@ -475,6 +486,7 @@ function DashboardContent({
         loading={recommendationLoading}
         movements={oddsMovement}
         paperBets={paperBets}
+        dailyJournal={dailyJournal}
         quality={recommendationQuality}
         recommendations={recommendations}
         review={recommendationReview}
@@ -1015,6 +1027,7 @@ function AIAnalystPanel({
 
 function RecommendationDashboardPanel({
   combinations,
+  dailyJournal,
   error,
   loading,
   movements,
@@ -1024,6 +1037,7 @@ function RecommendationDashboardPanel({
   review,
 }: {
   combinations: PaperCombination[]
+  dailyJournal?: DailyPaperJournal
   error: boolean
   loading: boolean
   movements: OddsMovementSummary[]
@@ -1097,6 +1111,7 @@ function RecommendationDashboardPanel({
               review={review}
               watchlistCount={summary.watchlistCount}
             />
+            <DailyJournalSummary journal={dailyJournal} />
             <RecommendationFiltersBar
               filters={filters}
               gradeOptions={summary.gradeOptions}
@@ -1203,6 +1218,50 @@ function DailyDecisionSummary({
       />
     </div>
   )
+}
+
+function DailyJournalSummary({ journal }: { journal?: DailyPaperJournal }) {
+  if (!journal) {
+    return (
+      <div
+        className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"
+        data-testid="daily-journal-summary"
+      >
+        No daily paper journal has been generated yet.
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm md:grid-cols-4"
+      data-testid="daily-journal-summary"
+    >
+      <InfoBlock
+        label="Journal"
+        value={`${journal.journal_date} / ${formatJournalState(journal.decision_state)}`}
+      />
+      <InfoBlock
+        label="AI slate"
+        value={`${journal.summary.ai_approval_state} / ${journal.summary.candidate_count} candidates`}
+      />
+      <InfoBlock
+        label="Learning"
+        value={`${journal.summary.settled_count} settled / ${journal.summary.open_paper_bet_count} open`}
+      />
+      <InfoBlock
+        label="Traceability"
+        value={`${journal.source_ids.length} source records`}
+      />
+    </div>
+  )
+}
+
+function formatJournalState(state: DailyPaperJournal['decision_state']): string {
+  if (state === 'candidate_ready') return 'Candidate ready'
+  if (state === 'ai_rejected') return 'AI rejected'
+  if (state === 'settled_learning') return 'Settled learning'
+  return 'No candidates'
 }
 
 function RecommendationFiltersBar({
