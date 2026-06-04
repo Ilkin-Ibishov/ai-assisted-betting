@@ -430,15 +430,19 @@ Task 73 added raw-versus-calibrated confidence backtest scenarios with EV thresh
 
 ### P2 - Team Strength Inputs Are Still Thin
 
-Status: accepted
+Status: resolved
 Introduced: Post-deployment audit on 2026-06-03
+Resolved by: Task 74 - Richer Team Strength Feature Inputs
 Owner: Task 74 - Richer Team Strength Feature Inputs
 Area: prediction quality
 
 The system is operationally stable, but the baseline model still relies heavily on bookmaker probabilities, shallow form, neutral cold-start features, and small heuristic adjustments.
 
-Resolution target:
-Add richer team and match context such as home/away split, opponent-adjusted form, league strength, rest days, goal-difference trend, odds movement velocity, overround normalization, and closing-line movement tracking.
+Resolution:
+Task 74 added deterministic local feature enrichment tiers, provenance, rest days, goal-difference trend, odds movement velocity, overround-normalized bookmaker probability, and enriched-only prediction adjustments. AI recommendation review now separates odds-only actionable rows from enriched actionable rows.
+
+Remaining source-selection note:
+External league table, opponent-adjusted, lineup, injury, and closing-line sources still require stability/legal review before integration.
 
 ### P2 - Daily Learning Narrative Is Missing
 

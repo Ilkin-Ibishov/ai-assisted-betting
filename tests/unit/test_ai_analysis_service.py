@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.db.engine import create_engine_from_url, session_scope
 from app.db.migrations import init_db
-from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation
+from app.db.models import AIAnalysisRun, PaperCombination, PaperRecommendation, Prediction
 from app.db.repositories import LiveRunRepository
 from app.services.ai_analysis_service import AIAnalysisProvider, AIAnalysisService
 from app.services.ai_prompt_registry import LiveStatusPrompt, RecommendationReviewPrompt
@@ -353,6 +353,23 @@ def test_ai_analysis_service_records_recommendation_backtest_advisory(tmp_path) 
     assert "combination_underperformance" in output["risk_flags"]
     assert output["source_record_ids"] == ["pytest_rec"]
     assert "real-money" not in " ".join(output["recommended_next_actions"]).lower()
+    engine.dispose()
+
+
+def test_ai_analysis_service_flags_odds_only_actionable_recommendations(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'feature-provenance-ai.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+    _seed_feature_provenance_recommendation_review_inputs(engine)
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_review()
+
+    output = json.loads(analysis.output_json)
+    assert "odds_only_actionable_recommendations" in output["risk_flags"]
+    assert output["model_quality"]["odds_only_actionable_count"] == 1
+    assert output["model_quality"]["enriched_actionable_count"] == 1
+    reviewed = json.loads(analysis.input_json)["paper_recommendations"]
+    assert {item["feature_tier"] for item in reviewed} == {"cold_start", "full_enriched"}
     engine.dispose()
 
 
@@ -748,6 +765,93 @@ def _seed_calibrated_recommendation_review_inputs(engine) -> None:
                 risk_flags_json='["no_current_risk_flags"]',
                 rationale="Positive edge is above minimum threshold with calibrated confidence.",
             )
+        )
+
+
+def _seed_feature_provenance_recommendation_review_inputs(engine) -> None:
+    with session_scope(engine) as session:
+        cold_match = _seed_match(session, source_match_id="cold-feature-match")
+        enriched_match = _seed_match(session, source_match_id="enriched-feature-match")
+        cold_prediction = Prediction(
+            match_id=cold_match.id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=0.62,
+            bookmaker_probability=0.5,
+            edge=0.12,
+            confidence_score=0.72,
+            decision="SKIP",
+            reason=(
+                "baseline heuristic probability generated; feature_tier=cold_start; "
+                "feature_provenance=market_overround_normalized,cold_start_history"
+            ),
+        )
+        enriched_prediction = Prediction(
+            match_id=enriched_match.id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=0.64,
+            bookmaker_probability=0.5,
+            edge=0.14,
+            confidence_score=0.8,
+            decision="SKIP",
+            reason=(
+                "baseline heuristic probability generated with enriched feature signal; "
+                "feature_tier=full_enriched; "
+                "feature_provenance=market_overround_normalized,recent_form,rest_days"
+            ),
+        )
+        session.add_all([cold_prediction, enriched_prediction])
+        session.flush()
+        session.add_all(
+            [
+                PaperRecommendation(
+                    match_id=cold_match.id,
+                    prediction_id=cold_prediction.id,
+                    source_match_id=cold_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="HOME",
+                    latest_snapshot_time="2026-06-04T09:00:00+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="recommended",
+                    status="active",
+                    model_probability=0.62,
+                    implied_probability=0.5,
+                    edge=0.12,
+                    confidence_score=0.72,
+                    current_odds=2.0,
+                    expected_value=0.24,
+                    risk_flags_json='["no_current_risk_flags"]',
+                    rationale="Positive edge is above recommendation threshold.",
+                ),
+                PaperRecommendation(
+                    match_id=enriched_match.id,
+                    prediction_id=enriched_prediction.id,
+                    source_match_id=enriched_match.source_match_id,
+                    bookmaker="Misli.az",
+                    market="1X2",
+                    selection="HOME",
+                    latest_snapshot_time="2026-06-04T09:00:00+00:00",
+                    model_name="baseline_heuristic",
+                    model_version="v0",
+                    grade="recommended",
+                    status="active",
+                    model_probability=0.64,
+                    implied_probability=0.5,
+                    edge=0.14,
+                    confidence_score=0.8,
+                    current_odds=2.0,
+                    expected_value=0.28,
+                    risk_flags_json='["no_current_risk_flags"]',
+                    rationale="Positive edge is above recommendation threshold.",
+                ),
+            ]
         )
 
 

@@ -100,6 +100,13 @@ class Feature(Base):
     bookmaker_margin_estimate: Mapped[float | None]
     home_elo_rating: Mapped[float | None]
     away_elo_rating: Mapped[float | None]
+    enrichment_tier: Mapped[str | None] = mapped_column(String)
+    feature_provenance_json: Mapped[str | None] = mapped_column(Text)
+    home_rest_days: Mapped[float | None]
+    away_rest_days: Mapped[float | None]
+    home_goal_difference_trend_5: Mapped[float | None]
+    away_goal_difference_trend_5: Mapped[float | None]
+    odds_movement_velocity: Mapped[float | None]
     feature_version: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
 

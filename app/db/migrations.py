@@ -11,6 +11,7 @@ MIGRATION_NAMES = [
     "007_create_live_snapshots",
     "008_create_result_fetch_jobs",
     "009_add_recommendation_confidence_audit_columns",
+    "010_add_feature_enrichment_columns",
 ]
 
 
@@ -32,6 +33,11 @@ def run_migrations(engine) -> None:
                 connection,
                 "009_add_recommendation_confidence_audit_columns",
                 _add_recommendation_confidence_audit_columns,
+            )
+            _run_migration(
+                connection,
+                "010_add_feature_enrichment_columns",
+                _add_feature_enrichment_columns,
             )
             return
         _run_migration(
@@ -78,6 +84,11 @@ def run_migrations(engine) -> None:
             connection,
             "009_add_recommendation_confidence_audit_columns",
             _add_recommendation_confidence_audit_columns,
+        )
+        _run_migration(
+            connection,
+            "010_add_feature_enrichment_columns",
+            _add_feature_enrichment_columns,
         )
 
 
@@ -143,7 +154,10 @@ def _create_schema_migrations(connection) -> None:
 
 def _record_noop_migrations_for_model_managed_database(connection) -> None:
     for migration_name in MIGRATION_NAMES:
-        if migration_name == "009_add_recommendation_confidence_audit_columns":
+        if migration_name in {
+            "009_add_recommendation_confidence_audit_columns",
+            "010_add_feature_enrichment_columns",
+        }:
             continue
         connection.exec_driver_sql(
             """
@@ -487,6 +501,28 @@ def _add_recommendation_confidence_audit_columns(connection) -> None:
         connection.exec_driver_sql(
             "ALTER TABLE paper_recommendations ADD COLUMN confidence_adjustment_reason TEXT"
         )
+
+
+def _add_feature_enrichment_columns(connection) -> None:
+    table_names = _table_names(connection)
+    if "features" not in table_names:
+        return
+
+    column_names = _column_names(connection, "features")
+    column_definitions = {
+        "enrichment_tier": "TEXT",
+        "feature_provenance_json": "TEXT",
+        "home_rest_days": "REAL",
+        "away_rest_days": "REAL",
+        "home_goal_difference_trend_5": "REAL",
+        "away_goal_difference_trend_5": "REAL",
+        "odds_movement_velocity": "REAL",
+    }
+    for column_name, column_type in column_definitions.items():
+        if column_name not in column_names:
+            connection.exec_driver_sql(
+                f"ALTER TABLE features ADD COLUMN {column_name} {column_type}"
+            )
 
 
 def _table_names(connection) -> set[str]:

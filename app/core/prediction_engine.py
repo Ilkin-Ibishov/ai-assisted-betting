@@ -16,6 +16,12 @@ class PredictionInput:
     home_advantage_flag: int
     home_elo_rating: float | None = None
     away_elo_rating: float | None = None
+    enrichment_tier: str = "cold_start"
+    home_rest_days: float | None = None
+    away_rest_days: float | None = None
+    home_goal_difference_trend_5: float = 0.0
+    away_goal_difference_trend_5: float = 0.0
+    odds_movement_velocity: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -39,7 +45,8 @@ class BaselineHeuristicPredictionEngine:
 
     def predict(self, prediction_input: PredictionInput) -> PredictionOutput:
         base = prediction_input.bookmaker_probability
-        adjustment = _home_adjustment(prediction_input)
+        enriched_adjustment = _enriched_home_adjustment(prediction_input)
+        adjustment = _home_adjustment(prediction_input) + enriched_adjustment
         if prediction_input.selection == "AWAY":
             adjustment = -adjustment
         elif prediction_input.selection == "DRAW":
@@ -60,7 +67,11 @@ class BaselineHeuristicPredictionEngine:
             edge=edge,
             confidence_score=confidence_score,
             decision="SKIP",
-            reason="baseline heuristic probability generated",
+            reason=(
+                "baseline heuristic probability generated with enriched feature signal"
+                if enriched_adjustment
+                else "baseline heuristic probability generated"
+            ),
         )
 
 
@@ -128,6 +139,36 @@ def _home_adjustment(prediction_input: PredictionInput) -> float:
         0.01 * form_diff
         + 0.02 * goal_diff
         + 0.02 * prediction_input.home_advantage_flag
+    )
+
+
+def _enriched_home_adjustment(prediction_input: PredictionInput) -> float:
+    if prediction_input.enrichment_tier == "cold_start":
+        return 0.0
+    rest_advantage = 0.0
+    if (
+        prediction_input.home_rest_days is not None
+        and prediction_input.away_rest_days is not None
+    ):
+        rest_advantage = _clamp(
+            (prediction_input.home_rest_days - prediction_input.away_rest_days) / 10,
+            -0.5,
+            0.5,
+        )
+    trend_advantage = _clamp(
+        (
+            prediction_input.home_goal_difference_trend_5
+            - prediction_input.away_goal_difference_trend_5
+        )
+        / 3,
+        -0.5,
+        0.5,
+    )
+    movement_signal = _clamp(-prediction_input.odds_movement_velocity * 2, -0.5, 0.5)
+    tier_weight = 0.5 if prediction_input.enrichment_tier == "partial_enriched" else 1.0
+    return round(
+        tier_weight * (0.015 * rest_advantage + 0.02 * trend_advantage + 0.01 * movement_signal),
+        6,
     )
 
 

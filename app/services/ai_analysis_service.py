@@ -12,6 +12,7 @@ from app.db.models import (
     PaperBet,
     PaperCombination,
     PaperRecommendation,
+    Prediction,
 )
 from app.services.ai_analysis_evals import evaluate_ai_analysis_output
 from app.services.ai_prompt_registry import (
@@ -684,9 +685,21 @@ def _recommendation_review_input(engine: Engine, *, limit: int) -> dict[str, Any
             .order_by(EvaluationRun.created_at.desc(), EvaluationRun.id.desc())
             .limit(1)
         )
+        prediction_ids = [
+            recommendation.prediction_id
+            for recommendation in recommendations
+            if recommendation.prediction_id is not None
+        ]
+        predictions_by_id = {
+            prediction.id: prediction
+            for prediction in session.scalars(
+                select(Prediction).where(Prediction.id.in_(prediction_ids))
+            )
+        } if prediction_ids else {}
     return {
         "paper_recommendations": [
-            _recommendation_review_record(item) for item in recommendations
+            _recommendation_review_record(item, predictions_by_id.get(item.prediction_id))
+            for item in recommendations
         ],
         "paper_combinations": [_combination_review_record(item) for item in combinations],
         "provider_health": _live_run_input(latest_provider_run),
@@ -694,7 +707,11 @@ def _recommendation_review_input(engine: Engine, *, limit: int) -> dict[str, Any
     }
 
 
-def _recommendation_review_record(recommendation: PaperRecommendation) -> dict[str, Any]:
+def _recommendation_review_record(
+    recommendation: PaperRecommendation,
+    prediction: Prediction | None = None,
+) -> dict[str, Any]:
+    provenance = _feature_provenance_from_reason(prediction.reason if prediction else None)
     return {
         "id": recommendation.id,
         "source_match_id": recommendation.source_match_id,
@@ -714,6 +731,8 @@ def _recommendation_review_record(recommendation: PaperRecommendation) -> dict[s
         "expected_value": recommendation.expected_value,
         "risk_flags": json.loads(recommendation.risk_flags_json),
         "rationale": recommendation.rationale,
+        "feature_tier": provenance["feature_tier"],
+        "feature_provenance": provenance["feature_provenance"],
     }
 
 
@@ -775,6 +794,11 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
     calibrated_recommendations = [
         item for item in recommendations if item.get("confidence_adjustment_reason")
     ]
+    odds_only_actionable = [
+        item
+        for item in recommendations
+        if item.get("feature_tier") == "cold_start" and _is_actionable_recommendation(item)
+    ]
     risky_combinations = [
         item
         for item in combinations
@@ -813,6 +837,18 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
         )
         next_checks.append(
             "Compare raw-confidence and calibrated-confidence recommendation outcomes."
+        )
+    if odds_only_actionable:
+        risk_flags.append("odds_only_actionable_recommendations")
+        concerns.append(
+            "Some actionable recommendations still rely on cold-start odds-only features."
+        )
+        next_checks.insert(
+            0,
+            (
+                "Prefer enriched actionable rows over odds-only actionable rows until "
+                "backtests separate them."
+            ),
         )
     if risky_combinations:
         risk_flags.append("combination_correlation_heuristic")
@@ -897,10 +933,7 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
     actionable = [
         item
         for item in recommendations
-        if item["status"] == "active"
-        and item["grade"] in {"recommended", "lean"}
-        and float(item["expected_value"] or 0) > 0
-        and not set(item["risk_flags"]).intersection(blocking_flags)
+        if _is_actionable_recommendation(item, blocking_flags=blocking_flags)
     ]
     max_confidence = max(confidence_values) if confidence_values else None
     return {
@@ -918,6 +951,16 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
         "confidence_adjusted_count": len(
             [item for item in recommendations if item.get("confidence_adjustment_reason")]
         ),
+        "odds_only_actionable_count": len(
+            [item for item in actionable if item.get("feature_tier") == "cold_start"]
+        ),
+        "enriched_actionable_count": len(
+            [
+                item
+                for item in actionable
+                if item.get("feature_tier") in {"partial_enriched", "full_enriched"}
+            ]
+        ),
         "max_confidence_score": round(max_confidence, 6)
         if max_confidence is not None
         else None,
@@ -927,6 +970,50 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
             and max_confidence is not None
             and max_confidence < 0.5
         ),
+    }
+
+
+def _is_actionable_recommendation(
+    item: dict[str, Any],
+    *,
+    blocking_flags: set[str] | None = None,
+) -> bool:
+    if blocking_flags is None:
+        blocking_flags = {
+            "negative_expected_value",
+            "missing_prediction",
+            "stale_odds",
+            "missing_outcome",
+            "provider_health_warning",
+            "edge_below_threshold",
+            "low_confidence",
+        }
+    return (
+        item["status"] == "active"
+        and item["grade"] in {"recommended", "lean"}
+        and float(item["expected_value"] or 0) > 0
+        and not set(item["risk_flags"]).intersection(blocking_flags)
+    )
+
+
+def _feature_provenance_from_reason(reason: str | None) -> dict[str, Any]:
+    if not reason:
+        return {"feature_tier": "unknown", "feature_provenance": []}
+    parts = [part.strip() for part in reason.split(";")]
+    values: dict[str, str] = {}
+    for part in parts:
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        values[key.strip()] = value.strip()
+    provenance = [
+        value
+        for value in values.get("feature_provenance", "").split(",")
+        if value
+    ]
+    return {
+        "feature_tier": values.get("feature_tier", "unknown"),
+        "feature_provenance": provenance,
     }
 
 

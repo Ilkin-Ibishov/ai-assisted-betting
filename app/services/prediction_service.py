@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 
 from sqlalchemy import Engine, select
@@ -115,6 +116,19 @@ class PredictionService:
                         bookmaker_margin_estimate=built_feature.bookmaker_margin_estimate,
                         home_elo_rating=built_feature.home_elo_rating,
                         away_elo_rating=built_feature.away_elo_rating,
+                        enrichment_tier=built_feature.enrichment_tier,
+                        feature_provenance_json=json.dumps(
+                            list(built_feature.feature_provenance)
+                        ),
+                        home_rest_days=built_feature.home_rest_days,
+                        away_rest_days=built_feature.away_rest_days,
+                        home_goal_difference_trend_5=(
+                            built_feature.home_goal_difference_trend_5
+                        ),
+                        away_goal_difference_trend_5=(
+                            built_feature.away_goal_difference_trend_5
+                        ),
+                        odds_movement_velocity=built_feature.odds_movement_velocity,
                         feature_version=self.settings.feature_version,
                     )
                     items_created += 1
@@ -180,7 +194,21 @@ class PredictionService:
                         home_advantage_flag=feature.home_advantage_flag or 0,
                         home_elo_rating=feature.home_elo_rating,
                         away_elo_rating=feature.away_elo_rating,
+                        enrichment_tier=feature.enrichment_tier or "cold_start",
+                        home_rest_days=feature.home_rest_days,
+                        away_rest_days=feature.away_rest_days,
+                        home_goal_difference_trend_5=(
+                            feature.home_goal_difference_trend_5 or 0
+                        ),
+                        away_goal_difference_trend_5=(
+                            feature.away_goal_difference_trend_5 or 0
+                        ),
+                        odds_movement_velocity=feature.odds_movement_velocity or 0,
                     )
+                )
+                reason = (
+                    f"{output.reason}; feature_tier={feature.enrichment_tier or 'cold_start'}; "
+                    f"feature_provenance={_feature_provenance_label(feature.feature_provenance_json)}"
                 )
                 prediction_repository.add(
                     match_id=output.match_id,
@@ -193,7 +221,7 @@ class PredictionService:
                     edge=output.edge,
                     confidence_score=output.confidence_score,
                     decision=output.decision,
-                    reason=output.reason,
+                    reason=reason,
                 )
                 items_created += 1
                 log_repository.add(
@@ -253,7 +281,10 @@ class PredictionService:
                     model_probability=prediction.model_probability,
                 )
                 prediction.decision = value_decision.decision
-                prediction.reason = value_decision.reason
+                prediction.reason = _merge_reason_with_feature_provenance(
+                    value_decision.reason,
+                    prediction.reason,
+                )
 
                 if not logger.should_create(
                     prediction=prediction,
@@ -287,3 +318,29 @@ class PredictionService:
                 )
 
         return StepSummary(items_read, items_created, 0, items_skipped, 0)
+
+
+def _feature_provenance_label(raw_value: str | None) -> str:
+    if not raw_value:
+        return "unknown"
+    try:
+        values = json.loads(raw_value)
+    except json.JSONDecodeError:
+        return "unknown"
+    if not isinstance(values, list):
+        return "unknown"
+    labels = [str(value) for value in values if value]
+    return ",".join(labels) if labels else "unknown"
+
+
+def _merge_reason_with_feature_provenance(reason: str, previous_reason: str | None) -> str:
+    if not previous_reason:
+        return reason
+    provenance_parts = [
+        part.strip()
+        for part in previous_reason.split(";")
+        if part.strip().startswith(("feature_tier=", "feature_provenance="))
+    ]
+    if not provenance_parts:
+        return reason
+    return f"{reason}; {'; '.join(provenance_parts)}"

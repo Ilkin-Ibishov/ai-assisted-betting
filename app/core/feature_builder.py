@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.db.models import Match, OddsSnapshot
 
@@ -19,6 +20,13 @@ class BuiltFeature:
     bookmaker_margin_estimate: float
     home_elo_rating: float
     away_elo_rating: float
+    enrichment_tier: str
+    feature_provenance: tuple[str, ...]
+    home_rest_days: float | None
+    away_rest_days: float | None
+    home_goal_difference_trend_5: float
+    away_goal_difference_trend_5: float
+    odds_movement_velocity: float
 
 
 class FeatureBuilder:
@@ -55,6 +63,11 @@ class FeatureBuilder:
 
         home_stats = _team_stats_or_neutral(match.home_team, home_history)
         away_stats = _team_stats_or_neutral(match.away_team, away_history)
+        enrichment_tier = _enrichment_tier(home_history, away_history)
+        feature_provenance = _feature_provenance(
+            enrichment_tier,
+            has_odds_movement=_has_odds_movement(odds_snapshots),
+        )
         ratings = _elo_ratings_before(
             match.kickoff_time,
             completed_matches,
@@ -80,6 +93,13 @@ class FeatureBuilder:
                 bookmaker_margin_estimate=round(margin, 6),
                 home_elo_rating=round(ratings.get(match.home_team, self.elo_initial_rating), 6),
                 away_elo_rating=round(ratings.get(match.away_team, self.elo_initial_rating), 6),
+                enrichment_tier=enrichment_tier,
+                feature_provenance=feature_provenance,
+                home_rest_days=_rest_days(match.kickoff_time, home_history),
+                away_rest_days=_rest_days(match.kickoff_time, away_history),
+                home_goal_difference_trend_5=home_stats.goal_difference_trend,
+                away_goal_difference_trend_5=away_stats.goal_difference_trend,
+                odds_movement_velocity=_odds_movement_velocity(snapshot, odds_snapshots),
             )
             for snapshot in odds_snapshots
         ]
@@ -90,6 +110,7 @@ class _TeamStats:
     form_points: float
     goals_for_avg: float
     goals_against_avg: float
+    goal_difference_trend: float
 
 
 def _team_history(team: str, kickoff_time: str, completed_matches: list[Match]) -> list[Match]:
@@ -129,6 +150,7 @@ def _team_stats(team: str, matches: list[Match]) -> _TeamStats:
         form_points=round(points / count, 6),
         goals_for_avg=round(goals_for / count, 6),
         goals_against_avg=round(goals_against / count, 6),
+        goal_difference_trend=round((goals_for - goals_against) / count, 6),
     )
 
 
@@ -138,8 +160,75 @@ def _team_stats_or_neutral(team: str, matches: list[Match]) -> _TeamStats:
             form_points=0.0,
             goals_for_avg=0.0,
             goals_against_avg=0.0,
+            goal_difference_trend=0.0,
         )
     return _team_stats(team, matches)
+
+
+def _enrichment_tier(home_history: list[Match], away_history: list[Match]) -> str:
+    minimum_history = min(len(home_history), len(away_history))
+    if minimum_history >= 3:
+        return "full_enriched"
+    if minimum_history > 0:
+        return "partial_enriched"
+    return "cold_start"
+
+
+def _feature_provenance(enrichment_tier: str, *, has_odds_movement: bool) -> tuple[str, ...]:
+    labels = ["market_overround_normalized"]
+    if enrichment_tier == "cold_start":
+        labels.append("cold_start_history")
+    else:
+        labels.extend(["recent_form", "home_away_split", "rest_days", "goal_difference_trend"])
+    if has_odds_movement:
+        labels.append("odds_movement_velocity")
+    if enrichment_tier == "full_enriched":
+        labels.append("elo_rating")
+    return tuple(labels)
+
+
+def _rest_days(kickoff_time: str, history: list[Match]) -> float | None:
+    if not history:
+        return None
+    kickoff = _parse_datetime(kickoff_time)
+    previous = _parse_datetime(history[0].kickoff_time)
+    return round((kickoff - previous).total_seconds() / 86400, 6)
+
+
+def _has_odds_movement(odds_snapshots: list[OddsSnapshot]) -> bool:
+    selections = {snapshot.selection for snapshot in odds_snapshots}
+    return any(
+        len([snapshot for snapshot in odds_snapshots if snapshot.selection == selection]) > 1
+        for selection in selections
+    )
+
+
+def _odds_movement_velocity(
+    current_snapshot: OddsSnapshot,
+    odds_snapshots: list[OddsSnapshot],
+) -> float:
+    selection_snapshots = sorted(
+        [
+            snapshot
+            for snapshot in odds_snapshots
+            if snapshot.selection == current_snapshot.selection
+        ],
+        key=lambda snapshot: snapshot.snapshot_time,
+    )
+    if len(selection_snapshots) < 2:
+        return 0.0
+    first = selection_snapshots[0]
+    last = selection_snapshots[-1]
+    elapsed_hours = (
+        _parse_datetime(last.snapshot_time) - _parse_datetime(first.snapshot_time)
+    ).total_seconds() / 3600
+    if elapsed_hours <= 0:
+        return 0.0
+    return round((last.odds_decimal - first.odds_decimal) / elapsed_hours, 6)
+
+
+def _parse_datetime(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _elo_ratings_before(
