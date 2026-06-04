@@ -356,6 +356,72 @@ def test_ai_analysis_service_records_recommendation_backtest_advisory(tmp_path) 
     engine.dispose()
 
 
+def test_ai_analysis_service_answers_whether_confidence_calibration_should_remain_enabled(
+    tmp_path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'calibration-backtest-ai.sqlite').as_posix()}"
+    init_db(database_url)
+    report_path = tmp_path / "pytest_calibration_recommendation_backtest.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "report_type": "recommendation_backtest",
+                    "report_name": "pytest_calibration",
+                },
+                "singles": {"settled_bets": 120, "roi": 0.01},
+                "combinations": {"settled_bets": 10, "roi": -0.2},
+                "threshold_sensitivity": [],
+                "calibration_scenarios": [
+                    {
+                        "name": "raw_confidence_ev_0_10_conf_0_50_odds_cap_6_00",
+                        "confidence_mode": "raw_model",
+                        "settled_bets": 40,
+                        "roi": -0.05,
+                        "hit_rate": 0.35,
+                        "brier_score": 0.29,
+                        "log_loss": 0.82,
+                        "max_drawdown_units": 7.0,
+                    },
+                    {
+                        "name": "calibrated_confidence_ev_0_10_conf_0_50_odds_cap_6_00",
+                        "confidence_mode": "calibrated_recommendation",
+                        "settled_bets": 45,
+                        "roi": 0.08,
+                        "hit_rate": 0.42,
+                        "brier_score": 0.25,
+                        "log_loss": 0.72,
+                        "max_drawdown_units": 5.0,
+                    },
+                ],
+                "calibration_comparison": {
+                    "raw_scenario": "raw_confidence_ev_0_10_conf_0_50_odds_cap_6_00",
+                    "calibrated_scenario": (
+                        "calibrated_confidence_ev_0_10_conf_0_50_odds_cap_6_00"
+                    ),
+                    "candidate_delta": 5,
+                    "roi_delta": 0.13,
+                    "hit_rate_delta": 0.07,
+                    "brier_score_delta": -0.04,
+                    "log_loss_delta": -0.1,
+                    "max_drawdown_delta": -2.0,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    engine = create_engine_from_url(database_url)
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_backtest_report(report_path)
+
+    output = json.loads(analysis.output_json)
+    assert output["calibration_decision"] == "keep_enabled_provisionally"
+    assert "confidence_calibration_supported" in output["risk_flags"]
+    assert "small_calibration_sample" in output["risk_flags"]
+    assert any("calibration" in action.lower() for action in output["recommended_next_actions"])
+    engine.dispose()
+
+
 def _seed_failed_misli_run(engine) -> None:
     with session_scope(engine) as session:
         repository = LiveRunRepository(session)

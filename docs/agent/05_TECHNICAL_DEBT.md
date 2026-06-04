@@ -417,15 +417,16 @@ Task 72 added nullable confidence-audit columns, preserved raw prediction confid
 
 ### P1 - High-EV Confidence Calibration Needs Backtest Proof
 
-Status: accepted
+Status: resolved
 Introduced: High-EV confidence calibration on 2026-06-03
+Resolved by: Task 73 - Confidence Calibration Backtest Scenarios
 Owner: Task 73 - Confidence Calibration Backtest Scenarios
 Area: model evaluation
 
 The calibration change improved live paper candidate visibility, but it could still be confidence theater unless settled outcomes and historical backtests show better behavior.
 
-Resolution target:
-Compare raw-confidence and calibrated-confidence recommendation scenarios with ROI, calibration, drawdown, edge buckets, odds buckets, confidence buckets, and sample-size warnings.
+Resolution:
+Task 73 added raw-versus-calibrated confidence backtest scenarios with EV thresholds, confidence floors, odds caps, ROI, hit rate, Brier score, log loss, drawdown, settled sample size, edge buckets, odds buckets, confidence buckets, calibrated-candidate counts, and AI backtest guidance that marks calibration as provisional when sample size is small.
 
 ### P2 - Team Strength Inputs Are Still Thin
 

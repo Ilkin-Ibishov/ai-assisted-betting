@@ -443,6 +443,8 @@ def _recommendation_backtest_input(report_path: Path) -> dict[str, Any]:
         "market_buckets": report.get("market_buckets", {}),
         "model_provider_splits": report.get("model_provider_splits", {}),
         "threshold_sensitivity": report.get("threshold_sensitivity", []),
+        "calibration_scenarios": report.get("calibration_scenarios", []),
+        "calibration_comparison": report.get("calibration_comparison", {}),
     }
 
 
@@ -450,8 +452,12 @@ def _recommendation_backtest_output(input_payload: dict[str, Any]) -> dict[str, 
     singles = input_payload["singles"]
     combinations = input_payload["combinations"]
     threshold_sensitivity = input_payload["threshold_sensitivity"]
+    calibration_comparison = input_payload.get("calibration_comparison", {})
     singles_roi = _metric_value(singles.get("roi"))
     combinations_roi = _metric_value(combinations.get("roi"))
+    calibration_decision, calibration_flags, calibration_action = _calibration_decision(
+        calibration_comparison
+    )
     risk_flags: list[str] = []
     recommended_actions = [
         "Replay a larger historical sample before changing paper recommendation thresholds.",
@@ -480,6 +486,9 @@ def _recommendation_backtest_output(input_payload: dict[str, Any]) -> dict[str, 
         recommended_actions.append(
             "Compare stricter edge and confidence thresholds in the next replay batch."
         )
+    risk_flags.extend(calibration_flags)
+    if calibration_action is not None:
+        recommended_actions.insert(0, calibration_action)
     return {
         "label": "AI-assisted advisory analysis",
         "short_summary": (
@@ -496,7 +505,71 @@ def _recommendation_backtest_output(input_payload: dict[str, Any]) -> dict[str, 
         "recommended_next_actions": recommended_actions,
         "confidence": "medium" if risk_flags else "high",
         "source_record_ids": [input_payload["report_name"]],
+        "calibration_decision": calibration_decision,
     }
+
+
+def _calibration_decision(
+    calibration_comparison: dict[str, Any],
+) -> tuple[str, list[str], str | None]:
+    if not calibration_comparison:
+        return (
+            "insufficient_evidence",
+            ["confidence_calibration_not_backtested"],
+            (
+                "Generate raw-versus-calibrated confidence backtest scenarios before "
+                "trusting calibration."
+            ),
+        )
+
+    candidate_delta = _metric_value(calibration_comparison.get("candidate_delta")) or 0.0
+    roi_delta = _metric_value(calibration_comparison.get("roi_delta"))
+    hit_rate_delta = _metric_value(calibration_comparison.get("hit_rate_delta"))
+    brier_delta = _metric_value(calibration_comparison.get("brier_score_delta"))
+    log_loss_delta = _metric_value(calibration_comparison.get("log_loss_delta"))
+    drawdown_delta = _metric_value(calibration_comparison.get("max_drawdown_delta"))
+    sample_size = _calibrated_scenario_sample(calibration_comparison)
+
+    improved_metrics = sum(
+        [
+            roi_delta is not None and roi_delta > 0,
+            hit_rate_delta is not None and hit_rate_delta > 0,
+            brier_delta is not None and brier_delta < 0,
+            log_loss_delta is not None and log_loss_delta < 0,
+            drawdown_delta is not None and drawdown_delta <= 0,
+        ]
+    )
+    flags: list[str] = []
+    if sample_size < 300:
+        flags.append("small_calibration_sample")
+    if candidate_delta > 0 and improved_metrics >= 3:
+        flags.append("confidence_calibration_supported")
+        decision = "keep_enabled" if sample_size >= 300 else "keep_enabled_provisionally"
+        return (
+            decision,
+            flags,
+            (
+                "Keep confidence calibration enabled provisionally and rerun the comparison "
+                "after more settled samples."
+            ),
+        )
+    flags.append("confidence_calibration_unsupported")
+    return (
+        "disable_or_tighten",
+        flags,
+        "Disable or tighten confidence calibration until raw-versus-calibrated scenarios improve.",
+    )
+
+
+def _calibrated_scenario_sample(calibration_comparison: dict[str, Any]) -> int:
+    raw_delta = calibration_comparison.get("candidate_delta")
+    sample = calibration_comparison.get("calibrated_settled_bets")
+    if sample is not None:
+        return int(sample)
+    raw_sample = calibration_comparison.get("raw_settled_bets")
+    if raw_sample is not None and raw_delta is not None:
+        return int(raw_sample) + int(raw_delta)
+    return 0
 
 
 def _provider_health_input(engine: Engine, provider: str) -> dict[str, Any]:

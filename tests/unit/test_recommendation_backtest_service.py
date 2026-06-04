@@ -51,6 +51,59 @@ def test_recommendation_backtest_thresholds_change_selected_candidates(
     assert strict["singles"]["roi"] > loose["singles"]["roi"]
 
 
+def test_recommendation_backtest_compares_raw_and_calibrated_confidence_scenarios(
+    tmp_path: Path,
+) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'calibration.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_backtest_dataset(engine)
+    with session_scope(engine) as session:
+        calibrated_win = _match(session, "match-calibrated-win", "HOME")
+        _recommendation(
+            session,
+            calibrated_win,
+            "HOME",
+            odds=2.5,
+            edge=0.14,
+            confidence=0.52,
+            model_confidence=0.133333,
+            recommendation_confidence=0.52,
+            confidence_adjustment_reason="high_ev_confidence_calibration",
+        )
+        capped_odds_loss = _match(session, "match-capped-odds-loss", "AWAY")
+        _recommendation(
+            session,
+            capped_odds_loss,
+            "HOME",
+            odds=7.5,
+            edge=0.2,
+            confidence=0.8,
+            model_confidence=0.8,
+            recommendation_confidence=0.8,
+        )
+
+    report = RecommendationBacktestService(engine).backtest(
+        RecommendationBacktestRequest(report_name="pytest_calibration_backtest")
+    )
+
+    scenarios = {scenario["name"]: scenario for scenario in report["calibration_scenarios"]}
+    raw = scenarios["raw_confidence_ev_0_10_conf_0_50_odds_cap_6_00"]
+    calibrated = scenarios["calibrated_confidence_ev_0_10_conf_0_50_odds_cap_6_00"]
+    no_odds_cap = scenarios["calibrated_confidence_ev_0_10_conf_0_50_no_odds_cap"]
+
+    assert raw["confidence_mode"] == "raw_model"
+    assert calibrated["confidence_mode"] == "calibrated_recommendation"
+    assert raw["settled_bets"] == 2
+    assert calibrated["settled_bets"] == 3
+    assert calibrated["calibrated_candidate_count"] == 1
+    assert calibrated["confidence_buckets"]["0.50-0.65"]["settled_bets"] == 1
+    assert calibrated["odds_buckets"]["2.50-3.50"]["settled_bets"] == 1
+    assert no_odds_cap["settled_bets"] == 4
+    assert report["calibration_comparison"]["candidate_delta"] == 1
+    assert report["calibration_comparison"]["raw_scenario"] == raw["name"]
+    assert report["calibration_comparison"]["calibrated_scenario"] == calibrated["name"]
+
+
 def test_recommendation_backtest_exports_dashboard_consumable_report(
     tmp_path: Path,
 ) -> None:
@@ -128,6 +181,9 @@ def _recommendation(
     odds: float,
     edge: float,
     confidence: float,
+    model_confidence: float | None = None,
+    recommendation_confidence: float | None = None,
+    confidence_adjustment_reason: str | None = None,
 ) -> PaperRecommendation:
     recommendation = PaperRecommendation(
         match_id=match.id,
@@ -144,6 +200,9 @@ def _recommendation(
         implied_probability=1 / odds,
         edge=edge,
         confidence_score=confidence,
+        model_confidence_score=model_confidence,
+        recommendation_confidence_score=recommendation_confidence,
+        confidence_adjustment_reason=confidence_adjustment_reason,
         current_odds=odds,
         expected_value=(0.6 * odds) - 1,
         risk_flags_json='["no_current_risk_flags"]',

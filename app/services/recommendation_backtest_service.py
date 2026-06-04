@@ -25,7 +25,7 @@ class RecommendationBacktestService:
         self.engine = engine
 
     def backtest(self, request: RecommendationBacktestRequest) -> dict[str, Any]:
-        singles, combinations = _load_backtest_inputs(self.engine, request)
+        eligible_singles, singles, combinations = _load_backtest_inputs(self.engine, request)
         single_bets = [_single_backtest_bet(row) for row in singles]
         single_bets = [bet for bet in single_bets if bet is not None]
         combination_bets = [_combination_backtest_bet(row, single_bets) for row in combinations]
@@ -33,6 +33,7 @@ class RecommendationBacktestService:
 
         singles_metrics = _metrics(single_bets)
         combinations_metrics = _metrics(combination_bets)
+        calibration_scenarios = _calibration_scenarios(eligible_singles)
         return {
             "metadata": {
                 "report_type": "recommendation_backtest",
@@ -58,7 +59,11 @@ class RecommendationBacktestService:
                 single_bets,
                 lambda bet: f"{bet['model_name']}/{bet['bookmaker']}",
             ),
-            "threshold_sensitivity": _threshold_sensitivity(singles),
+            "odds_buckets": _bucket_metrics(single_bets, _odds_bucket),
+            "confidence_buckets": _bucket_metrics(single_bets, _confidence_bucket),
+            "threshold_sensitivity": _threshold_sensitivity(eligible_singles),
+            "calibration_scenarios": calibration_scenarios,
+            "calibration_comparison": _calibration_comparison(calibration_scenarios),
         }
 
     def export(
@@ -85,7 +90,11 @@ class RecommendationBacktestService:
 def _load_backtest_inputs(
     engine: Engine,
     request: RecommendationBacktestRequest,
-) -> tuple[list[tuple[PaperRecommendation, Match]], list[PaperCombination]]:
+) -> tuple[
+    list[tuple[PaperRecommendation, Match]],
+    list[tuple[PaperRecommendation, Match]],
+    list[PaperCombination],
+]:
     with session_scope(engine) as session:
         singles = list(
             session.execute(
@@ -99,9 +108,10 @@ def _load_backtest_inputs(
                 .order_by(PaperRecommendation.created_at.asc(), PaperRecommendation.id.asc())
             )
         )
+        eligible_singles = [(recommendation, match) for recommendation, match in singles]
         filtered_singles = [
             (recommendation, match)
-            for recommendation, match in singles
+            for recommendation, match in eligible_singles
             if _passes_thresholds(recommendation, request.min_edge, request.min_confidence)
         ]
         combinations = list(
@@ -111,10 +121,14 @@ def _load_backtest_inputs(
                 .order_by(PaperCombination.rank.asc(), PaperCombination.id.asc())
             )
         )
-    return filtered_singles, combinations
+    return eligible_singles, filtered_singles, combinations
 
 
-def _single_backtest_bet(row: tuple[PaperRecommendation, Match]) -> dict[str, Any] | None:
+def _single_backtest_bet(
+    row: tuple[PaperRecommendation, Match],
+    *,
+    confidence_score: float | None = None,
+) -> dict[str, Any] | None:
     recommendation, match = row
     if recommendation.current_odds is None or recommendation.model_probability is None:
         return None
@@ -134,7 +148,12 @@ def _single_backtest_bet(row: tuple[PaperRecommendation, Match]) -> dict[str, An
         "bookmaker": recommendation.bookmaker,
         "model_name": recommendation.model_name,
         "grade": recommendation.grade,
-        "confidence_score": recommendation.confidence_score,
+        "confidence_score": confidence_score
+        if confidence_score is not None
+        else recommendation.confidence_score,
+        "model_confidence_score": recommendation.model_confidence_score,
+        "recommendation_confidence_score": recommendation.recommendation_confidence_score,
+        "confidence_adjustment_reason": recommendation.confidence_adjustment_reason,
     }
 
 
@@ -217,16 +236,147 @@ def _threshold_sensitivity(rows: list[tuple[PaperRecommendation, Match]]) -> lis
     return output
 
 
+def _calibration_scenarios(rows: list[tuple[PaperRecommendation, Match]]) -> list[dict[str, Any]]:
+    scenario_params = [
+        {"min_edge": 0.1, "min_confidence": 0.5, "max_odds": 6.0},
+        {"min_edge": 0.05, "min_confidence": 0.5, "max_odds": 6.0},
+        {"min_edge": 0.15, "min_confidence": 0.65, "max_odds": 3.5},
+        {"min_edge": 0.1, "min_confidence": 0.5, "max_odds": None},
+    ]
+    scenarios: list[dict[str, Any]] = []
+    for params in scenario_params:
+        for confidence_mode in ("raw_model", "calibrated_recommendation"):
+            bets = _scenario_bets(rows, confidence_mode=confidence_mode, **params)
+            metrics = _metrics(bets)
+            scenarios.append(
+                {
+                    "name": _scenario_name(confidence_mode, **params),
+                    "confidence_mode": confidence_mode,
+                    "min_edge": params["min_edge"],
+                    "min_confidence": params["min_confidence"],
+                    "max_odds": params["max_odds"],
+                    "calibrated_candidate_count": sum(
+                        1 for bet in bets if bet.get("confidence_adjustment_reason")
+                    ),
+                    **metrics,
+                    "edge_buckets": _bucket_metrics(bets, _edge_bucket),
+                    "odds_buckets": _bucket_metrics(bets, _odds_bucket),
+                    "confidence_buckets": _bucket_metrics(bets, _confidence_bucket),
+                }
+            )
+    return scenarios
+
+
+def _scenario_bets(
+    rows: list[tuple[PaperRecommendation, Match]],
+    *,
+    confidence_mode: str,
+    min_edge: float,
+    min_confidence: float,
+    max_odds: float | None,
+) -> list[dict[str, Any]]:
+    bets: list[dict[str, Any]] = []
+    for row in rows:
+        recommendation = row[0]
+        confidence = _scenario_confidence(recommendation, confidence_mode)
+        if not _passes_thresholds(
+            recommendation,
+            min_edge,
+            min_confidence,
+            max_odds=max_odds,
+            confidence_score=confidence,
+        ):
+            continue
+        bet = _single_backtest_bet(row, confidence_score=confidence)
+        if bet is not None:
+            bets.append(bet)
+    return bets
+
+
+def _scenario_confidence(recommendation: PaperRecommendation, confidence_mode: str) -> float | None:
+    if confidence_mode == "raw_model":
+        value = recommendation.model_confidence_score
+        if value is None:
+            value = recommendation.confidence_score
+    else:
+        value = recommendation.recommendation_confidence_score
+        if value is None:
+            value = recommendation.confidence_score
+    return float(value) if value is not None else None
+
+
+def _calibration_comparison(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
+    by_name = {scenario["name"]: scenario for scenario in scenarios}
+    raw_name = "raw_confidence_ev_0_10_conf_0_50_odds_cap_6_00"
+    calibrated_name = "calibrated_confidence_ev_0_10_conf_0_50_odds_cap_6_00"
+    raw = by_name.get(raw_name, {})
+    calibrated = by_name.get(calibrated_name, {})
+    return {
+        "raw_scenario": raw_name,
+        "calibrated_scenario": calibrated_name,
+        "raw_settled_bets": raw.get("settled_bets"),
+        "calibrated_settled_bets": calibrated.get("settled_bets"),
+        "candidate_delta": _metric_delta(calibrated, raw, "settled_bets"),
+        "roi_delta": _metric_delta(calibrated, raw, "roi"),
+        "hit_rate_delta": _metric_delta(calibrated, raw, "hit_rate"),
+        "brier_score_delta": _metric_delta(calibrated, raw, "brier_score"),
+        "log_loss_delta": _metric_delta(calibrated, raw, "log_loss"),
+        "max_drawdown_delta": _metric_delta(calibrated, raw, "max_drawdown_units"),
+    }
+
+
+def _metric_delta(
+    calibrated: dict[str, Any],
+    raw: dict[str, Any],
+    metric: str,
+) -> float | int | None:
+    calibrated_value = calibrated.get(metric)
+    raw_value = raw.get(metric)
+    if calibrated_value is None or raw_value is None:
+        return None
+    delta = float(calibrated_value) - float(raw_value)
+    if metric == "settled_bets":
+        return int(delta)
+    return round(delta, 6)
+
+
+def _scenario_name(
+    confidence_mode: str,
+    *,
+    min_edge: float,
+    min_confidence: float,
+    max_odds: float | None,
+) -> str:
+    prefix = "raw_confidence" if confidence_mode == "raw_model" else "calibrated_confidence"
+    odds_part = "no_odds_cap" if max_odds is None else f"odds_cap_{_scenario_number(max_odds)}"
+    return (
+        f"{prefix}_ev_{_scenario_number(min_edge)}_conf_"
+        f"{_scenario_number(min_confidence)}_{odds_part}"
+    )
+
+
+def _scenario_number(value: float) -> str:
+    return f"{value:.2f}".replace(".", "_")
+
+
 def _passes_thresholds(
     recommendation: PaperRecommendation,
     min_edge: float,
     min_confidence: float,
+    *,
+    max_odds: float | None = None,
+    confidence_score: float | None = None,
 ) -> bool:
     if recommendation.edge is None or recommendation.edge < min_edge:
         return False
-    if recommendation.confidence_score is None:
+    if max_odds is not None and (
+        recommendation.current_odds is None or recommendation.current_odds > max_odds
+    ):
+        return False
+    confidence = recommendation.confidence_score if confidence_score is None else confidence_score
+    if confidence is None:
         return min_confidence <= 0
-    return recommendation.confidence_score >= min_confidence
+    return confidence >= min_confidence
 
 
 def _write_summary_csv(path: Path, report: dict[str, Any]) -> None:
@@ -335,6 +485,33 @@ def _edge_bucket(bet: dict[str, Any]) -> str:
     if edge < 0.1:
         return "0.05-0.10"
     return "0.10+"
+
+
+def _odds_bucket(bet: dict[str, Any]) -> str:
+    odds = float(bet["odds"])
+    if odds < 1.7:
+        return "<1.70"
+    if odds < 2.5:
+        return "1.70-2.50"
+    if odds < 3.5:
+        return "2.50-3.50"
+    if odds <= 6.0:
+        return "3.50-6.00"
+    return "6.00+"
+
+
+def _confidence_bucket(bet: dict[str, Any]) -> str:
+    confidence = bet.get("confidence_score")
+    if confidence is None:
+        return "missing"
+    value = float(confidence)
+    if value < 0.5:
+        return "<0.50"
+    if value < 0.65:
+        return "0.50-0.65"
+    if value < 0.8:
+        return "0.65-0.80"
+    return "0.80+"
 
 
 def _average(values: list[float]) -> float | None:
