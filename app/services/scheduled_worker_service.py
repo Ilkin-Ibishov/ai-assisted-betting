@@ -8,7 +8,7 @@ from sqlalchemy import Engine, select
 
 from app.config import Settings
 from app.db.engine import session_scope
-from app.db.models import LiveRun, utc_now_iso
+from app.db.models import AIAnalysisRun, LiveRun, utc_now_iso
 from app.db.repositories import LiveRunRepository
 from app.services.ai_analysis_service import AIAnalysisService
 from app.services.combination_service import CombinationService
@@ -20,10 +20,15 @@ from app.services.live_cycle_service import (
 )
 from app.services.misli_result_service import MisliResultService
 from app.services.prediction_service import StepSummary
+from app.services.recommendation_backtest_service import (
+    RecommendationBacktestRequest,
+    RecommendationBacktestService,
+)
 from app.services.recommendation_service import RecommendationService
 from app.services.settlement_service import SettlementService
 
 MAX_SNAPSHOT_DOWNLOAD_BYTES = 5_000_000
+SCHEDULED_WORKER_REPORTS_DIR = Path("reports/scheduled-worker")
 
 
 @dataclass(frozen=True)
@@ -46,6 +51,7 @@ class ScheduledPaperWorkerSummary:
     recommendation_items: int = 0
     combination_items: int = 0
     ai_review_id: int | None = None
+    threshold_review_id: int | None = None
     journal_id: int | None = None
     result_summary: StepSummary | None = None
     settlement_summary: StepSummary | None = None
@@ -146,6 +152,7 @@ class ScheduledPaperWorkerService:
         recommendation_items = 0
         combination_items = 0
         ai_review_id = None
+        threshold_review_id = None
         journal_id = None
         settlement_summary = None
         result_summary = None
@@ -162,6 +169,8 @@ class ScheduledPaperWorkerService:
                 settlement_summary = SettlementService(self.engine).settle_results()
             ai_review = AIAnalysisService(self.engine).analyze_recommendation_review()
             ai_review_id = ai_review.id
+            threshold_review = _generate_threshold_review(self.engine)
+            threshold_review_id = threshold_review.id
             journal = DailyPaperJournalService(
                 self.engine,
                 product_timezone=self.settings.product_timezone,
@@ -198,6 +207,7 @@ class ScheduledPaperWorkerService:
             recommendation_items=recommendation_items,
             combination_items=combination_items,
             ai_review_id=ai_review_id,
+            threshold_review_id=threshold_review_id,
             journal_id=journal_id,
             result_summary=result_summary,
             settlement_summary=settlement_summary,
@@ -271,3 +281,11 @@ def _provider_source(provider: str) -> str:
     if provider == "misli-public":
         return "misli_public"
     return provider
+
+
+def _generate_threshold_review(engine: Engine) -> AIAnalysisRun:
+    _csv_path, json_path, _report = RecommendationBacktestService(engine).export(
+        RecommendationBacktestRequest(report_name="scheduled_worker_threshold_review"),
+        reports_dir=SCHEDULED_WORKER_REPORTS_DIR,
+    )
+    return AIAnalysisService(engine).analyze_recommendation_backtest_report(json_path)

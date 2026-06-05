@@ -33,6 +33,7 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     monkeypatch.setenv("LIVE_COLLECTION_ENABLED", "true")
     monkeypatch.setenv("MIN_EDGE", "0.01")
+    monkeypatch.chdir(tmp_path)
     settings = load_settings()
     engine = create_engine_from_url(settings.database_url)
     Base.metadata.create_all(engine)
@@ -67,6 +68,13 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
                 select(AIAnalysisRun).where(AIAnalysisRun.analysis_type == "recommendation_review")
             )
         )
+        threshold_reviews = list(
+            session.scalars(
+                select(AIAnalysisRun).where(
+                    AIAnalysisRun.analysis_type == "recommendation_backtest_summary"
+                )
+            )
+        )
         journals = list(session.scalars(select(PaperJournalEntry)))
 
     assert worker_run is not None
@@ -76,8 +84,12 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
     assert len(recommendations) == summary.recommendation_items
     assert len(combinations) == summary.combination_items
     assert len(ai_reviews) == 1
+    assert len(threshold_reviews) == 1
     assert len(journals) == 1
     assert journals[0].id == summary.journal_id
+    journal_payload = json.loads(journals[0].summary_json)
+    assert journal_payload["threshold_review"]["overall_decision"] != "missing"
+    assert f"ai_analysis:{threshold_reviews[0].id}" in journal_payload["source_ids"]
 
 
 def test_scheduled_worker_settles_completed_open_bets_when_enabled(
