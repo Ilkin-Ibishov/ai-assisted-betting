@@ -10,6 +10,7 @@ from app.db.models import (
     LiveRun,
     PaperBet,
     PaperCombination,
+    PaperJournalEntry,
     PaperRecommendation,
 )
 from app.db.repositories import (
@@ -51,6 +52,7 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
     assert summary.errors_count == 0
     assert summary.snapshot_path == snapshot_path
     assert summary.ai_review_id is not None
+    assert summary.journal_id is not None
     assert summary.settlement_summary is None
 
     with session_scope(engine) as session:
@@ -65,6 +67,7 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
                 select(AIAnalysisRun).where(AIAnalysisRun.analysis_type == "recommendation_review")
             )
         )
+        journals = list(session.scalars(select(PaperJournalEntry)))
 
     assert worker_run is not None
     assert worker_run.status == "completed"
@@ -73,6 +76,8 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
     assert len(recommendations) == summary.recommendation_items
     assert len(combinations) == summary.combination_items
     assert len(ai_reviews) == 1
+    assert len(journals) == 1
+    assert journals[0].id == summary.journal_id
 
 
 def test_scheduled_worker_settles_completed_open_bets_when_enabled(
@@ -142,6 +147,7 @@ def test_scheduled_worker_can_resolve_fresh_snapshot_url(
     assert summary.status == "completed"
     assert summary.snapshot_path == snapshot_path
     assert summary.ai_review_id is not None
+    assert summary.journal_id is not None
 
     with session_scope(engine) as session:
         worker_run = session.scalar(

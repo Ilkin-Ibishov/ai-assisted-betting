@@ -765,7 +765,10 @@ def _recommendation_review_record(
 
 
 def _combination_review_record(combination: PaperCombination) -> dict[str, Any]:
-    risk_flags = json.loads(combination.risk_flags_json)
+    risk_flags = _combination_risk_flags_payload(
+        leg_count=combination.leg_count,
+        risk_flags=json.loads(combination.risk_flags_json),
+    )
     return {
         "id": combination.id,
         "leg_recommendation_ids": json.loads(combination.leg_recommendation_ids_json),
@@ -1051,6 +1054,15 @@ def _is_quarantined_combination_flags(risk_flags: list[str]) -> bool:
             }
         )
     )
+
+
+def _combination_risk_flags_payload(*, leg_count: int, risk_flags: list[str]) -> list[str]:
+    if leg_count <= 1 or "experimental_combination" in risk_flags:
+        return risk_flags
+    return [
+        "experimental_combination",
+        *[flag for flag in risk_flags if flag != "no_current_risk_flags"],
+    ]
 
 
 def _is_actionable_recommendation(

@@ -194,12 +194,14 @@ def test_ai_analysis_service_records_recommendation_review_advisory(tmp_path) ->
     assert analysis.prompt_version == "ai-recommendation-review-v1"
     assert analysis.status == "completed"
     output = json.loads(analysis.output_json)
+    reviewed_combinations = json.loads(analysis.input_json)["paper_combinations"]
     assert output["label"] == "AI-assisted advisory analysis"
     assert output["approval_state"] == "caution"
     assert "combination_correlation_heuristic" in output["risk_flags"]
     assert "combination_quarantined" in output["risk_flags"]
     assert output["combination_quality"]["experimental_count"] == 1
     assert output["combination_quality"]["quarantined_count"] == 1
+    assert reviewed_combinations[0]["risk_flags"] == ["experimental_combination"]
     assert "combination" in output["short_summary"].lower()
     assert output["concerns"]
     assert output["confidence_explanation"]
@@ -640,7 +642,7 @@ def _seed_recommendation_review_inputs(engine) -> None:
                 estimated_probability=0.36,
                 combined_expected_value=0.368,
                 confidence_score=0.69,
-                risk_flags_json='["experimental_combination"]',
+                risk_flags_json='["no_current_risk_flags"]',
                 rationale="Recommended paper combination with 2 legs.",
             )
         )

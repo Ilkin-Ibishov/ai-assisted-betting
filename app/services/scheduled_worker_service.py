@@ -12,6 +12,7 @@ from app.db.models import LiveRun, utc_now_iso
 from app.db.repositories import LiveRunRepository
 from app.services.ai_analysis_service import AIAnalysisService
 from app.services.combination_service import CombinationService
+from app.services.daily_paper_journal_service import DailyPaperJournalService
 from app.services.live_cycle_service import (
     LivePaperCycleRequest,
     LivePaperCycleService,
@@ -45,6 +46,7 @@ class ScheduledPaperWorkerSummary:
     recommendation_items: int = 0
     combination_items: int = 0
     ai_review_id: int | None = None
+    journal_id: int | None = None
     result_summary: StepSummary | None = None
     settlement_summary: StepSummary | None = None
 
@@ -144,6 +146,7 @@ class ScheduledPaperWorkerService:
         recommendation_items = 0
         combination_items = 0
         ai_review_id = None
+        journal_id = None
         settlement_summary = None
         result_summary = None
         if cycle_summary.status == "completed":
@@ -159,6 +162,8 @@ class ScheduledPaperWorkerService:
                 settlement_summary = SettlementService(self.engine).settle_results()
             ai_review = AIAnalysisService(self.engine).analyze_recommendation_review()
             ai_review_id = ai_review.id
+            journal = DailyPaperJournalService(self.engine).generate()
+            journal_id = int(journal["id"]) if journal.get("id") is not None else None
 
         with session_scope(self.engine) as session:
             live_runs = LiveRunRepository(session)
@@ -190,6 +195,7 @@ class ScheduledPaperWorkerService:
             recommendation_items=recommendation_items,
             combination_items=combination_items,
             ai_review_id=ai_review_id,
+            journal_id=journal_id,
             result_summary=result_summary,
             settlement_summary=settlement_summary,
         )

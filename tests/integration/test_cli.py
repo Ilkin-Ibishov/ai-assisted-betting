@@ -452,6 +452,7 @@ def test_run_scheduled_paper_worker_command_records_worker_run(tmp_path) -> None
     assert "run-scheduled-paper-worker: started" in result.output
     assert "status=completed" in result.output
     assert "cycle.status=completed" in result.output
+    assert "journal_id=" in result.output
     assert "run-scheduled-paper-worker: finished" in result.output
 
     engine = create_engine(env["DATABASE_URL"])
@@ -463,10 +464,14 @@ def test_run_scheduled_paper_worker_command_records_worker_run(tmp_path) -> None
             text("SELECT count(*) FROM live_runs WHERE run_type='run_live_paper_cycle'")
         ).scalar_one()
         paper_bets_count = connection.execute(text("SELECT count(*) FROM paper_bets")).scalar_one()
+        journal_count = connection.execute(
+            text("SELECT count(*) FROM paper_journal_entries")
+        ).scalar_one()
 
     assert worker_run_count == 1
     assert cycle_run_count == 1
     assert paper_bets_count > 0
+    assert journal_count == 1
 
 
 def test_collect_results_command_updates_match_and_settles_open_bet(tmp_path) -> None:

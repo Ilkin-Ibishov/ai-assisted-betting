@@ -573,6 +573,7 @@ def run_scheduled_paper_worker(
         if summary.settlement_summary is not None:
             _print_stage_summary("settlement", summary.settlement_summary)
         typer.echo(f"ai_review_id={summary.ai_review_id}")
+        typer.echo(f"journal_id={summary.journal_id}")
     if summary.error_summary:
         typer.echo(f"error_summary={summary.error_summary}")
     typer.echo(f"items_read={summary.items_read}")

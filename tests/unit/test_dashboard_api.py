@@ -1312,7 +1312,7 @@ def _seed_combination_database(database_url: str) -> None:
                 confidence_score=0.7,
                 current_odds=2.0,
                 expected_value=0.2,
-                risk_flags_json='["experimental_combination"]',
+                risk_flags_json='["no_current_risk_flags"]',
                 rationale="Seed recommendation",
             )
             session.add(recommendation)
@@ -1331,7 +1331,7 @@ def _seed_combination_database(database_url: str) -> None:
                 estimated_probability=0.313,
                 combined_expected_value=0.19,
                 confidence_score=0.7,
-                risk_flags_json='["experimental_combination"]',
+                risk_flags_json='["no_current_risk_flags"]',
                 rationale="Seed combination",
             )
         )
