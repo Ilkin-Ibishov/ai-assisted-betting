@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -19,6 +20,26 @@ def test_daily_journal_reports_no_candidates(tmp_path) -> None:
     assert entry["summary"]["ai_approval_state"] == "missing"
     assert entry["settled_since_previous_journal"] == []
     assert entry["source_ids"] == []
+
+
+def test_daily_journal_default_date_uses_product_timezone(tmp_path) -> None:
+    engine = _engine(tmp_path, "timezone-journal.sqlite")
+
+    entry = DailyPaperJournalService(engine).generate(
+        now=datetime(2026, 6, 5, 22, 30, tzinfo=UTC),
+    )
+
+    assert entry["journal_date"] == "2026-06-06"
+
+
+def test_daily_journal_default_date_can_use_configured_utc_timezone(tmp_path) -> None:
+    engine = _engine(tmp_path, "utc-journal.sqlite")
+
+    entry = DailyPaperJournalService(engine, product_timezone="UTC").generate(
+        now=datetime(2026, 6, 5, 22, 30, tzinfo=UTC),
+    )
+
+    assert entry["journal_date"] == "2026-06-05"
 
 
 def test_daily_journal_reports_candidate_ready(tmp_path) -> None:

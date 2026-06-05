@@ -162,7 +162,10 @@ class ScheduledPaperWorkerService:
                 settlement_summary = SettlementService(self.engine).settle_results()
             ai_review = AIAnalysisService(self.engine).analyze_recommendation_review()
             ai_review_id = ai_review.id
-            journal = DailyPaperJournalService(self.engine).generate()
+            journal = DailyPaperJournalService(
+                self.engine,
+                product_timezone=self.settings.product_timezone,
+            ).generate()
             journal_id = int(journal["id"]) if journal.get("id") is not None else None
 
         with session_scope(self.engine) as session:

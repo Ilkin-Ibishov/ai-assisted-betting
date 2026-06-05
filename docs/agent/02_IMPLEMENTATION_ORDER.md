@@ -230,6 +230,7 @@ Build live recommendation work in this order:
 15. Task 76 - Combination Risk Quarantine, completed
 16. Task 77 - Outcome Learning And Threshold Review Loop, completed
 17. Task 78 - Production Journal Freshness, completed
+18. Task 79 - Product Timezone Journals, completed
 
 ## Recommendation Maturity Phase Order
 
@@ -243,6 +244,7 @@ The live paper loop is operationally healthy, but the model and review layer are
 6. Implemented: Task 76 keeps combinations experimental, flags exposure/correlation risk, labels API/AI/dashboard rows, and excludes experimental combinations from primary daily decisions.
 7. Implemented: Task 77 turns settled recommendation backtests into conservative threshold advice and surfaces the latest review in the daily journal/dashboard.
 8. Implemented: Task 78 generates daily journals in scheduled worker runs and normalizes legacy multi-leg combination payloads as experimental.
+9. Implemented: Task 79 makes default journal dates follow `PRODUCT_TIMEZONE` (`Asia/Baku` by default) instead of the Railway container timezone.
 
 ## Do Not Jump Ahead
 

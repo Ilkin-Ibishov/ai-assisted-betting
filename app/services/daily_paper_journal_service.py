@@ -1,6 +1,7 @@
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Engine, select
 
@@ -16,11 +17,20 @@ from app.db.models import (
 
 
 class DailyPaperJournalService:
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, *, product_timezone: str = "Asia/Baku") -> None:
         self.engine = engine
+        self.product_timezone = product_timezone
 
-    def generate(self, *, journal_date: str | None = None) -> dict[str, Any]:
-        date_value = journal_date or date.today().isoformat()
+    def generate(
+        self,
+        *,
+        journal_date: str | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        date_value = journal_date or _default_journal_date(
+            product_timezone=self.product_timezone,
+            now=now,
+        )
         with session_scope(self.engine) as session:
             previous = _previous_journal(session, date_value)
             recommendations = _recommendations(session)
@@ -86,6 +96,13 @@ class DailyPaperJournalService:
             if entry is None:
                 return None
             return _entry_payload(entry)
+
+
+def _default_journal_date(*, product_timezone: str, now: datetime | None = None) -> str:
+    current = now or datetime.now(UTC)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=UTC)
+    return current.astimezone(ZoneInfo(product_timezone)).date().isoformat()
 
 
 def _entry_payload(entry: PaperJournalEntry) -> dict[str, Any]:

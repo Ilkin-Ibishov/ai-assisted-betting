@@ -26,6 +26,7 @@ class Settings:
     scheduled_settlement_enabled: bool = False
     ai_analysis_mode: str = "deterministic"
     ai_analysis_model_name: str = "deterministic_ai_fallback"
+    product_timezone: str = "Asia/Baku"
     snapshot_ingest_token: str = ""
     cors_allowed_origins: tuple[str, ...] = (
         "http://localhost:5173",
@@ -75,6 +76,7 @@ def load_settings() -> Settings:
         scheduled_settlement_enabled=_get_bool("SCHEDULED_SETTLEMENT_ENABLED", "false"),
         ai_analysis_mode=getenv("AI_ANALYSIS_MODE", "deterministic"),
         ai_analysis_model_name=getenv("AI_ANALYSIS_MODEL_NAME", "deterministic_ai_fallback"),
+        product_timezone=getenv("PRODUCT_TIMEZONE", "Asia/Baku"),
         snapshot_ingest_token=getenv("SNAPSHOT_INGEST_TOKEN", ""),
         cors_allowed_origins=_get_csv(
             "CORS_ALLOWED_ORIGINS",

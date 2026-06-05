@@ -436,7 +436,10 @@ def daily_paper_journal(
     settings = load_settings()
     engine = create_engine_from_url(settings.database_url)
     try:
-        journal = DailyPaperJournalService(engine).generate(journal_date=journal_date)
+        journal = DailyPaperJournalService(
+            engine,
+            product_timezone=settings.product_timezone,
+        ).generate(journal_date=journal_date)
     finally:
         engine.dispose()
     typer.echo("daily-paper-journal: started")

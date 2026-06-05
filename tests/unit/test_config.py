@@ -9,6 +9,7 @@ def test_default_settings_load() -> None:
     assert settings.min_edge == 0.07
     assert settings.ai_analysis_mode == "deterministic"
     assert settings.ai_analysis_model_name == "deterministic_ai_fallback"
+    assert settings.product_timezone == "Asia/Baku"
     assert "http://127.0.0.1:5173" in settings.cors_allowed_origins
     assert "railway" in settings.cors_allowed_origin_regex
 
@@ -33,6 +34,14 @@ def test_ai_analysis_settings_load_from_environment(monkeypatch) -> None:
 
     assert settings.ai_analysis_mode == "openai"
     assert settings.ai_analysis_model_name == "gpt-test-analyst"
+
+
+def test_product_timezone_loads_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv("PRODUCT_TIMEZONE", "UTC")
+
+    settings = load_settings()
+
+    assert settings.product_timezone == "UTC"
 
 
 def test_cors_settings_load_from_environment(monkeypatch) -> None:
