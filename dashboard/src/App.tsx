@@ -48,6 +48,7 @@ import {
   fetchPaperBets,
   fetchPaperCombinations,
   fetchPaperRecommendations,
+  fetchProductionBehavior,
   fetchRecommendationQuality,
 } from '@/lib/api'
 import type {
@@ -65,6 +66,7 @@ import type {
   PaperBet,
   PaperCombination,
   PaperRecommendation,
+  ProductionBehaviorStatus,
   RecommendationQuality,
   ResultFetchJobsResponse,
 } from '@/lib/api'
@@ -145,6 +147,11 @@ function App() {
   const guardrails = useQuery({
     queryKey: ['operational-guardrails'],
     queryFn: fetchOperationalGuardrails,
+  })
+
+  const productionBehavior = useQuery({
+    queryKey: ['production-behavior'],
+    queryFn: fetchProductionBehavior,
   })
 
   const recommendationQuality = useQuery({
@@ -264,6 +271,7 @@ function App() {
                 void detail.refetch()
                 void betLedger.refetch()
                 void resultJobs.refetch()
+                void productionBehavior.refetch()
               }}
                 title="Refresh dashboard data"
               >
@@ -297,6 +305,9 @@ function App() {
               guardrailError={guardrails.isError}
               guardrailLoading={guardrails.isLoading}
               guardrailStatus={guardrails.data}
+              behaviorError={productionBehavior.isError}
+              behaviorLoading={productionBehavior.isLoading}
+              behaviorStatus={productionBehavior.data}
               aiAnalysis={aiAnalysis.data}
               aiError={aiAnalysis.isError}
               aiLoading={aiAnalysis.isLoading}
@@ -374,6 +385,9 @@ type DashboardContentProps = {
   guardrailError: boolean
   guardrailLoading: boolean
   guardrailStatus?: OperationalGuardrailStatus
+  behaviorError: boolean
+  behaviorLoading: boolean
+  behaviorStatus?: ProductionBehaviorStatus
   aiAnalysis?: AIAnalysisRun | null
   aiError: boolean
   aiLoading: boolean
@@ -420,6 +434,9 @@ function DashboardContent({
   guardrailError,
   guardrailLoading,
   guardrailStatus,
+  behaviorError,
+  behaviorLoading,
+  behaviorStatus,
   aiAnalysis,
   aiError,
   aiLoading,
@@ -521,6 +538,12 @@ function DashboardContent({
           status={guardrailStatus}
         />
       </div>
+
+      <ProductionBehaviorPanel
+        error={behaviorError}
+        loading={behaviorLoading}
+        status={behaviorStatus}
+      />
 
       <AIAnalystPanel
         analysis={aiAnalysis}
@@ -975,6 +998,134 @@ function OperationalGuardrailsPanel({
       </CardContent>
     </Card>
   )
+}
+
+function ProductionBehaviorPanel({
+  error,
+  loading,
+  status,
+}: {
+  error: boolean
+  loading: boolean
+  status?: ProductionBehaviorStatus
+}) {
+  const stages = status?.stages ?? {}
+  const stageOrder = [
+    ['worker', 'Worker'],
+    ['snapshot', 'Snapshot'],
+    ['recommendations', 'Recommendations'],
+    ['ai_review', 'AI review'],
+    ['threshold_review', 'Threshold review'],
+    ['journal', 'Journal'],
+  ] as const
+
+  return (
+    <Card data-testid="production-behavior">
+      <CardHeader>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <CardTitle>
+              <span className="flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Loop behavior
+              </span>
+            </CardTitle>
+            <CardDescription>
+              End-to-end freshness across the scheduled paper pipeline.
+            </CardDescription>
+          </div>
+          <Badge className={guardrailBadgeClass(status?.overall_status)} variant="secondary">
+            {loading ? 'Loading behavior' : (status?.overall_status ?? 'unknown')}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : error ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+            Production behavior API is not reachable.
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {stageOrder.map(([key, label]) => (
+              <ProductionBehaviorTile
+                key={key}
+                label={label}
+                stage={stages[key]}
+                testId={`behavior-${key}`}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProductionBehaviorTile({
+  label,
+  stage,
+  testId,
+}: {
+  label: string
+  stage?: ProductionBehaviorStatus['stages'][string]
+  testId: string
+}) {
+  const status = stage?.status ?? 'missing'
+  const helper = productionBehaviorHelper(stage)
+
+  return (
+    <div
+      className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm"
+      data-testid={testId}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="truncate text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {label}
+        </div>
+        <Badge className={guardrailBadgeClass(stage?.severity)} variant="secondary">
+          {stage?.severity ?? 'warning'}
+        </Badge>
+      </div>
+      <div className="mt-2 truncate font-semibold text-slate-950">
+        {status.replaceAll('_', ' ')}
+      </div>
+      <div className="mt-1 line-clamp-2 text-slate-500">{helper}</div>
+    </div>
+  )
+}
+
+function productionBehaviorHelper(stage?: ProductionBehaviorStatus['stages'][string]) {
+  if (!stage) {
+    return 'No stage data recorded.'
+  }
+  if (typeof stage.count === 'number') {
+    return `${stage.count} rows since latest worker.`
+  }
+  if (typeof stage.event_count === 'number') {
+    return `${stage.event_count} events in latest snapshot.`
+  }
+  if (stage.threshold_overall_decision) {
+    return `Threshold review: ${stage.threshold_overall_decision}.`
+  }
+  if (typeof stage.freshness_minutes === 'number') {
+    return `${stage.freshness_minutes} minutes since latest update.`
+  }
+  if (stage.updated_at) {
+    return `Updated ${formatDate(stage.updated_at)}.`
+  }
+  if (stage.created_at) {
+    return `Created ${formatDate(stage.created_at)}.`
+  }
+  return stage.id ? `Analysis ${stage.id}.` : 'Waiting for the next completed cycle.'
 }
 
 function AIAnalystPanel({

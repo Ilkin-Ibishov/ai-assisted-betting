@@ -26,6 +26,7 @@ from app.services.misli_result_service import result_jobs_payload
 from app.services.odds_movement_service import OddsMovementService
 from app.services.operational_guardrail_service import OperationalGuardrailService
 from app.services.paper_bet_maintenance_service import PaperBetMaintenanceService
+from app.services.production_behavior_service import ProductionBehaviorService
 from app.services.recommendation_quality_service import RecommendationQualityService
 from app.services.worker_monitoring_service import WorkerMonitoringService
 
@@ -115,6 +116,16 @@ def create_api(
         return OperationalGuardrailService(live_database_url).status(
             worker_fresh_after_minutes=worker_fresh_after_minutes,
             repeated_failure_threshold=repeated_failure_threshold,
+            now_iso=now,
+        )
+
+    @api.get("/api/operations/behavior")
+    def get_production_behavior(
+        fresh_after_minutes: int = 90,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        return ProductionBehaviorService(live_database_url).status(
+            fresh_after_minutes=fresh_after_minutes,
             now_iso=now,
         )
 

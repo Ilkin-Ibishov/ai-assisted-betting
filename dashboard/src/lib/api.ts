@@ -130,6 +130,29 @@ export type OperationalGuardrailStatus = {
   }
 }
 
+export type ProductionBehaviorStage = {
+  status: string
+  severity: 'ok' | 'warning' | 'critical'
+  freshness_minutes?: number | null
+  count?: number
+  id?: number | null
+  event_count?: number
+  journal_date?: string
+  threshold_overall_decision?: string
+  created_at?: string
+  updated_at?: string
+  latest_run?: LiveRun | null
+  source_url?: string | null
+}
+
+export type ProductionBehaviorStatus = {
+  overall_status: 'ok' | 'warning' | 'critical'
+  healthy: boolean
+  attention_required: string[]
+  fresh_after_minutes: number
+  stages: Record<string, ProductionBehaviorStage>
+}
+
 export type RecommendationQuality = {
   overall_state: string
   summary: {
@@ -419,6 +442,10 @@ export async function fetchResultJobs(): Promise<ResultFetchJobsResponse> {
 
 export async function fetchOperationalGuardrails(): Promise<OperationalGuardrailStatus> {
   return getJson('/api/operations/guardrails')
+}
+
+export async function fetchProductionBehavior(): Promise<ProductionBehaviorStatus> {
+  return getJson('/api/operations/behavior')
 }
 
 export async function fetchRecommendationQuality(): Promise<RecommendationQuality> {

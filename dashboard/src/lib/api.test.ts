@@ -5,6 +5,7 @@ import {
   fetchLatestDailyJournal,
   fetchRecommendationQuality,
   fetchOperationalGuardrails,
+  fetchProductionBehavior,
   fetchLatestRecommendationReview,
   fetchOddsMovement,
   fetchPaperBets,
@@ -234,6 +235,37 @@ describe('fetchOperationalGuardrails', () => {
 
       expect(status.overall_status).toBe('warning')
       expect(status.guardrails[0].name).toBe('worker_freshness')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+})
+
+describe('fetchProductionBehavior', () => {
+  it('reads production behavior status from the API', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string) => {
+      expect(url).toBe('/api/operations/behavior')
+      return new Response(
+        JSON.stringify({
+          overall_status: 'ok',
+          healthy: true,
+          attention_required: [],
+          fresh_after_minutes: 90,
+          stages: {
+            worker: { status: 'fresh', severity: 'ok', freshness_minutes: 12 },
+            threshold_review: { status: 'fresh', severity: 'ok', id: 448 },
+          },
+        }),
+        { status: 200 },
+      )
+    }) as typeof fetch
+
+    try {
+      const status = await fetchProductionBehavior()
+
+      expect(status.overall_status).toBe('ok')
+      expect(status.stages.threshold_review.status).toBe('fresh')
     } finally {
       globalThis.fetch = originalFetch
     }

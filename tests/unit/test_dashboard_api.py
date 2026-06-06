@@ -9,6 +9,7 @@ from app.db.engine import create_engine_from_url, session_scope
 from app.db.models import (
     AIAnalysisRun,
     Base,
+    LiveSnapshot,
     PaperCombination,
     PaperJournalEntry,
     PaperRecommendation,
@@ -377,6 +378,124 @@ def test_operational_guardrails_endpoint_reports_critical_ai_failure(tmp_path: P
         item["name"] == "ai_eval_safety" and item["severity"] == "critical"
         for item in payload["guardrails"]
     )
+
+
+def test_production_behavior_endpoint_reports_complete_loop(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        repository = LiveRunRepository(session)
+        repository.start(
+            run_id="scheduled-worker-behavior-api",
+            run_type="scheduled_paper_worker",
+            provider="misli_public",
+        )
+        worker = repository.get_by_run_id("scheduled-worker-behavior-api")
+        assert worker is not None
+        worker.started_at = "2026-06-06T10:00:00+00:00"
+        repository.complete(run_id="scheduled-worker-behavior-api", items_read=10, items_created=3)
+        worker = repository.get_by_run_id("scheduled-worker-behavior-api")
+        assert worker is not None
+        worker.started_at = "2026-06-06T10:00:00+00:00"
+        worker.finished_at = "2026-06-06T10:01:00+00:00"
+        session.add(
+            LiveSnapshot(
+                provider="misli_public",
+                snapshot_hash="api-behavior-snapshot",
+                source_url="https://example.com/misli",
+                event_count=8,
+                payload_json="{}",
+                created_at="2026-06-06T10:02:00+00:00",
+            )
+        )
+        match = MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:behavior-api",
+            league="Behavior League",
+            home_team="Home",
+            away_team="Away",
+            kickoff_time="2026-06-06T12:00:00+04:00",
+            status="scheduled",
+        )
+        session.add(
+            PaperRecommendation(
+                match_id=match.id,
+                prediction_id=None,
+                source_run_id="scheduled-worker-behavior-api",
+                source_match_id=match.source_match_id,
+                bookmaker="misli",
+                market="1X2",
+                selection="HOME",
+                latest_snapshot_time="2026-06-06T10:02:00+00:00",
+                model_name="baseline_heuristic",
+                model_version="v0",
+                grade="watch",
+                status="active",
+                model_probability=0.5,
+                implied_probability=0.45,
+                edge=0.05,
+                confidence_score=0.4,
+                model_confidence_score=0.4,
+                recommendation_confidence_score=0.4,
+                confidence_adjustment_reason=None,
+                current_odds=2.2,
+                expected_value=0.1,
+                risk_flags_json="[]",
+                rationale="seed behavior recommendation",
+                created_at="2026-06-06T10:03:00+00:00",
+            )
+        )
+        threshold = AIAnalysisRun(
+            analysis_type="recommendation_backtest_summary",
+            source_type="scheduled_worker",
+            source_id="threshold",
+            input_json="{}",
+            output_json=json.dumps({"threshold_advice": {"overall_decision": "fail_closed"}}),
+            model_name="deterministic_ai_fallback",
+            prompt_version="pytest",
+            status="completed",
+            created_at="2026-06-06T10:04:00+00:00",
+        )
+        session.add_all(
+            [
+                AIAnalysisRun(
+                    analysis_type="recommendation_review",
+                    source_type="scheduled_worker",
+                    source_id="review",
+                    input_json="{}",
+                    output_json=json.dumps({"approval_state": "reject", "risk_flags": []}),
+                    model_name="deterministic_ai_fallback",
+                    prompt_version="pytest",
+                    status="completed",
+                    created_at="2026-06-06T10:04:00+00:00",
+                ),
+                threshold,
+            ]
+        )
+        session.flush()
+        session.add(
+            PaperJournalEntry(
+                journal_date="2026-06-06",
+                decision_state="no_candidates",
+                summary_json=json.dumps(
+                    {"threshold_review": {"overall_decision": "fail_closed"}}
+                ),
+                source_ids_json=json.dumps([f"ai_analysis:{threshold.id}"]),
+                created_at="2026-06-06T10:05:00+00:00",
+                updated_at="2026-06-06T10:05:00+00:00",
+            )
+        )
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get(
+        "/api/operations/behavior?fresh_after_minutes=90&now=2026-06-06T10:30:00+00:00"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["overall_status"] == "ok"
+    assert payload["stages"]["threshold_review"]["status"] == "fresh"
+    assert payload["stages"]["journal"]["threshold_overall_decision"] == "fail_closed"
 
 
 def test_live_status_endpoint_returns_latest_success_failure_and_bet_counts(

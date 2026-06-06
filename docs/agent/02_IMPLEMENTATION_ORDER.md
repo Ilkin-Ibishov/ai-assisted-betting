@@ -232,6 +232,7 @@ Build live recommendation work in this order:
 17. Task 78 - Production Journal Freshness, completed
 18. Task 79 - Product Timezone Journals, completed
 19. Task 80 - Scheduled Threshold Review, completed
+20. Task 81 - Production Behavior Monitor, completed
 
 ## Recommendation Maturity Phase Order
 
@@ -247,6 +248,7 @@ The live paper loop is operationally healthy, but the model and review layer are
 8. Implemented: Task 78 generates daily journals in scheduled worker runs and normalizes legacy multi-leg combination payloads as experimental.
 9. Implemented: Task 79 makes default journal dates follow `PRODUCT_TIMEZONE` (`Asia/Baku` by default) instead of the Railway container timezone.
 10. Implemented: Task 80 generates a recommendation backtest summary during successful scheduled worker runs before writing the daily journal.
+11. Implemented: Task 81 adds an end-to-end behavior monitor for worker, snapshot, recommendation, AI review, threshold review, and journal freshness.
 
 ## Do Not Jump Ahead
 
