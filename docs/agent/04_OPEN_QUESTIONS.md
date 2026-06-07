@@ -16,6 +16,14 @@ Resolved by Task 83: threshold proposals are persisted in `threshold_policy_runs
 
 Resolved by Task 84: Football-Data CSV is the first approved source. Open follow-up: add team alias coverage so Misli public team names can reliably match imported Football-Data historical rows.
 
+## Release Process
+
+Resolved direction: this is a solo-coder project and new Codex work should be pushed directly to `main` unless the user explicitly asks for a PR. Open follow-up: Task 85 must prove Railway deploys the pushed `main` commit before production success is claimed.
+
+## Threshold Policy Operations
+
+Open: decide whether dashboard policy approve/apply/rollback actions should be protected by a shared admin token, Railway-only access, or another lightweight operator guard. Do not add dashboard mutating controls until Task 87 defines governance and Task 88 implements protection.
+
 ## Documentation Maintenance
 
 Resolved: after each implementation task, agents must update agent-context docs and relevant project docs before claiming completion. The canonical rule lives in:

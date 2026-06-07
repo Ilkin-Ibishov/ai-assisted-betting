@@ -20,6 +20,66 @@ P3 - useful cleanup or polish
 
 ## Open
 
+### P1 - Release Proof Can Confuse Pushed Branch With Production Code
+
+Status: open
+Introduced: Post Task 83/84 deployment audit on 2026-06-08
+Area: release process and Railway operations
+Owner: Task 85 - Direct Main Deployment Proof
+
+Task 83/84 code was pushed to a feature branch and verified locally, but Railway production still served the previous `main` commit. Production health checks were valid for the old release, not for the new implementation.
+
+Impact:
+The team can accidentally claim production success for code that has not deployed.
+
+Next:
+Use direct `main` pushes for this solo-coder workflow and verify Railway deployment metadata matches the pushed commit before production smoke is counted as release proof.
+
+### P2 - External Context Matching Is Exact-Name Heavy
+
+Status: open
+Introduced: Task 84 - External Football Context Source Selection
+Area: feature enrichment and source provenance
+Owner: Task 86 - Team Alias Coverage For External Context
+
+Task 84 labels Football-Data CSV context when completed history is available, but Misli public team names can differ from Football-Data names. Exact-name matching limits coverage and can make external-context backtests underpowered.
+
+Impact:
+External context may look weaker than it is because rows fail to match, or coverage may be uneven across leagues.
+
+Next:
+Add deterministic, auditable team aliases with ambiguity handling and coverage reporting before using external-context evidence to approve active threshold policy changes.
+
+### P2 - Threshold Policy Has Mechanism Before Full Governance
+
+Status: open
+Introduced: Task 83 - Outcome-Driven Threshold Policy
+Area: strategy governance
+Owner: Task 87 - Threshold Policy Governance And Decision Log
+
+Task 83 added durable policy states and CLI/API control, but the approval rules are still implicit. The system needs explicit sample-size gates, decision reasons, actor metadata, and evidence links before active policy changes become routine.
+
+Impact:
+An operator could apply a policy for the right reason, but the future audit trail would be weaker than the business requirement implies.
+
+Next:
+Define governance rules and durable decision logs before adding dashboard mutating controls.
+
+### P2 - Dashboard Policy Controls Are Read-Only
+
+Status: open
+Introduced: Task 83 - Outcome-Driven Threshold Policy
+Area: dashboard operations
+Owner: Task 88 - Dashboard Threshold Policy Operations
+
+The dashboard shows threshold policy state, but approve/apply/rollback remain CLI-only. This is acceptable while governance is incomplete, but it is not ideal for daily operation.
+
+Impact:
+Operational changes require shell access and can be harder to review from the same surface that shows journal and behavior evidence.
+
+Next:
+After Task 87, add guarded dashboard controls with reason capture and tests for disabled/low-sample states.
+
 ### P3 - Odds Movement Uses Computed Summaries Instead Of A Dedicated Table
 
 Status: accepted  

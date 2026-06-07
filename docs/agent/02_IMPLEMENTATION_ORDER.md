@@ -102,6 +102,11 @@ Build in this order:
 - Task 82 - Backlog Reconciliation And Production Proof
 - Task 83 - Outcome-Driven Threshold Policy
 - Task 84 - External Football Context Source Selection
+- Task 85 - Direct Main Deployment Proof, planned
+- Task 86 - Team Alias Coverage For External Context, planned
+- Task 87 - Threshold Policy Governance And Decision Log, planned
+- Task 88 - Dashboard Threshold Policy Operations, planned
+- Task 89 - Source Context Backtest Gates, planned
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -109,10 +114,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Review enriched recommendation backtests before approving active threshold policy changes.
+Prove the direct-main Railway deployment path for the latest code before claiming production success.
 ```
 
-Task 84 selected Football-Data CSV as the first approved external football context source, added explicit `external_context:football_data_csv` feature provenance, AI review counts for external-context actionable rows, and recommendation backtest `source_context_buckets`. Next work should use enriched backtest evidence before approving Task 83 active policy changes. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML.
+Task 85 is now first because production remained on the old `main` commit after Task 83/84 were pushed to a feature branch. The solo-coder release path is direct `main` push plus Railway deployed-commit proof. After that, Task 86 should improve team alias coverage, Task 87 should add threshold policy governance logs, Task 88 should add dashboard operations, and Task 89 should turn source-context backtest evidence into an approval gate. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML.
 
 Required verification commands after implementation:
 
@@ -264,10 +269,15 @@ The live paper loop is operationally healthy, but the model and review layer are
 10. Implemented: Task 80 generates a recommendation backtest summary during successful scheduled worker runs before writing the daily journal.
 11. Implemented: Task 81 adds an end-to-end behavior monitor for worker, snapshot, recommendation, AI review, threshold review, and journal freshness.
 12. Implemented: Task 83 adds a controlled threshold policy layer with advisory/proposed/approved/applied/rolled-back states and active-policy recommendation gating.
+13. Planned: Task 85 proves the direct-main deployment path before production success is claimed.
+14. Planned: Task 86 adds team alias coverage so external context is not exact-name only.
+15. Planned: Task 87 adds explicit threshold policy governance and decision logs.
+16. Planned: Task 88 adds guarded dashboard controls for policy operations.
+17. Planned: Task 89 adds source-context backtest gates before threshold approval.
 
 ## Current Planned Tasks
 
-No new numbered implementation task has been selected after Task 84. Recommended next planning item: team alias coverage and enriched-context backtest review before approving active threshold changes.
+Task 85 is the next task. Tasks 86 through 89 are queued after deployment proof because model-governance work should not outrun release verification.
 
 ## Do Not Jump Ahead
 
