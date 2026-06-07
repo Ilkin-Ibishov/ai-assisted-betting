@@ -43,6 +43,60 @@ def test_show_config_redacts_database_password() -> None:
     assert "secret" not in result.output
 
 
+def test_threshold_policy_cli_latest_reports_policy_state(tmp_path) -> None:
+    runner = CliRunner()
+    db_path = tmp_path / "threshold-policy-cli.sqlite"
+    env = {"DATABASE_URL": f"sqlite:///{db_path.as_posix()}"}
+    assert runner.invoke(app, ["init-db"], env=env).exit_code == 0
+
+    engine = create_engine(env["DATABASE_URL"])
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO threshold_policy_runs (
+                    state,
+                    decision,
+                    active,
+                    source_backtest_name,
+                    sample_size,
+                    roi,
+                    policy_values_json,
+                    rollback_policy_values_json,
+                    evidence_json,
+                    rationale,
+                    risk_flags_json,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    'applied',
+                    'tighten',
+                    1,
+                    'pytest_policy',
+                    350,
+                    -0.1,
+                    '{"min_edge": 0.1}',
+                    '{"min_edge": 0.07}',
+                    '{"sample_size": 350}',
+                    'Applied test policy.',
+                    '["negative_singles_roi"]',
+                    '2026-06-07T10:00:00+00:00',
+                    '2026-06-07T10:00:00+00:00'
+                )
+                """
+            )
+        )
+
+    result = runner.invoke(app, ["threshold-policy-latest"], env=env)
+
+    assert result.exit_code == 0
+    assert "threshold-policy-latest: started" in result.output
+    assert "state=applied" in result.output
+    assert "decision=tighten" in result.output
+    assert "active=true" in result.output
+
+
 def test_import_sample_data_command_populates_database_idempotently(tmp_path) -> None:
     runner = CliRunner()
     db_path = tmp_path / "sample.sqlite"

@@ -5,7 +5,14 @@ from sqlalchemy import select
 
 from app.db.engine import create_engine_from_url, session_scope
 from app.db.migrations import init_db
-from app.db.models import AIAnalysisRun, Match, PaperBet, PaperRecommendation, Prediction
+from app.db.models import (
+    AIAnalysisRun,
+    Match,
+    PaperBet,
+    PaperRecommendation,
+    Prediction,
+    ThresholdPolicyRun,
+)
 from app.services.daily_paper_journal_service import DailyPaperJournalService
 
 
@@ -83,6 +90,19 @@ def test_daily_journal_surfaces_latest_threshold_review(tmp_path) -> None:
         "disable"
     )
     assert "ai_analysis:2" in entry["source_ids"]
+
+
+def test_daily_journal_surfaces_latest_threshold_policy(tmp_path) -> None:
+    engine = _engine(tmp_path, "threshold-policy-journal.sqlite")
+    _seed_recommendation(engine, grade="recommended", risk_flags=["no_current_risk_flags"])
+    _seed_threshold_policy(engine)
+
+    entry = DailyPaperJournalService(engine).generate(journal_date="2026-06-07")
+
+    assert entry["threshold_policy"]["state"] == "applied"
+    assert entry["threshold_policy"]["active"] is True
+    assert entry["threshold_policy"]["policy_values"]["min_edge"] == 0.1
+    assert "threshold_policy:" in " ".join(entry["source_ids"])
 
 
 def test_daily_journal_links_settled_results_since_previous_journal(tmp_path) -> None:
@@ -212,6 +232,30 @@ def _seed_threshold_review(engine) -> None:
                 prompt_version="ai-recommendation-backtest-v1",
                 status="completed",
                 created_at="2026-06-04T09:03:00+00:00",
+            )
+        )
+
+
+def _seed_threshold_policy(engine) -> None:
+    with session_scope(engine) as session:
+        session.add(
+            ThresholdPolicyRun(
+                state="applied",
+                decision="tighten",
+                active=True,
+                source_backtest_id=None,
+                source_backtest_name="pytest_threshold_policy",
+                sample_size=350,
+                roi=-0.1,
+                hit_rate=0.4,
+                brier_score=0.31,
+                log_loss=0.8,
+                max_drawdown_units=-20.0,
+                policy_values_json=json.dumps({"min_edge": 0.1}),
+                rollback_policy_values_json=json.dumps({"min_edge": 0.07}),
+                evidence_json=json.dumps({"sample_size": 350}),
+                rationale="Applied stricter policy.",
+                risk_flags_json=json.dumps(["negative_singles_roi"]),
             )
         )
 

@@ -14,6 +14,7 @@ from app.db.models import (
     PaperJournalEntry,
     PaperRecommendation,
     ResultFetchJob,
+    ThresholdPolicyRun,
 )
 from app.db.repositories import (
     LiveRunRepository,
@@ -485,6 +486,29 @@ def test_production_behavior_endpoint_reports_complete_loop(tmp_path: Path) -> N
                 updated_at="2026-06-06T10:05:00+00:00",
             )
         )
+        session.add(
+            ThresholdPolicyRun(
+                state="applied",
+                decision="tighten",
+                active=True,
+                source_backtest_id=None,
+                source_backtest_name="pytest_threshold_policy",
+                sample_size=350,
+                roi=-0.1,
+                hit_rate=0.4,
+                brier_score=0.3,
+                log_loss=0.8,
+                max_drawdown_units=-18.0,
+                policy_values_json=json.dumps({"min_edge": 0.1}),
+                rollback_policy_values_json=json.dumps({"min_edge": 0.07}),
+                evidence_json=json.dumps({"sample_size": 350}),
+                rationale="Applied test threshold policy.",
+                risk_flags_json=json.dumps(["negative_singles_roi"]),
+                applied_at="2026-06-06T10:04:30+00:00",
+                created_at="2026-06-06T10:04:30+00:00",
+                updated_at="2026-06-06T10:04:30+00:00",
+            )
+        )
     client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
 
     response = client.get(
@@ -495,6 +519,7 @@ def test_production_behavior_endpoint_reports_complete_loop(tmp_path: Path) -> N
     payload = response.json()
     assert payload["overall_status"] == "ok"
     assert payload["stages"]["threshold_review"]["status"] == "fresh"
+    assert payload["stages"]["threshold_policy"]["status"] == "applied"
     assert payload["stages"]["journal"]["threshold_overall_decision"] == "fail_closed"
 
 

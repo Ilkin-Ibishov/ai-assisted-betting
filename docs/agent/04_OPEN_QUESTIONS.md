@@ -8,6 +8,14 @@ Resolved direction: use a separate Railway worker service invoked by Railway cro
 
 Open: choose an external alert destination, if any, after dashboard/API guardrail status is stable in staging. Task 61 added API/dashboard guardrail status but intentionally did not add notification bots.
 
+## Outcome-Driven Threshold Policy
+
+Resolved by Task 83: threshold proposals are persisted in `threshold_policy_runs`. Small samples stay advisory/fail-closed, loosening remains advisory by default, and active policy changes require explicit approval plus apply commands with rollback metadata.
+
+## External Football Context Sources
+
+Resolved by Task 84: Football-Data CSV is the first approved source. Open follow-up: add team alias coverage so Misli public team names can reliably match imported Football-Data historical rows.
+
 ## Documentation Maintenance
 
 Resolved: after each implementation task, agents must update agent-context docs and relevant project docs before claiming completion. The canonical rule lives in:

@@ -13,6 +13,7 @@ from app.db.models import (
     PaperJournalEntry,
     PaperRecommendation,
     Prediction,
+    ThresholdPolicyRun,
 )
 
 
@@ -36,6 +37,7 @@ class DailyPaperJournalService:
             recommendations = _recommendations(session)
             ai_review = _latest_ai_review(session)
             threshold_review = _latest_threshold_review(session)
+            threshold_policy = _latest_threshold_policy(session)
             settled = _settled_since_previous_journal(
                 session,
                 previous.created_at if previous is not None else None,
@@ -48,7 +50,7 @@ class DailyPaperJournalService:
                 open_bets=open_bets,
             )
             source_ids = _source_ids(recommendations, ai_review, settled)
-            source_ids = _journal_source_ids(source_ids, threshold_review)
+            source_ids = _journal_source_ids(source_ids, threshold_review, threshold_policy)
             decision_state = _decision_state(summary)
             payload = {
                 "journal_date": date_value,
@@ -57,6 +59,7 @@ class DailyPaperJournalService:
                 "quality_snapshot": _quality_snapshot(summary),
                 "ai_review": _ai_review_payload(ai_review),
                 "threshold_review": _threshold_review_payload(threshold_review),
+                "threshold_policy": _threshold_policy_payload(threshold_policy),
                 "settled_since_previous_journal": settled,
                 "open_paper_bets": [_paper_bet_row(item) for item in open_bets],
                 "source_ids": source_ids,
@@ -108,6 +111,7 @@ def _default_journal_date(*, product_timezone: str, now: datetime | None = None)
 def _entry_payload(entry: PaperJournalEntry) -> dict[str, Any]:
     payload = json.loads(entry.summary_json)
     payload.setdefault("threshold_review", _threshold_review_payload(None))
+    payload.setdefault("threshold_policy", _threshold_policy_payload(None))
     payload["id"] = entry.id
     payload["created_at"] = entry.created_at
     payload["updated_at"] = entry.updated_at
@@ -151,6 +155,14 @@ def _latest_threshold_review(session) -> AIAnalysisRun | None:
         select(AIAnalysisRun)
         .where(AIAnalysisRun.analysis_type == "recommendation_backtest_summary")
         .order_by(AIAnalysisRun.created_at.desc(), AIAnalysisRun.id.desc())
+        .limit(1)
+    )
+
+
+def _latest_threshold_policy(session) -> ThresholdPolicyRun | None:
+    return session.scalar(
+        select(ThresholdPolicyRun)
+        .order_by(ThresholdPolicyRun.created_at.desc(), ThresholdPolicyRun.id.desc())
         .limit(1)
     )
 
@@ -290,6 +302,22 @@ def _risk_flags(item: PaperRecommendation) -> list[str]:
     return [str(value) for value in values] if isinstance(values, list) else ["invalid_risk_flags"]
 
 
+def _json_object(raw: str) -> dict[str, Any]:
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _json_list(raw: str) -> list[Any]:
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    return value if isinstance(value, list) else []
+
+
 def _ai_review_payload(review: AIAnalysisRun | None) -> dict[str, Any]:
     if review is None:
         return {
@@ -354,10 +382,42 @@ def _source_ids(
 def _journal_source_ids(
     source_ids: list[str],
     threshold_review: AIAnalysisRun | None,
+    threshold_policy: ThresholdPolicyRun | None,
 ) -> list[str]:
+    ids = list(source_ids)
     if threshold_review is None:
-        return source_ids
-    return [*source_ids, f"ai_analysis:{threshold_review.id}"]
+        pass
+    else:
+        ids.append(f"ai_analysis:{threshold_review.id}")
+    if threshold_policy is not None:
+        ids.append(f"threshold_policy:{threshold_policy.id}")
+    return ids
+
+
+def _threshold_policy_payload(policy: ThresholdPolicyRun | None) -> dict[str, Any]:
+    if policy is None:
+        return {
+            "id": None,
+            "state": "missing",
+            "decision": "missing",
+            "active": False,
+            "risk_flags": ["threshold_policy_missing"],
+            "policy_values": {},
+            "short_summary": "No threshold policy has been evaluated yet.",
+        }
+    return {
+        "id": policy.id,
+        "state": policy.state,
+        "decision": policy.decision,
+        "active": policy.active,
+        "sample_size": policy.sample_size,
+        "risk_flags": _json_list(policy.risk_flags_json),
+        "policy_values": _json_object(policy.policy_values_json),
+        "rollback_policy_values": _json_object(policy.rollback_policy_values_json),
+        "rationale": policy.rationale,
+        "created_at": policy.created_at,
+        "updated_at": policy.updated_at,
+    }
 
 
 def _recommendation_row(item: PaperRecommendation) -> dict[str, Any]:

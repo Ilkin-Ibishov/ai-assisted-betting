@@ -47,6 +47,7 @@ def test_init_db_creates_expected_tables(tmp_path) -> None:
         "predictions",
         "result_fetch_jobs",
         "schema_migrations",
+        "threshold_policy_runs",
     }.issubset(table_names)
 
 
@@ -137,6 +138,7 @@ def test_init_db_upgrades_old_database_with_missing_elo_feature_columns(tmp_path
         ("009_add_recommendation_confidence_audit_columns",),
         ("010_add_feature_enrichment_columns",),
         ("011_create_paper_journal_entries",),
+        ("012_create_threshold_policy_runs",),
     ]
 
 
@@ -229,6 +231,7 @@ def test_init_db_upgrades_old_database_with_identity_uniqueness_indexes(tmp_path
         ("009_add_recommendation_confidence_audit_columns",),
         ("010_add_feature_enrichment_columns",),
         ("011_create_paper_journal_entries",),
+        ("012_create_threshold_policy_runs",),
     ]
 
 
@@ -297,6 +300,7 @@ def test_init_db_upgrades_old_database_with_live_run_registry(tmp_path) -> None:
         ("009_add_recommendation_confidence_audit_columns",),
         ("010_add_feature_enrichment_columns",),
         ("011_create_paper_journal_entries",),
+        ("012_create_threshold_policy_runs",),
     ]
 
 
@@ -362,6 +366,7 @@ def test_init_db_upgrades_old_database_with_ai_analysis_runs(tmp_path) -> None:
         ("009_add_recommendation_confidence_audit_columns",),
         ("010_add_feature_enrichment_columns",),
         ("011_create_paper_journal_entries",),
+        ("012_create_threshold_policy_runs",),
     ]
 
 

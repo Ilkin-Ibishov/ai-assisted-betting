@@ -139,6 +139,10 @@ export type ProductionBehaviorStage = {
   event_count?: number
   journal_date?: string
   threshold_overall_decision?: string
+  decision?: string
+  active?: boolean
+  sample_size?: number
+  policy_values?: Record<string, unknown>
   created_at?: string
   updated_at?: string
   latest_run?: LiveRun | null
@@ -209,6 +213,17 @@ export type DailyPaperJournal = {
     risk_flags?: string[]
     decisions?: Record<string, { decision: string; rationale?: string }>
     short_summary?: string
+  }
+  threshold_policy?: {
+    id?: number | null
+    state: string
+    decision: string
+    active: boolean
+    sample_size?: number
+    risk_flags?: string[]
+    policy_values?: Record<string, unknown>
+    rollback_policy_values?: Record<string, unknown>
+    rationale?: string
   }
   settled_since_previous_journal: Array<Record<string, unknown>>
   open_paper_bets: Array<Record<string, unknown>>

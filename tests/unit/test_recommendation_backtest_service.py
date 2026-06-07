@@ -37,6 +37,7 @@ def test_recommendation_backtest_reports_singles_and_combinations(tmp_path: Path
     assert report["threshold_advice"]["decisions"]["combination_enablement"]["decision"] == (
         "disable"
     )
+    assert "source_context_buckets" in report
     assert report["market_buckets"]["1X2"]["settled_bets"] == 3
     assert report["model_provider_splits"]["baseline_heuristic/Misli.az"]["settled_bets"] == 3
 
@@ -172,6 +173,50 @@ def test_recommendation_backtest_compares_raw_and_calibrated_confidence_scenario
     assert report["calibration_comparison"]["calibrated_scenario"] == calibrated["name"]
 
 
+def test_recommendation_backtest_compares_external_context_source_buckets(
+    tmp_path: Path,
+) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'source-context.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    with session_scope(engine) as session:
+        external_match = _match(session, "match-external-context", "HOME")
+        local_match = _match(session, "match-local-context", "AWAY")
+        _recommendation(
+            session,
+            external_match,
+            "HOME",
+            odds=2.0,
+            edge=0.12,
+            confidence=0.72,
+            rationale=(
+                "Positive edge; feature_tier=full_enriched; "
+                "feature_provenance=market_overround_normalized,"
+                "external_context:football_data_csv"
+            ),
+        )
+        _recommendation(
+            session,
+            local_match,
+            "HOME",
+            odds=2.0,
+            edge=0.12,
+            confidence=0.72,
+            rationale=(
+                "Positive edge; feature_tier=full_enriched; "
+                "feature_provenance=market_overround_normalized,recent_form"
+            ),
+        )
+
+    report = RecommendationBacktestService(engine).backtest(
+        RecommendationBacktestRequest(report_name="pytest_source_context")
+    )
+
+    assert report["source_context_buckets"]["external_context"]["settled_bets"] == 1
+    assert report["source_context_buckets"]["local_or_unknown"]["settled_bets"] == 1
+    assert report["source_context_buckets"]["external_context"]["roi"] == 1.0
+    assert report["source_context_buckets"]["local_or_unknown"]["roi"] == -1.0
+
+
 def test_recommendation_backtest_exports_dashboard_consumable_report(
     tmp_path: Path,
 ) -> None:
@@ -252,6 +297,7 @@ def _recommendation(
     model_confidence: float | None = None,
     recommendation_confidence: float | None = None,
     confidence_adjustment_reason: str | None = None,
+    rationale: str = "Seed recommendation",
 ) -> PaperRecommendation:
     recommendation = PaperRecommendation(
         match_id=match.id,
@@ -274,7 +320,7 @@ def _recommendation(
         current_odds=odds,
         expected_value=(0.6 * odds) - 1,
         risk_flags_json='["no_current_risk_flags"]',
-        rationale="Seed recommendation",
+        rationale=rationale,
     )
     session.add(recommendation)
     session.flush()

@@ -255,6 +255,14 @@ describe('fetchProductionBehavior', () => {
           stages: {
             worker: { status: 'fresh', severity: 'ok', freshness_minutes: 12 },
             threshold_review: { status: 'fresh', severity: 'ok', id: 448 },
+            threshold_policy: {
+              status: 'applied',
+              severity: 'ok',
+              id: 12,
+              active: true,
+              decision: 'tighten',
+              policy_values: { min_edge: 0.1 },
+            },
           },
         }),
         { status: 200 },
@@ -266,6 +274,7 @@ describe('fetchProductionBehavior', () => {
 
       expect(status.overall_status).toBe('ok')
       expect(status.stages.threshold_review.status).toBe('fresh')
+      expect(status.stages.threshold_policy.active).toBe(true)
     } finally {
       globalThis.fetch = originalFetch
     }
@@ -330,6 +339,13 @@ describe('fetchLatestDailyJournal', () => {
             overall_decision: 'fail_closed',
             risk_flags: ['small_threshold_review_sample'],
           },
+          threshold_policy: {
+            state: 'applied',
+            decision: 'tighten',
+            active: true,
+            policy_values: { min_edge: 0.1 },
+            risk_flags: ['negative_singles_roi'],
+          },
           settled_since_previous_journal: [],
           open_paper_bets: [],
           source_ids: ['paper_recommendation:1'],
@@ -345,6 +361,7 @@ describe('fetchLatestDailyJournal', () => {
       expect(journal.decision_state).toBe('candidate_ready')
       expect(journal.summary.candidate_count).toBe(1)
       expect(journal.threshold_review?.overall_decision).toBe('fail_closed')
+      expect(journal.threshold_policy?.state).toBe('applied')
       expect(journal.source_ids).toEqual(['paper_recommendation:1'])
     } finally {
       globalThis.fetch = originalFetch

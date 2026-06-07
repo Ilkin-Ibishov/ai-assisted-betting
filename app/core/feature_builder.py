@@ -67,6 +67,10 @@ class FeatureBuilder:
         feature_provenance = _feature_provenance(
             enrichment_tier,
             has_odds_movement=_has_odds_movement(odds_snapshots),
+            has_external_football_data_context=_has_external_football_data_context(
+                home_history,
+                away_history,
+            ),
         )
         ratings = _elo_ratings_before(
             match.kickoff_time,
@@ -174,17 +178,33 @@ def _enrichment_tier(home_history: list[Match], away_history: list[Match]) -> st
     return "cold_start"
 
 
-def _feature_provenance(enrichment_tier: str, *, has_odds_movement: bool) -> tuple[str, ...]:
+def _feature_provenance(
+    enrichment_tier: str,
+    *,
+    has_odds_movement: bool,
+    has_external_football_data_context: bool,
+) -> tuple[str, ...]:
     labels = ["market_overround_normalized"]
     if enrichment_tier == "cold_start":
         labels.append("cold_start_history")
     else:
         labels.extend(["recent_form", "home_away_split", "rest_days", "goal_difference_trend"])
+    if has_external_football_data_context:
+        labels.append("external_context:football_data_csv")
     if has_odds_movement:
         labels.append("odds_movement_velocity")
     if enrichment_tier == "full_enriched":
         labels.append("elo_rating")
     return tuple(labels)
+
+
+def _has_external_football_data_context(
+    home_history: list[Match],
+    away_history: list[Match],
+) -> bool:
+    return any(
+        match.source == "football_data" for match in [*home_history, *away_history]
+    )
 
 
 def _rest_days(kickoff_time: str, history: list[Match]) -> float | None:

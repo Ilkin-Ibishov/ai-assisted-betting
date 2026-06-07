@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.config import Settings
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import Base, LiveRun, PaperRecommendation
+from app.db.models import Base, LiveRun, PaperRecommendation, ThresholdPolicyRun
 from app.db.repositories import (
     LiveRunRepository,
     MatchRepository,
@@ -218,6 +218,23 @@ def test_recommendation_service_rejects_when_provider_health_is_unhealthy(tmp_pa
     assert "provider_health_warning" in json.loads(recommendation.risk_flags_json)
 
 
+def test_recommendation_service_uses_active_threshold_policy(tmp_path) -> None:
+    engine = create_engine_from_url(f"sqlite:///{(tmp_path / 'policy-recs.sqlite').as_posix()}")
+    Base.metadata.create_all(engine)
+    _seed_candidate(engine, edge=0.08, confidence=0.8)
+    _seed_active_threshold_policy(engine, min_edge=0.1, min_confidence=0.5)
+
+    RecommendationService(engine, _settings()).generate(stale_after_minutes=100000)
+
+    with session_scope(engine) as session:
+        recommendation = session.scalar(select(PaperRecommendation))
+
+    assert recommendation is not None
+    assert recommendation.grade == "reject"
+    assert "edge_below_threshold" in json.loads(recommendation.risk_flags_json)
+    assert "active threshold policy" in recommendation.rationale
+
+
 def _seed_candidate(
     engine,
     *,
@@ -263,6 +280,45 @@ def _seed_candidate(
             confidence_score=confidence,
             decision="PENDING",
             reason="seed prediction",
+        )
+
+
+def _seed_active_threshold_policy(
+    engine,
+    *,
+    min_edge: float,
+    min_confidence: float,
+) -> None:
+    with session_scope(engine) as session:
+        session.add(
+            ThresholdPolicyRun(
+                state="applied",
+                decision="tighten",
+                active=True,
+                source_backtest_id=None,
+                source_backtest_name="pytest_policy",
+                sample_size=350,
+                roi=-0.1,
+                hit_rate=0.4,
+                brier_score=0.3,
+                log_loss=0.8,
+                max_drawdown_units=-15.0,
+                policy_values_json=json.dumps(
+                    {
+                        "min_edge": min_edge,
+                        "min_expected_value": 0.0,
+                        "min_odds": 1.7,
+                        "max_odds": 3.5,
+                        "min_confidence": min_confidence,
+                        "recommendations_enabled": True,
+                        "combinations_enabled": False,
+                    }
+                ),
+                rollback_policy_values_json=json.dumps({"min_edge": 0.07}),
+                evidence_json=json.dumps({"sample_size": 350}),
+                rationale="Apply stricter test policy.",
+                risk_flags_json=json.dumps(["negative_singles_roi"]),
+            )
         )
 
 

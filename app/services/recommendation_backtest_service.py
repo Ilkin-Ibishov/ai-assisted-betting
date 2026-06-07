@@ -69,6 +69,7 @@ class RecommendationBacktestService:
                 single_bets,
                 lambda bet: f"{bet['model_name']}/{bet['bookmaker']}",
             ),
+            "source_context_buckets": _bucket_metrics(single_bets, _source_context_bucket),
             "odds_buckets": _bucket_metrics(single_bets, _odds_bucket),
             "confidence_buckets": _bucket_metrics(single_bets, _confidence_bucket),
             "threshold_sensitivity": threshold_sensitivity,
@@ -165,6 +166,7 @@ def _single_backtest_bet(
         "model_confidence_score": recommendation.model_confidence_score,
         "recommendation_confidence_score": recommendation.recommendation_confidence_score,
         "confidence_adjustment_reason": recommendation.confidence_adjustment_reason,
+        "feature_provenance": _feature_provenance_from_text(recommendation.rationale),
     }
 
 
@@ -262,6 +264,30 @@ def _bucket_metrics(
         bucket: _metrics([bet for bet in bets if str(bucket_selector(bet)) == bucket])
         for bucket in buckets
     }
+
+
+def _source_context_bucket(bet: dict[str, Any]) -> str:
+    provenance = bet.get("feature_provenance")
+    if isinstance(provenance, list) and any(
+        str(value).startswith("external_context:") for value in provenance
+    ):
+        return "external_context"
+    return "local_or_unknown"
+
+
+def _feature_provenance_from_text(value: str | None) -> list[str]:
+    if not value:
+        return []
+    marker = "feature_provenance="
+    for part in value.split(";"):
+        stripped = part.strip()
+        if stripped.startswith(marker):
+            return [
+                item.strip()
+                for item in stripped.removeprefix(marker).split(",")
+                if item.strip()
+            ]
+    return []
 
 
 def _threshold_sensitivity(rows: list[tuple[PaperRecommendation, Match]]) -> list[dict[str, Any]]:

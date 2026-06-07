@@ -28,6 +28,7 @@ from app.services.operational_guardrail_service import OperationalGuardrailServi
 from app.services.paper_bet_maintenance_service import PaperBetMaintenanceService
 from app.services.production_behavior_service import ProductionBehaviorService
 from app.services.recommendation_quality_service import RecommendationQualityService
+from app.services.threshold_policy_service import ThresholdPolicyService
 from app.services.worker_monitoring_service import WorkerMonitoringService
 
 SNAPSHOT_BODY = Body(...)
@@ -193,6 +194,17 @@ def create_api(
         if journal is None:
             raise HTTPException(status_code=404, detail="daily journal entry not found")
         return journal
+
+    @api.get("/api/live/threshold-policy/latest")
+    def get_live_threshold_policy_latest() -> dict[str, Any]:
+        engine = create_engine_from_url(live_database_url)
+        try:
+            policy = ThresholdPolicyService(engine, settings).latest()
+        finally:
+            engine.dispose()
+        if policy is None:
+            raise HTTPException(status_code=404, detail="threshold policy not found")
+        return policy
 
     @api.get("/api/live/paper-bets")
     def list_live_paper_bets(limit: int = 100) -> list[dict[str, Any]]:

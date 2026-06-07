@@ -247,6 +247,45 @@ class PaperJournalEntry(Base):
     )
 
 
+class ThresholdPolicyRun(Base):
+    __tablename__ = "threshold_policy_runs"
+    __table_args__ = (
+        Index("idx_threshold_policy_runs_state", "state"),
+        Index("idx_threshold_policy_runs_active", "active"),
+        Index("idx_threshold_policy_runs_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    state: Mapped[str] = mapped_column(String, nullable=False)
+    decision: Mapped[str] = mapped_column(String, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    source_backtest_id: Mapped[int | None] = mapped_column(ForeignKey("ai_analysis_runs.id"))
+    source_backtest_name: Mapped[str | None] = mapped_column(String)
+    sample_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    roi: Mapped[float | None]
+    hit_rate: Mapped[float | None]
+    brier_score: Mapped[float | None]
+    log_loss: Mapped[float | None]
+    max_drawdown_units: Mapped[float | None]
+    policy_values_json: Mapped[str] = mapped_column(Text, nullable=False)
+    rollback_policy_values_json: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_json: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    risk_flags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    reviewer: Mapped[str | None] = mapped_column(String)
+    review_rationale: Mapped[str | None] = mapped_column(Text)
+    reviewed_at: Mapped[str | None] = mapped_column(String)
+    applied_at: Mapped[str | None] = mapped_column(String)
+    rolled_back_at: Mapped[str | None] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String, nullable=False, default=utc_now_iso)
+    updated_at: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default=utc_now_iso,
+        onupdate=utc_now_iso,
+    )
+
+
 class DecisionLog(Base):
     __tablename__ = "decision_logs"
     __table_args__ = (Index("idx_decision_logs_match_stage", "match_id", "stage"),)

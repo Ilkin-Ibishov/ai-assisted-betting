@@ -1016,6 +1016,7 @@ function ProductionBehaviorPanel({
     ['recommendations', 'Recommendations'],
     ['ai_review', 'AI review'],
     ['threshold_review', 'Threshold review'],
+    ['threshold_policy', 'Threshold policy'],
     ['journal', 'Journal'],
   ] as const
 
@@ -1115,6 +1116,9 @@ function productionBehaviorHelper(stage?: ProductionBehaviorStatus['stages'][str
   }
   if (stage.threshold_overall_decision) {
     return `Threshold review: ${stage.threshold_overall_decision}.`
+  }
+  if (stage.policy_values) {
+    return `${stage.active ? 'Active' : 'Inactive'} ${stage.decision ?? 'policy'} policy.`
   }
   if (typeof stage.freshness_minutes === 'number') {
     return `${stage.freshness_minutes} minutes since latest update.`
@@ -1385,7 +1389,7 @@ function DailyJournalSummary({ journal }: { journal?: DailyPaperJournal }) {
 
   return (
     <div
-      className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm md:grid-cols-5"
+      className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm md:grid-cols-6"
       data-testid="daily-journal-summary"
     >
       <InfoBlock
@@ -1405,6 +1409,12 @@ function DailyJournalSummary({ journal }: { journal?: DailyPaperJournal }) {
         value={`${journal.threshold_review?.overall_decision ?? 'missing'} / ${
           journal.threshold_review?.risk_flags?.length ?? 0
         } flags`}
+      />
+      <InfoBlock
+        label="Policy"
+        value={`${journal.threshold_policy?.state ?? 'missing'} / ${
+          journal.threshold_policy?.active ? 'active' : 'inactive'
+        }`}
       />
       <InfoBlock
         label="Traceability"

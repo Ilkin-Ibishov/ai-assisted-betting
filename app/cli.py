@@ -39,6 +39,7 @@ from app.services.scheduled_worker_service import (
     ScheduledPaperWorkerService,
 )
 from app.services.settlement_service import SettlementService
+from app.services.threshold_policy_service import ThresholdPolicyService
 
 app = typer.Typer(help="Paper Odds Lab CLI.")
 LEAGUE_OPTION = typer.Option(..., help="Football-Data league code, for example E0.")
@@ -452,6 +453,103 @@ def daily_paper_journal(
     typer.echo("daily-paper-journal: finished")
 
 
+@app.command("threshold-policy-evaluate")
+def threshold_policy_evaluate() -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    try:
+        policy = ThresholdPolicyService(engine, settings).evaluate_latest()
+    finally:
+        engine.dispose()
+    _print_threshold_policy("threshold-policy-evaluate", policy)
+
+
+@app.command("threshold-policy-latest")
+def threshold_policy_latest() -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    try:
+        policy = ThresholdPolicyService(engine, settings).latest()
+    finally:
+        engine.dispose()
+    if policy is None:
+        typer.echo("threshold-policy-latest: not found")
+        raise typer.Exit(code=1)
+    _print_threshold_policy("threshold-policy-latest", policy)
+
+
+@app.command("threshold-policy-approve")
+def threshold_policy_approve(
+    policy_id: int = typer.Option(..., help="Threshold policy id to approve."),
+    reviewer: str = typer.Option("human", help="Reviewer name or role."),
+    rationale: str = typer.Option(..., help="Approval rationale."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    try:
+        policy = ThresholdPolicyService(engine, settings).approve(
+            policy_id,
+            reviewer=reviewer,
+            rationale=rationale,
+        )
+    finally:
+        engine.dispose()
+    _print_threshold_policy("threshold-policy-approve", policy)
+
+
+@app.command("threshold-policy-apply")
+def threshold_policy_apply(
+    policy_id: int = typer.Option(..., help="Approved threshold policy id to apply."),
+    reviewer: str = typer.Option("human", help="Reviewer name or role."),
+    rationale: str = typer.Option(..., help="Apply rationale."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    try:
+        policy = ThresholdPolicyService(engine, settings).apply(
+            policy_id,
+            reviewer=reviewer,
+            rationale=rationale,
+        )
+    finally:
+        engine.dispose()
+    _print_threshold_policy("threshold-policy-apply", policy)
+
+
+@app.command("threshold-policy-rollback")
+def threshold_policy_rollback(
+    policy_id: int = typer.Option(..., help="Applied threshold policy id to roll back."),
+    reviewer: str = typer.Option("human", help="Reviewer name or role."),
+    rationale: str = typer.Option(..., help="Rollback rationale."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    try:
+        policy = ThresholdPolicyService(engine, settings).rollback(
+            policy_id,
+            reviewer=reviewer,
+            rationale=rationale,
+        )
+    finally:
+        engine.dispose()
+    _print_threshold_policy("threshold-policy-rollback", policy)
+
+
+def _print_threshold_policy(command_name: str, policy: dict[str, object]) -> None:
+    typer.echo(f"{command_name}: started")
+    typer.echo(f"id={policy.get('id')}")
+    typer.echo(f"state={policy.get('state')}")
+    typer.echo(f"decision={policy.get('decision')}")
+    typer.echo(f"active={str(policy.get('active')).lower()}")
+    typer.echo(f"sample_size={policy.get('sample_size')}")
+    metrics = policy.get("metrics")
+    if isinstance(metrics, dict):
+        typer.echo(f"roi={metrics.get('roi')}")
+    typer.echo(f"policy_values={json.dumps(policy.get('policy_values'), sort_keys=True)}")
+    typer.echo(f"risk_flags={json.dumps(policy.get('risk_flags'), sort_keys=True)}")
+    typer.echo(f"{command_name}: finished")
+
+
 def _split_csv_option(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
@@ -576,6 +674,8 @@ def run_scheduled_paper_worker(
         if summary.settlement_summary is not None:
             _print_stage_summary("settlement", summary.settlement_summary)
         typer.echo(f"ai_review_id={summary.ai_review_id}")
+        typer.echo(f"threshold_review_id={summary.threshold_review_id}")
+        typer.echo(f"threshold_policy_id={summary.threshold_policy_id}")
         typer.echo(f"journal_id={summary.journal_id}")
     if summary.error_summary:
         typer.echo(f"error_summary={summary.error_summary}")

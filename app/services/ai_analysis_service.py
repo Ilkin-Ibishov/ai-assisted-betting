@@ -837,6 +837,11 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
         for item in recommendations
         if item.get("feature_tier") == "cold_start" and _is_actionable_recommendation(item)
     ]
+    external_context_actionable = [
+        item
+        for item in recommendations
+        if _is_actionable_recommendation(item) and _has_external_context(item)
+    ]
     risky_combinations = [
         item
         for item in combinations
@@ -887,6 +892,11 @@ def _recommendation_review_output(input_payload: dict[str, Any]) -> dict[str, An
                 "Prefer enriched actionable rows over odds-only actionable rows until "
                 "backtests separate them."
             ),
+        )
+    if external_context_actionable:
+        risk_flags.append("external_context_recommendations_present")
+        next_checks.append(
+            "Backtest external-context recommendations separately from local-only rows."
         )
     if risky_combinations:
         risk_flags.append("combination_correlation_heuristic")
@@ -1005,6 +1015,9 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
                 if item.get("feature_tier") in {"partial_enriched", "full_enriched"}
             ]
         ),
+        "external_context_actionable_count": len(
+            [item for item in actionable if _has_external_context(item)]
+        ),
         "max_confidence_score": round(max_confidence, 6)
         if max_confidence is not None
         else None,
@@ -1015,6 +1028,13 @@ def _recommendation_model_quality(recommendations: list[dict[str, Any]]) -> dict
             and max_confidence < 0.5
         ),
     }
+
+
+def _has_external_context(item: dict[str, Any]) -> bool:
+    return any(
+        str(value).startswith("external_context:")
+        for value in item.get("feature_provenance", [])
+    )
 
 
 def _combination_model_quality(combinations: list[dict[str, Any]]) -> dict[str, Any]:

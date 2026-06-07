@@ -8,6 +8,7 @@ from app.db.models import LiveRun, Prediction
 from app.db.repositories import PaperRecommendationRepository
 from app.services.odds_movement_service import OddsMovementService
 from app.services.prediction_service import StepSummary
+from app.services.threshold_policy_service import ThresholdPolicyService
 
 COLD_START_CONFIDENCE_CEILING = 0.15
 HIGH_EV_CONFIDENCE_THRESHOLD = 0.15
@@ -26,6 +27,15 @@ class RecommendationService:
             limit=500,
         )
         provider_unhealthy = _provider_unhealthy(self.engine)
+        policy_values = ThresholdPolicyService(self.engine, self.settings).effective_policy_values()
+        min_edge = float(policy_values.get("min_edge", self.settings.min_edge))
+        min_confidence = float(policy_values.get("min_confidence", 0.5))
+        min_odds = float(policy_values.get("min_odds", self.settings.min_odds))
+        max_odds = float(policy_values.get("max_odds", self.settings.max_odds))
+        recommendations_enabled = bool(policy_values.get("recommendations_enabled", True))
+        policy_active = (
+            ThresholdPolicyService(self.engine, self.settings).active_policy() is not None
+        )
         items_read = 0
         items_created = 0
         items_updated = 0
@@ -57,7 +67,7 @@ class RecommendationService:
                     edge=edge,
                     expected_value=expected_value,
                     current_odds=movement.get("current_odds"),
-                    min_edge=self.settings.min_edge,
+                    min_edge=min_edge,
                 )
                 confidence_adjustment_reason = _confidence_adjustment_reason(
                     raw_confidence=raw_confidence,
@@ -68,7 +78,12 @@ class RecommendationService:
                     edge=edge,
                     confidence=confidence,
                     expected_value=expected_value,
-                    min_edge=self.settings.min_edge,
+                    min_edge=min_edge,
+                    min_confidence=min_confidence,
+                    min_odds=min_odds,
+                    max_odds=max_odds,
+                    recommendations_enabled=recommendations_enabled,
+                    policy_active=policy_active,
                     provider_unhealthy=provider_unhealthy,
                     confidence_was_calibrated=(
                         raw_confidence is not None
@@ -151,11 +166,20 @@ def _score_recommendation(
     confidence: float | None,
     expected_value: float | None,
     min_edge: float,
+    min_confidence: float,
+    min_odds: float,
+    max_odds: float,
+    recommendations_enabled: bool,
+    policy_active: bool,
     provider_unhealthy: bool,
     confidence_was_calibrated: bool = False,
 ) -> tuple[str, list[str], str]:
     risk_flags: list[str] = []
+    policy_phrase = " active threshold policy" if policy_active else ""
     movement_status = str(movement.get("status"))
+    current_odds = movement.get("current_odds")
+    if not recommendations_enabled:
+        risk_flags.append("threshold_policy_recommendations_disabled")
     if movement_status == "stale":
         risk_flags.append("stale_odds")
     if movement_status == "missing":
@@ -166,25 +190,36 @@ def _score_recommendation(
         risk_flags.append("missing_prediction")
     elif edge < min_edge:
         risk_flags.append("edge_below_threshold")
+    if policy_active and current_odds is not None and float(current_odds) < min_odds:
+        risk_flags.append("odds_below_policy_minimum")
+    if policy_active and current_odds is not None and float(current_odds) > max_odds:
+        risk_flags.append("odds_above_policy_cap")
     if expected_value is not None and expected_value <= 0:
         risk_flags.append("negative_expected_value")
-    if confidence is not None and confidence < 0.5:
+    if confidence is not None and confidence < min_confidence:
         risk_flags.append("low_confidence")
 
-    unsafe_live_flags = ("stale_odds", "missing_outcome", "provider_health_warning")
+    unsafe_live_flags = (
+        "threshold_policy_recommendations_disabled",
+        "stale_odds",
+        "missing_outcome",
+        "provider_health_warning",
+        "odds_below_policy_minimum",
+        "odds_above_policy_cap",
+    )
     if any(flag in risk_flags for flag in unsafe_live_flags):
         return (
             "reject",
             risk_flags,
-            "Rejected because live odds/provider state is not healthy enough.",
+            f"Rejected because live odds/provider state or{policy_phrase} is not healthy enough.",
         )
     if edge is None:
         return "reject", risk_flags, "Rejected because no model prediction is available."
     if edge < min_edge:
-        return "reject", risk_flags, "Rejected because edge is below threshold."
+        return "reject", risk_flags, f"Rejected because edge is below{policy_phrase} threshold."
     if expected_value is not None and expected_value <= 0:
         return "reject", risk_flags, "Rejected because current-odds EV is not positive."
-    if confidence is not None and confidence < 0.5:
+    if confidence is not None and confidence < min_confidence:
         return "watch", risk_flags, "Positive edge exists, but confidence is low."
     if edge >= min_edge * 1.5:
         if confidence_was_calibrated:

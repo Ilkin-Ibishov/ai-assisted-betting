@@ -88,6 +88,20 @@ Build in this order:
 - Task 68 - Fresh Misli Snapshot Producer
 - Task 69 - Misli Bare-Time Resolution
 - Task 70 - Snapshot Producer Railway Image
+- Task 71 - Recommendation Quality Cycle Report
+- Task 72 - Raw Versus Calibrated Recommendation Confidence
+- Task 73 - Confidence Calibration Backtest Scenarios
+- Task 74 - Richer Team Strength Feature Inputs
+- Task 75 - Daily Paper Trading Journal
+- Task 76 - Combination Risk Quarantine
+- Task 77 - Outcome Learning And Threshold Review Loop
+- Task 78 - Production Journal Freshness
+- Task 79 - Product Timezone Journals
+- Task 80 - Scheduled Threshold Review
+- Task 81 - Production Behavior Monitor
+- Task 82 - Backlog Reconciliation And Production Proof
+- Task 83 - Outcome-Driven Threshold Policy
+- Task 84 - External Football Context Source Selection
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -95,10 +109,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Wait for or trigger the Railway worker to consume the fresh Misli snapshot, then prove the full fresh-data loop from producer to API to worker to dashboard.
+Review enriched recommendation backtests before approving active threshold policy changes.
 ```
 
-Task 68 added and deployed the API latest-snapshot store, producer POST support, a browser-enabled `Dockerfile.snapshot`, and a scheduled `snapshot-producer` Railway service. The first fresh proof stored a 21-event Misli snapshot, but the worker failed on a bare `HH:MM` kickoff row. Task 69 fixes that parser gap and the API/worker deployment is healthy. Task 70 switched the producer to the official Playwright image because the previous Railway upload exported an image but stayed as a stopped `BUILDING` deployment; deployment `df944e43-9e2c-4bad-9b1f-0c582f4e5e37` is successful and a fresh snapshot was posted at `2026-05-28T00:05:28Z`. Task 70 also added service-specific Railway config references and removed root `railway.json` because it overrides every repo-linked service. A 2026-05-28 audit found fresh Misli recommendations were rejected as `missing_prediction`; the fix resolves bare-time scoping and adds neutral cold-start features for live teams without local history. The same follow-up rejects negative current-odds EV recommendations and counts in-run recommendation records in guardrails. New product work should prove the next scheduled worker cycle, then add richer club/player/stat sources. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML before the paper-only live loop is automatically repeatable, monitored, and audited.
+Task 84 selected Football-Data CSV as the first approved external football context source, added explicit `external_context:football_data_csv` feature provenance, AI review counts for external-context actionable rows, and recommendation backtest `source_context_buckets`. Next work should use enriched backtest evidence before approving Task 83 active policy changes. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML.
 
 Required verification commands after implementation:
 
@@ -249,6 +263,11 @@ The live paper loop is operationally healthy, but the model and review layer are
 9. Implemented: Task 79 makes default journal dates follow `PRODUCT_TIMEZONE` (`Asia/Baku` by default) instead of the Railway container timezone.
 10. Implemented: Task 80 generates a recommendation backtest summary during successful scheduled worker runs before writing the daily journal.
 11. Implemented: Task 81 adds an end-to-end behavior monitor for worker, snapshot, recommendation, AI review, threshold review, and journal freshness.
+12. Implemented: Task 83 adds a controlled threshold policy layer with advisory/proposed/approved/applied/rolled-back states and active-policy recommendation gating.
+
+## Current Planned Tasks
+
+No new numbered implementation task has been selected after Task 84. Recommended next planning item: team alias coverage and enriched-context backtest review before approving active threshold changes.
 
 ## Do Not Jump Ahead
 

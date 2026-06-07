@@ -5,7 +5,13 @@ from typing import Any
 from sqlalchemy import func, select
 
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import AIAnalysisRun, LiveSnapshot, PaperJournalEntry, PaperRecommendation
+from app.db.models import (
+    AIAnalysisRun,
+    LiveSnapshot,
+    PaperJournalEntry,
+    PaperRecommendation,
+    ThresholdPolicyRun,
+)
 from app.services.worker_monitoring_service import WorkerMonitoringService
 
 
@@ -43,6 +49,7 @@ class ProductionBehaviorService:
                         _latest_analysis(session, "recommendation_backtest_summary"),
                         worker_started_at=worker_started_at,
                     ),
+                    "threshold_policy": _threshold_policy_stage(_latest_threshold_policy(session)),
                     "journal": _journal_stage(_latest_journal(session), worker_started_at),
                 }
         finally:
@@ -169,6 +176,25 @@ def _journal_stage(
     }
 
 
+def _threshold_policy_stage(policy: ThresholdPolicyRun | None) -> dict[str, Any]:
+    if policy is None:
+        return {"status": "missing", "severity": "warning", "id": None}
+    ok_states = {"advisory", "proposed", "approved", "applied"}
+    severity = "ok" if policy.state in ok_states else "warning"
+    return {
+        "status": policy.state,
+        "severity": severity,
+        "id": policy.id,
+        "active": policy.active,
+        "decision": policy.decision,
+        "sample_size": policy.sample_size,
+        "created_at": policy.created_at,
+        "applied_at": policy.applied_at,
+        "risk_flags": _json_list(policy.risk_flags_json),
+        "policy_values": _json_object(policy.policy_values_json),
+    }
+
+
 def _latest_worker_started_at(worker: dict[str, Any]) -> str | None:
     latest = worker.get("latest_worker_run")
     if not isinstance(latest, dict):
@@ -199,6 +225,14 @@ def _latest_journal(session) -> PaperJournalEntry | None:
     return session.scalar(
         select(PaperJournalEntry)
         .order_by(PaperJournalEntry.updated_at.desc(), PaperJournalEntry.id.desc())
+        .limit(1)
+    )
+
+
+def _latest_threshold_policy(session) -> ThresholdPolicyRun | None:
+    return session.scalar(
+        select(ThresholdPolicyRun)
+        .order_by(ThresholdPolicyRun.created_at.desc(), ThresholdPolicyRun.id.desc())
         .limit(1)
     )
 

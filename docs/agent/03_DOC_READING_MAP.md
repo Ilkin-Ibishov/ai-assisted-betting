@@ -542,6 +542,55 @@ Only after the offline sample pipeline works:
 - `app/cli.py`
 - `tests/unit/test_scheduled_paper_worker_service.py`
 
+## Task 82 - Backlog Reconciliation And Production Proof
+
+- `docs/tasks/task-82-backlog-reconciliation-production-proof.md`
+- `docs/agent/02_IMPLEMENTATION_ORDER.md`
+- `docs/agent/00_READ_ME_FIRST.md`
+- `docs/deployment/production-readiness-review.md`
+- `docs/deployment/railway-readiness.md`
+- `app/services/production_smoke_service.py`
+- `app/services/production_behavior_service.py`
+- `app/services/worker_monitoring_service.py`
+- `app/services/operational_guardrail_service.py`
+- `app/api.py`
+- `dashboard/src/App.tsx`
+- `dashboard/src/lib/api.ts`
+
+## Task 83 - Outcome-Driven Threshold Policy
+
+- `docs/tasks/task-83-outcome-driven-threshold-policy.md`
+- `docs/tasks/task-77-outcome-learning-threshold-review-loop.md`
+- `docs/specs/value-detection-and-paper-bets.md`
+- `docs/specs/logging-and-evaluation.md`
+- `docs/specs/configuration.md`
+- `docs/specs/dashboard.md`
+- `app/services/recommendation_backtest_service.py`
+- `app/services/ai_analysis_service.py`
+- `app/services/daily_paper_journal_service.py`
+- `app/services/recommendation_service.py`
+- `app/config.py`
+- `app/db/models.py`
+- `app/db/migrations.py`
+- `app/api.py`
+- `dashboard/src/App.tsx`
+
+## Task 84 - External Football Context Source Selection
+
+- `docs/tasks/task-84-external-football-context-source-selection.md`
+- `docs/tasks/task-74-richer-team-strength-feature-inputs.md`
+- `docs/specs/data-providers.md`
+- `docs/specs/feature-engineering.md`
+- `docs/specs/prediction-engine.md`
+- `docs/specs/safety-and-compliance.md`
+- `docs/agent/04_OPEN_QUESTIONS.md`
+- `docs/agent/05_TECHNICAL_DEBT.md`
+- `app/core/feature_builder.py`
+- `app/core/prediction_engine.py`
+- `app/services/prediction_service.py`
+- `app/services/ai_analysis_service.py`
+- `app/providers/base.py`
+
 ## Task 22 - Dashboard Data API
 
 - `docs/tasks/task-22-dashboard-data-api.md`

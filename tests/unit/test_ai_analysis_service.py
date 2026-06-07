@@ -403,8 +403,30 @@ def test_ai_analysis_service_flags_odds_only_actionable_recommendations(tmp_path
     assert "odds_only_actionable_recommendations" in output["risk_flags"]
     assert output["model_quality"]["odds_only_actionable_count"] == 1
     assert output["model_quality"]["enriched_actionable_count"] == 1
+    assert output["model_quality"]["external_context_actionable_count"] == 0
     reviewed = json.loads(analysis.input_json)["paper_recommendations"]
     assert {item["feature_tier"] for item in reviewed} == {"cold_start", "full_enriched"}
+    engine.dispose()
+
+
+def test_ai_analysis_service_counts_external_context_actionable_recommendations(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'external-context-ai.sqlite').as_posix()}"
+    init_db(database_url)
+    engine = create_engine_from_url(database_url)
+    _seed_feature_provenance_recommendation_review_inputs(
+        engine,
+        enriched_provenance=(
+            "market_overround_normalized,recent_form,rest_days,"
+            "external_context:football_data_csv"
+        ),
+    )
+
+    analysis = AIAnalysisService(engine).analyze_recommendation_review()
+
+    output = json.loads(analysis.output_json)
+    assert output["model_quality"]["enriched_actionable_count"] == 1
+    assert output["model_quality"]["external_context_actionable_count"] == 1
+    assert "external_context_recommendations_present" in output["risk_flags"]
     engine.dispose()
 
 
@@ -803,7 +825,11 @@ def _seed_calibrated_recommendation_review_inputs(engine) -> None:
         )
 
 
-def _seed_feature_provenance_recommendation_review_inputs(engine) -> None:
+def _seed_feature_provenance_recommendation_review_inputs(
+    engine,
+    *,
+    enriched_provenance: str = "market_overround_normalized,recent_form,rest_days",
+) -> None:
     with session_scope(engine) as session:
         cold_match = _seed_match(session, source_match_id="cold-feature-match")
         enriched_match = _seed_match(session, source_match_id="enriched-feature-match")
@@ -837,7 +863,7 @@ def _seed_feature_provenance_recommendation_review_inputs(engine) -> None:
             reason=(
                 "baseline heuristic probability generated with enriched feature signal; "
                 "feature_tier=full_enriched; "
-                "feature_provenance=market_overround_normalized,recent_form,rest_days"
+                f"feature_provenance={enriched_provenance}"
             ),
         )
         session.add_all([cold_prediction, enriched_prediction])

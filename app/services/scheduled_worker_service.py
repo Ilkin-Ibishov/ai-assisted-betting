@@ -26,6 +26,7 @@ from app.services.recommendation_backtest_service import (
 )
 from app.services.recommendation_service import RecommendationService
 from app.services.settlement_service import SettlementService
+from app.services.threshold_policy_service import ThresholdPolicyService
 
 MAX_SNAPSHOT_DOWNLOAD_BYTES = 5_000_000
 SCHEDULED_WORKER_REPORTS_DIR = Path("reports/scheduled-worker")
@@ -52,6 +53,7 @@ class ScheduledPaperWorkerSummary:
     combination_items: int = 0
     ai_review_id: int | None = None
     threshold_review_id: int | None = None
+    threshold_policy_id: int | None = None
     journal_id: int | None = None
     result_summary: StepSummary | None = None
     settlement_summary: StepSummary | None = None
@@ -153,6 +155,7 @@ class ScheduledPaperWorkerService:
         combination_items = 0
         ai_review_id = None
         threshold_review_id = None
+        threshold_policy_id = None
         journal_id = None
         settlement_summary = None
         result_summary = None
@@ -171,6 +174,11 @@ class ScheduledPaperWorkerService:
             ai_review_id = ai_review.id
             threshold_review = _generate_threshold_review(self.engine)
             threshold_review_id = threshold_review.id
+            threshold_policy = ThresholdPolicyService(
+                self.engine,
+                self.settings,
+            ).evaluate_latest()
+            threshold_policy_id = threshold_policy.get("id")
             journal = DailyPaperJournalService(
                 self.engine,
                 product_timezone=self.settings.product_timezone,
@@ -208,6 +216,7 @@ class ScheduledPaperWorkerService:
             combination_items=combination_items,
             ai_review_id=ai_review_id,
             threshold_review_id=threshold_review_id,
+            threshold_policy_id=threshold_policy_id,
             journal_id=journal_id,
             result_summary=result_summary,
             settlement_summary=settlement_summary,

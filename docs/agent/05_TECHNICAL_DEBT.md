@@ -50,6 +50,22 @@ Single recommendation grades are useful for paper analysis, but they are not eno
 Next:
 Task 56 must add combination and exposure rules. Task 59 should backtest recommendation thresholds and risk assumptions.
 
+### P2 - Threshold Advice Is Not Active Policy
+
+Status: resolved
+Introduced: Task 77 - Outcome Learning And Threshold Review Loop
+Resolved: Task 83 - Outcome-Driven Threshold Policy
+Area: recommendation learning loop
+Owner: completed
+
+Task 77 creates conservative threshold advice from settled recommendation backtests and surfaces it through AI summaries, daily journals, and the dashboard. Task 83 adds durable `threshold_policy_runs`, advisory/proposed/approved/applied/rolled-back states, explicit approve/apply/rollback CLI commands, API visibility, journal visibility, behavior visibility, dashboard visibility, and active-policy recommendation gating.
+
+Impact:
+Resolved. The system can now turn settled-outcome threshold evidence into auditable strategy configuration while preserving fail-closed paper-only behavior.
+
+Next:
+Continue collecting enough settled paper recommendations before approving active changes. Task 84 should improve the upstream probability context so policy changes do not only tighten an odds-first model.
+
 ### P2 - Combination Correlation Rules Are Heuristic
 
 Status: accepted  
@@ -106,7 +122,12 @@ Task 69 resolves bare `HH:MM` rows to the snapshot `scraped_at` local date. This
 
 Next:
 The stronger long-term source of truth remains date group/header extraction from the rendered page, allowed detail-page context, or another explicit user-provided snapshot field.
+
 ## Recent No-Debt Implementation Notes
+
+Task 83 added the active threshold policy layer without introducing documented new debt. It intentionally keeps loosening advisory and requires human approval/apply steps before policy changes affect recommendations.
+
+Task 82 reconciled the backlog and proved the deployed production loop on 2026-06-07. It did not introduce new code debt.
 
 Task 22 added a read-only dashboard API without introducing new documented technical debt.
 
@@ -334,7 +355,7 @@ Area: recommendation quality
 The fresh Misli producer captures public list-page odds and match metadata. It does not yet enrich recommendations with current league table position, club form, player stats, injuries, lineups, rest days, travel, or schedule congestion.
 
 Resolution target:
-Add vetted public/statistical football data sources and incorporate them into recommendation scoring and AI review before calling the system product-complete for daily decision support.
+Task 84 selected Football-Data CSV and added external-context feature provenance plus backtest grouping. Remaining work is team alias coverage and broader source enrichment before calling the system product-complete for daily decision support.
 
 ### P2 - Live Cold-Start Features Use Neutral Team Form
 

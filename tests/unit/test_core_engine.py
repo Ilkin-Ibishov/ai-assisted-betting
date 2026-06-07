@@ -173,6 +173,34 @@ def test_feature_builder_marks_full_enrichment_from_history_and_odds_velocity() 
     assert home.odds_movement_velocity < 0
 
 
+def test_feature_builder_marks_external_football_data_csv_provenance() -> None:
+    match = _match("target", "Alpha", "Beta", "2026-06-10T20:00:00+04:00")
+    completed = [
+        _completed("fd-alpha-1", "Alpha", "Gamma", "2026-06-08T20:00:00+04:00", 2, 0),
+        _completed("fd-alpha-2", "Delta", "Alpha", "2026-06-04T20:00:00+04:00", 1, 2),
+        _completed("fd-alpha-3", "Alpha", "Echo", "2026-06-01T20:00:00+04:00", 1, 1),
+        _completed("fd-beta-1", "Beta", "Gamma", "2026-06-07T20:00:00+04:00", 0, 1),
+        _completed("fd-beta-2", "Delta", "Beta", "2026-06-03T20:00:00+04:00", 2, 0),
+        _completed("fd-beta-3", "Beta", "Echo", "2026-05-31T20:00:00+04:00", 1, 1),
+    ]
+    for historical_match in completed:
+        historical_match.source = "football_data"
+    features = FeatureBuilder(allow_cold_start_features=True).build_for_match(
+        match=match,
+        completed_matches=completed,
+        odds_snapshots=[
+            _odds(match.id, "HOME", 2.0, "2026-06-10T12:00:00+04:00"),
+            _odds(match.id, "DRAW", 3.2, "2026-06-10T12:00:00+04:00"),
+            _odds(match.id, "AWAY", 3.8, "2026-06-10T12:00:00+04:00"),
+        ],
+    )
+
+    home = next(feature for feature in features if feature.selection == "HOME")
+
+    assert home.enrichment_tier == "full_enriched"
+    assert "external_context:football_data_csv" in home.feature_provenance
+
+
 def test_value_detector_bets_only_when_edge_and_odds_are_in_range() -> None:
     settings = Settings(
         database_url="sqlite:///:memory:",
