@@ -35,6 +35,36 @@ The team can accidentally claim production success for code that has not deploye
 Next:
 Use direct `main` pushes for this solo-coder workflow and verify Railway deployment metadata matches the pushed commit before production smoke is counted as release proof.
 
+### P1 - Dashboard CLI Deploy Needs Explicit Path Root
+
+Status: open
+Introduced: Post Task 85 deployment proof on 2026-06-08
+Area: Railway dashboard deployment
+Owner: Task 85 - Direct Main Deployment Proof
+
+The dashboard Railway service is currently CLI-upload based rather than GitHub-linked. A dashboard upload without `--path-as-root` can package the wrong root and start the backend image on the dashboard service, causing dashboard `/` to return 404.
+
+Impact:
+Dashboard deployment can appear successful in Railway while serving the wrong app.
+
+Next:
+Use `railway up . --path-as-root --service dashboard --detach -m "Deploy dashboard frontend from main"` from `dashboard/` until the service is re-linked to GitHub with a stable dashboard root directory.
+
+### P2 - Local Railway Run Cannot Reach Private Postgres Host
+
+Status: accepted
+Introduced: Post Task 85 deployment proof on 2026-06-08
+Area: Railway worker operations
+Owner: future deployment tooling task
+
+`railway run --service worker` pulls production variables into the local shell, but the production database hostname `postgres.railway.internal` is private to Railway. A local one-off worker command fails DNS resolution before touching production.
+
+Impact:
+Local `railway run` is useful for env inspection but not for proving worker DB writes against the private Railway database.
+
+Next:
+Use Railway-executed cron runs, redeploy-triggered runs, or a Railway-hosted one-off job for production worker proof. Do not count local private-DNS failures as deployed worker failures.
+
 ### P2 - External Context Matching Is Exact-Name Heavy
 
 Status: open
