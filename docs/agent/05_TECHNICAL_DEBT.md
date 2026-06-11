@@ -109,7 +109,37 @@ Resolution:
 Task 90 made result writes and settlement default-on for scheduled worker runs and lowered the paper-bet research confidence floor from `0.5` to `0.1`. This keeps the system paper-only while allowing positive-EV cold-start candidates to create auditable samples for settlement and threshold learning.
 
 Follow-up:
-After deployment, audit the next Railway worker cycles. If paper bets still do not appear or result jobs still do not complete, the remaining blocker is likely Misli result-source coverage rather than paper-ledger gating.
+Post-deploy audit confirmed this is resolved: Railway is running commit `2378be65110d7379f0c3630f37962d06c70c3b43`, production smoke passes, and the worker created a new open paper bet. The remaining blocker is now tracked separately as Misli result-source coverage.
+
+### P1 - Misli Result Source Does Not Resolve Finished Paper Bets
+
+Status: open
+Introduced: Post Task 90 Railway deployment audit on 2026-06-12
+Area: result collection and settlement
+Owner: Task 91 - Misli Result Source Coverage
+
+Task 90 made result writes and settlement default-on, but deployed result jobs still remain pending with `result not found in Misli response`. The current Misli result collection path appears to read live/current statistics rather than a stable historical finished-event result source.
+
+Impact:
+The system can create paper samples, but cannot yet learn success rate or grow threshold-policy evidence from deployed bets.
+
+Next:
+Find and implement an approved finished-match result source with provenance, or explicitly classify stale/unresolvable result jobs instead of retrying them forever.
+
+### P2 - Low-Confidence Research Samples Look Invalid In The Ledger
+
+Status: open
+Introduced: Task 90 deployment audit on 2026-06-12
+Area: paper-bet API and dashboard semantics
+Owner: Task 92 - Paper Bet Research Validity Label
+
+Task 90 intentionally allows low-confidence positive-EV paper bets as research samples. The API still exposes these records with `is_valid_open=false` when `low_confidence` is present, which was reasonable before the research floor changed but is now confusing.
+
+Impact:
+Operators can mistake an intentional research sample for a broken or unsafe ledger record.
+
+Next:
+Separate research-sample validity from actionable recommendation safety. Low-confidence rows should remain non-actionable, but valid paper research records should not be labeled as invalid.
 
 ### P2 - Dashboard Policy Controls Are Read-Only
 

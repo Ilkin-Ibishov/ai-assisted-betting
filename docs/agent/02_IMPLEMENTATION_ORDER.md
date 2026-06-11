@@ -108,6 +108,8 @@ Build in this order:
 - Task 88 - Dashboard Threshold Policy Operations, planned
 - Task 89 - Source Context Backtest Gates, planned
 - Task 90 - Unblock Paper Learning Samples, completed
+- Task 91 - Misli Result Source Coverage, planned
+- Task 92 - Paper Bet Research Validity Label, planned
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -115,10 +117,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Deploy Task 90 and audit the next Railway worker cycles for new paper-bet and settlement samples.
+Task 91 - Misli Result Source Coverage
 ```
 
-Task 90 changed defaults so the worker can collect real paper results, run settlement, and create low-confidence positive-EV research paper bets. After deployment, verify whether new paper bets and completed result jobs appear. If they do, continue with Task 86 team alias coverage and Task 89 source-context gates. If they do not, investigate Misli result-source coverage before threshold governance. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML.
+Task 90 is deployed on Railway at commit `2378be65110d7379f0c3630f37962d06c70c3b43`. Production smoke passes, the worker is fresh, and the first post-deploy worker cycle created a new open paper bet. Result jobs still remain pending with `result not found in Misli response`, so the next business blocker is finished-match result coverage and automatic settlement. Do not continue threshold-governance or model-confidence work until deployed paper bets can settle from approved result sources.
 
 Required verification commands after implementation:
 
@@ -276,10 +278,12 @@ The live paper loop is operationally healthy, but the model and review layer are
 16. Planned: Task 88 adds guarded dashboard controls for policy operations.
 17. Planned: Task 89 adds source-context backtest gates before threshold approval.
 18. Implemented: Task 90 unblocks paper-learning samples by making result writes and settlement default-on for worker runs and lowering the paper-bet research confidence floor to 0.1.
+19. Planned: Task 91 fixes Misli/approved result-source coverage so deployed paper bets can settle automatically.
+20. Planned: Task 92 separates paper-bet research validity from actionable recommendation safety labels.
 
 ## Current Planned Tasks
 
-Task 90 is complete and should be deployed next. Tasks 86 through 89 remain queued, but result-source coverage should take priority if Task 90 does not produce new settled samples.
+Task 91 is the current priority. Task 90 deployment proved paper sample creation but not settlement: at least one new open paper bet exists in production, while result jobs remain pending. Task 92 should follow soon after because the API currently marks allowed low-confidence research samples as `is_valid_open=false`, which is confusing but less blocking than settlement.
 
 ## Do Not Jump Ahead
 
