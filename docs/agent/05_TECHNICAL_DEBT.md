@@ -95,6 +95,22 @@ An operator could apply a policy for the right reason, but the future audit trai
 Next:
 Define governance rules and durable decision logs before adding dashboard mutating controls.
 
+### P1 - Paper Learning Loop Had No New Samples
+
+Status: resolved
+Introduced: June 11/12 production audit
+Resolved: Task 90 - Unblock Paper Learning Samples
+Area: paper learning loop
+Owner: completed
+
+Production was operationally healthy but not generating useful learning data: result jobs remained pending in preview mode, paper bets were not being created after deployment, and threshold policy sample size stayed at `0`.
+
+Resolution:
+Task 90 made result writes and settlement default-on for scheduled worker runs and lowered the paper-bet research confidence floor from `0.5` to `0.1`. This keeps the system paper-only while allowing positive-EV cold-start candidates to create auditable samples for settlement and threshold learning.
+
+Follow-up:
+After deployment, audit the next Railway worker cycles. If paper bets still do not appear or result jobs still do not complete, the remaining blocker is likely Misli result-source coverage rather than paper-ledger gating.
+
 ### P2 - Dashboard Policy Controls Are Read-Only
 
 Status: open

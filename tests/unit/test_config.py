@@ -10,6 +10,8 @@ def test_default_settings_load() -> None:
     assert settings.ai_analysis_mode == "deterministic"
     assert settings.ai_analysis_model_name == "deterministic_ai_fallback"
     assert settings.product_timezone == "Asia/Baku"
+    assert settings.misli_result_preview_mode is False
+    assert settings.scheduled_settlement_enabled is True
     assert "http://127.0.0.1:5173" in settings.cors_allowed_origins
     assert "railway" in settings.cors_allowed_origin_regex
 

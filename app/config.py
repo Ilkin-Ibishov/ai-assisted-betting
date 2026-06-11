@@ -22,8 +22,8 @@ class Settings:
     log_level: str
     live_collection_enabled: bool
     misli_result_fetch_enabled: bool = False
-    misli_result_preview_mode: bool = True
-    scheduled_settlement_enabled: bool = False
+    misli_result_preview_mode: bool = False
+    scheduled_settlement_enabled: bool = True
     ai_analysis_mode: str = "deterministic"
     ai_analysis_model_name: str = "deterministic_ai_fallback"
     product_timezone: str = "Asia/Baku"
@@ -72,8 +72,8 @@ def load_settings() -> Settings:
         log_level=getenv("LOG_LEVEL", "INFO"),
         live_collection_enabled=_get_bool("LIVE_COLLECTION_ENABLED", "false"),
         misli_result_fetch_enabled=_get_bool("MISLI_RESULT_FETCH_ENABLED", "false"),
-        misli_result_preview_mode=_get_bool("MISLI_RESULT_PREVIEW_MODE", "true"),
-        scheduled_settlement_enabled=_get_bool("SCHEDULED_SETTLEMENT_ENABLED", "false"),
+        misli_result_preview_mode=_get_bool("MISLI_RESULT_PREVIEW_MODE", "false"),
+        scheduled_settlement_enabled=_get_bool("SCHEDULED_SETTLEMENT_ENABLED", "true"),
         ai_analysis_mode=getenv("AI_ANALYSIS_MODE", "deterministic"),
         ai_analysis_model_name=getenv("AI_ANALYSIS_MODEL_NAME", "deterministic_ai_fallback"),
         product_timezone=getenv("PRODUCT_TIMEZONE", "Asia/Baku"),

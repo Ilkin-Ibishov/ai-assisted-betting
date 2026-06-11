@@ -107,6 +107,7 @@ Build in this order:
 - Task 87 - Threshold Policy Governance And Decision Log, planned
 - Task 88 - Dashboard Threshold Policy Operations, planned
 - Task 89 - Source Context Backtest Gates, planned
+- Task 90 - Unblock Paper Learning Samples, completed
 - Planning - Live Misli recommendations and deployment readiness tasks 53 through 62 generated
 
 ## Current Next Task
@@ -114,10 +115,10 @@ Build in this order:
 The next implementation task is:
 
 ```text
-Prove the direct-main Railway deployment path for the latest code before claiming production success.
+Deploy Task 90 and audit the next Railway worker cycles for new paper-bet and settlement samples.
 ```
 
-Task 85 is now first because production remained on the old `main` commit after Task 83/84 were pushed to a feature branch. The solo-coder release path is direct `main` push plus Railway deployed-commit proof. After that, Task 86 should improve team alias coverage, Task 87 should add threshold policy governance logs, Task 88 should add dashboard operations, and Task 89 should turn source-context backtest evidence into an approval gate. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML.
+Task 90 changed defaults so the worker can collect real paper results, run settlement, and create low-confidence positive-EV research paper bets. After deployment, verify whether new paper bets and completed result jobs appear. If they do, continue with Task 86 team alias coverage and Task 89 source-context gates. If they do not, investigate Misli result-source coverage before threshold governance. Do not add real-money execution, account automation, protected scraping, notification bots, or advanced ML.
 
 Required verification commands after implementation:
 
@@ -274,10 +275,11 @@ The live paper loop is operationally healthy, but the model and review layer are
 15. Planned: Task 87 adds explicit threshold policy governance and decision logs.
 16. Planned: Task 88 adds guarded dashboard controls for policy operations.
 17. Planned: Task 89 adds source-context backtest gates before threshold approval.
+18. Implemented: Task 90 unblocks paper-learning samples by making result writes and settlement default-on for worker runs and lowering the paper-bet research confidence floor to 0.1.
 
 ## Current Planned Tasks
 
-Task 85 is the next task. Tasks 86 through 89 are queued after deployment proof because model-governance work should not outrun release verification.
+Task 90 is complete and should be deployed next. Tasks 86 through 89 remain queued, but result-source coverage should take priority if Task 90 does not produce new settled samples.
 
 ## Do Not Jump Ahead
 

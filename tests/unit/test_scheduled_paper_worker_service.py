@@ -54,7 +54,8 @@ def test_scheduled_worker_runs_one_paper_cycle_when_enabled(tmp_path, monkeypatc
     assert summary.snapshot_path == snapshot_path
     assert summary.ai_review_id is not None
     assert summary.journal_id is not None
-    assert summary.settlement_summary is None
+    assert summary.settlement_summary is not None
+    assert summary.settlement_summary.errors_count == 0
 
     with session_scope(engine) as session:
         worker_run = session.scalar(

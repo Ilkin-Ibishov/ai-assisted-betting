@@ -1,6 +1,9 @@
 from app.db.models import Match, PaperBet, Prediction
 
-MIN_PAPER_BET_CONFIDENCE = 0.5
+# Paper bets are research records, not real staking instructions. Keep the
+# confidence gate above neutral cold noise while allowing positive-EV candidates
+# to create enough paper samples for settlement and threshold learning.
+MIN_PAPER_BET_CONFIDENCE = 0.1
 
 
 class PaperBetLogger:

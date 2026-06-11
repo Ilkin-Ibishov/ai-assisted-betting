@@ -240,7 +240,7 @@ def test_value_detector_bets_only_when_edge_and_odds_are_in_range() -> None:
     assert high_odds_decision.decision == "SKIP"
 
 
-def test_paper_bet_logger_rejects_low_confidence_predictions() -> None:
+def test_paper_bet_logger_rejects_tiny_confidence_predictions() -> None:
     prediction = Prediction(
         match_id=1,
         market="1X2",
@@ -250,7 +250,7 @@ def test_paper_bet_logger_rejects_low_confidence_predictions() -> None:
         model_probability=0.6,
         bookmaker_probability=0.5,
         edge=0.1,
-        confidence_score=0.49,
+        confidence_score=0.05,
         decision="BET",
     )
     match = Match(
