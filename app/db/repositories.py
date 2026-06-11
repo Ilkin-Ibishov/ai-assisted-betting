@@ -484,7 +484,7 @@ class ResultFetchJobRepository:
             self.session.scalars(
                 select(ResultFetchJob)
                 .where(
-                    ResultFetchJob.status != "completed",
+                    ResultFetchJob.status.not_in(["completed", "unresolvable"]),
                     ResultFetchJob.next_attempt_at <= now_iso,
                 )
                 .order_by(ResultFetchJob.next_attempt_at.asc(), ResultFetchJob.id.asc())

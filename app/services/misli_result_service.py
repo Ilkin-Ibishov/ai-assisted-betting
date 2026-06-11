@@ -17,6 +17,10 @@ from app.providers.misli_results import match_misli_result, parse_misli_results_
 from app.services.prediction_service import StepSummary
 
 MISLI_RESULTS_URL = "https://apivx.misli.az/api/web/v1/statistics/sport/SOCCER/matches/live"
+RESULT_NOT_FOUND_MESSAGE = "result not found in Misli response"
+UNRESOLVABLE_RESULT_MESSAGE = "result unavailable after repeated Misli lookups"
+UNRESOLVABLE_RESULT_LOOKUP_ATTEMPTS = 3
+UNRESOLVABLE_RESULT_LOOKUP_AFTER = timedelta(days=2)
 
 
 class MisliResultService:
@@ -48,6 +52,7 @@ class MisliResultService:
             live_runs = LiveRunRepository(session)
             live_runs.start(run_id=run_id, run_type="collect_results", provider="misli_public")
             _ensure_result_jobs(session, now)
+            _retire_unresolvable_result_jobs(session, now)
             due_jobs = ResultFetchJobRepository(session).due(now_iso=now_iso_value, limit=limit)
 
         try:
@@ -92,7 +97,7 @@ class MisliResultService:
                 job.attempt_count += 1
                 if result is None:
                     job.status = "pending"
-                    job.last_error = "result not found in Misli response"
+                    job.last_error = RESULT_NOT_FOUND_MESSAGE
                     job.next_attempt_at = _next_pending_attempt(now, match)
                     items_skipped += 1
                     continue
@@ -209,6 +214,7 @@ def result_jobs_payload(
             "completed": sum(1 for job in jobs if job["status"] == "completed"),
             "postponed": sum(1 for job in jobs if job["status"] == "postponed"),
             "failed": sum(1 for job in jobs if job["status"] == "failed"),
+            "unresolvable": sum(1 for job in jobs if job["status"] == "unresolvable"),
             "pending": sum(1 for job in jobs if job["status"] in {"pending", "scheduled"}),
         },
         "jobs": jobs,
@@ -229,6 +235,25 @@ def _ensure_result_jobs(session, now: datetime) -> None:
             detail_url=detail_url,
             next_attempt_at=_initial_attempt_at(match, now),
         )
+
+
+def _retire_unresolvable_result_jobs(session, now: datetime) -> None:
+    rows = session.execute(
+        select(ResultFetchJob, Match)
+        .join(Match, ResultFetchJob.match_id == Match.id)
+        .where(
+            ResultFetchJob.status.in_(["pending", "failed"]),
+            ResultFetchJob.last_error == RESULT_NOT_FOUND_MESSAGE,
+            ResultFetchJob.attempt_count >= UNRESOLVABLE_RESULT_LOOKUP_ATTEMPTS,
+        )
+    ).all()
+    for job, match in rows:
+        kickoff = _parse_iso(match.kickoff_time)
+        if now - kickoff < UNRESOLVABLE_RESULT_LOOKUP_AFTER:
+            continue
+        job.status = "unresolvable"
+        job.last_error = UNRESOLVABLE_RESULT_MESSAGE
+        job.next_attempt_at = now.isoformat()
 
 
 def _misli_metadata(match: Match) -> tuple[str | None, str | None]:
@@ -279,7 +304,8 @@ def _job_payload(job: ResultFetchJob, match: Match, now_iso: str) -> dict[str, A
         "next_attempt_at": job.next_attempt_at,
         "attempt_count": job.attempt_count,
         "last_error": job.last_error,
-        "is_due": job.status != "completed" and job.next_attempt_at <= now_iso,
+        "is_due": job.status not in {"completed", "unresolvable"}
+        and job.next_attempt_at <= now_iso,
         "match_label": f"{match.home_team} vs {match.away_team}",
         "kickoff_time": match.kickoff_time,
     }

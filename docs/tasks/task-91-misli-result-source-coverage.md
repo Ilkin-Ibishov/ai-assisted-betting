@@ -27,6 +27,12 @@ That means the current blocker has moved from paper-bet creation to result-sourc
 - Result-job API/reporting distinguishes `pending`, `completed`, and stale/unresolvable jobs.
 - Tests cover successful result lookup, not-found retry behavior, and stale/unresolvable classification.
 
+## Implementation Note
+
+The first code slice retires stale `result not found in Misli response` jobs as `unresolvable` after repeated misses and more than two days after kickoff. This prevents old result jobs from consuming the worker's per-cycle limit forever and lets fresh recently-finished matches reach the current Misli result feed while they are still available.
+
+This does not yet prove full historical result coverage. If fresh finished matches still fail to settle after stale queue cleanup, the next slice must add a stronger approved result source.
+
 ## Verification
 
 ```powershell

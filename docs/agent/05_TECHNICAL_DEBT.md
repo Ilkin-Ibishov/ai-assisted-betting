@@ -124,7 +124,7 @@ Impact:
 The system can create paper samples, but cannot yet learn success rate or grow threshold-policy evidence from deployed bets.
 
 Next:
-Find and implement an approved finished-match result source with provenance, or explicitly classify stale/unresolvable result jobs instead of retrying them forever.
+First slice implemented stale/unresolvable classification so old jobs stop starving fresh due jobs. Next, deploy and verify whether fresh finished matches settle while they still appear in the Misli current results feed. If not, add a stronger approved finished-match result source with provenance.
 
 ### P2 - Low-Confidence Research Samples Look Invalid In The Ledger
 

@@ -943,6 +943,7 @@ def test_live_result_jobs_endpoint_reports_pipeline_health(tmp_path: Path) -> No
         "completed": 0,
         "postponed": 0,
         "failed": 0,
+        "unresolvable": 0,
         "pending": 1,
     }
     assert payload["jobs"][0]["source_match_id"] == "misli:football:2816300"
