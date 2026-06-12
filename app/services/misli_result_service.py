@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 from sqlalchemy import Engine, select
 
 from app.db.engine import session_scope
-from app.db.models import Match, ResultFetchJob
+from app.db.models import Match, PaperBet, ResultFetchJob
 from app.db.repositories import (
     DecisionLogRepository,
     LiveRunRepository,
@@ -228,13 +228,17 @@ def _ensure_result_jobs(session, now: datetime) -> None:
     ).all()
     for match in matches:
         event_id, detail_url = _misli_metadata(match)
-        repository.ensure(
+        job = repository.ensure(
             match_id=match.id,
             source_match_id=match.source_match_id,
             misli_event_id=event_id,
             detail_url=detail_url,
             next_attempt_at=_initial_attempt_at(match, now),
         )
+        if job.status == "unresolvable" and _has_open_paper_bet(session, match.id):
+            job.status = "pending"
+            job.last_error = None
+            job.next_attempt_at = now.isoformat()
 
 
 def _retire_unresolvable_result_jobs(session, now: datetime) -> None:
@@ -254,6 +258,17 @@ def _retire_unresolvable_result_jobs(session, now: datetime) -> None:
         job.status = "unresolvable"
         job.last_error = UNRESOLVABLE_RESULT_MESSAGE
         job.next_attempt_at = now.isoformat()
+
+
+def _has_open_paper_bet(session, match_id: int) -> bool:
+    return (
+        session.scalar(
+            select(PaperBet.id)
+            .where(PaperBet.match_id == match_id, PaperBet.status == "open")
+            .limit(1)
+        )
+        is not None
+    )
 
 
 def _misli_metadata(match: Match) -> tuple[str | None, str | None]:
