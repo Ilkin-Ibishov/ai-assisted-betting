@@ -200,10 +200,20 @@ def result_jobs_payload(
     now = _parse_iso(now_iso) if now_iso else datetime.now(UTC)
     now_iso_value = now.isoformat()
     with session_scope(engine) as session:
+        has_open_bet = (
+            select(PaperBet.id)
+            .where(PaperBet.match_id == ResultFetchJob.match_id, PaperBet.status == "open")
+            .limit(1)
+            .exists()
+        )
         rows = session.execute(
             select(ResultFetchJob, Match)
             .join(Match, ResultFetchJob.match_id == Match.id)
-            .order_by(ResultFetchJob.next_attempt_at.asc(), ResultFetchJob.id.asc())
+            .order_by(
+                has_open_bet.desc(),
+                ResultFetchJob.next_attempt_at.asc(),
+                ResultFetchJob.id.asc(),
+            )
             .limit(max(1, min(limit, 500)))
         ).all()
         jobs = [_job_payload(job, match, now_iso_value) for job, match in rows]
@@ -223,11 +233,21 @@ def result_jobs_payload(
 
 def _ensure_result_jobs(session, now: datetime) -> None:
     repository = ResultFetchJobRepository(session)
+    has_open_bet = (
+        select(PaperBet.id)
+        .where(PaperBet.match_id == Match.id, PaperBet.status == "open")
+        .limit(1)
+        .exists()
+    )
     matches = session.scalars(
-        select(Match).where(Match.source == "misli_public", Match.status != "completed")
+        select(Match).where(
+            Match.source == "misli_public",
+            (Match.status != "completed") | has_open_bet,
+        )
     ).all()
     for match in matches:
         event_id, detail_url = _misli_metadata(match)
+        has_open_paper_bet = _has_open_paper_bet(session, match.id)
         job = repository.ensure(
             match_id=match.id,
             source_match_id=match.source_match_id,
@@ -235,10 +255,23 @@ def _ensure_result_jobs(session, now: datetime) -> None:
             detail_url=detail_url,
             next_attempt_at=_initial_attempt_at(match, now),
         )
-        if job.status == "unresolvable" and _has_open_paper_bet(session, match.id):
+        if not has_open_paper_bet:
+            continue
+        if job.status == "unresolvable" or (
+            job.status == "completed" and not _match_has_settleable_result(match)
+        ):
             job.status = "pending"
             job.last_error = None
             job.next_attempt_at = now.isoformat()
+
+
+def _match_has_settleable_result(match: Match) -> bool:
+    return (
+        match.status == "completed"
+        and match.home_score is not None
+        and match.away_score is not None
+        and match.result in {"HOME", "DRAW", "AWAY"}
+    )
 
 
 def _retire_unresolvable_result_jobs(session, now: datetime) -> None:

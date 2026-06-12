@@ -477,6 +477,80 @@ def test_collect_due_results_reopens_unresolvable_open_paper_bet_job(tmp_path) -
     assert job.status == "completed"
 
 
+def test_collect_due_results_reopens_completed_job_when_open_bet_match_is_unsettleable(
+    tmp_path,
+) -> None:
+    engine = _engine(tmp_path, "reopen-completed-job.sqlite")
+    match_id = _seed_misli_match(
+        engine,
+        event_id="2816200",
+        kickoff_time="2026-05-18T20:30:00+04:00",
+    )
+    with session_scope(engine) as session:
+        prediction = Prediction(
+            match_id=match_id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=0.5,
+            bookmaker_probability=0.48,
+            edge=0.02,
+            confidence_score=0.133333,
+            decision="BET",
+        )
+        session.add(prediction)
+        session.flush()
+        session.add(
+            PaperBet(
+                prediction_id=prediction.id,
+                match_id=match_id,
+                market="1X2",
+                selection="HOME",
+                odds_taken=2.0,
+                stake_units=1.0,
+                expected_value=0.01,
+                status="open",
+            )
+        )
+        session.add(
+            ResultFetchJob(
+                match_id=match_id,
+                source_match_id="misli:football:2816200",
+                misli_event_id="2816200",
+                detail_url="https://www.misli.az/idman-novleri-canli-merc-teferruati/futbol/2816200",
+                status="completed",
+                next_attempt_at="2026-05-18T22:30:00+04:00",
+                attempt_count=1,
+            )
+        )
+
+    payload = {
+        "success": True,
+        "data": {
+            "data": [_result_item("2816200", "Forest City", "Eastport Athletic", "ENDED", 2, 1)]
+        },
+    }
+
+    summary = MisliResultService(engine, fetcher=lambda: payload).collect_due_results(
+        now_iso="2026-05-20T01:00:00+04:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 1
+    with session_scope(engine) as session:
+        match = session.get(Match, match_id)
+        job = session.scalar(select(ResultFetchJob).where(ResultFetchJob.match_id == match_id))
+    assert match is not None
+    assert match.status == "completed"
+    assert match.result == "HOME"
+    assert job is not None
+    assert job.status == "completed"
+    assert job.attempt_count == 2
+
+
 def test_result_jobs_payload_counts_unresolvable_jobs(tmp_path) -> None:
     engine = _engine(tmp_path, "result-job-payload.sqlite")
     match_id = _seed_misli_match(engine, event_id="2816300")
@@ -501,6 +575,73 @@ def test_result_jobs_payload_counts_unresolvable_jobs(tmp_path) -> None:
     assert payload["summary"]["unresolvable"] == 1
     assert payload["summary"]["pending"] == 0
     assert payload["jobs"][0]["is_due"] is False
+
+
+def test_result_jobs_payload_prioritizes_open_paper_bet_jobs(tmp_path) -> None:
+    engine = _engine(tmp_path, "result-job-open-bet-first.sqlite")
+    stale_match_id = _seed_misli_match(
+        engine,
+        event_id="2816300",
+        kickoff_time="2026-05-18T20:30:00+04:00",
+    )
+    open_bet_match_id = _seed_misli_match(
+        engine,
+        event_id="2816200",
+        kickoff_time="2026-05-20T20:30:00+04:00",
+    )
+    with session_scope(engine) as session:
+        prediction = Prediction(
+            match_id=open_bet_match_id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=0.5,
+            bookmaker_probability=0.48,
+            edge=0.02,
+            confidence_score=0.133333,
+            decision="BET",
+        )
+        session.add(prediction)
+        session.flush()
+        session.add(
+            PaperBet(
+                prediction_id=prediction.id,
+                match_id=open_bet_match_id,
+                market="1X2",
+                selection="HOME",
+                odds_taken=2.0,
+                stake_units=1.0,
+                expected_value=0.01,
+                status="open",
+            )
+        )
+        session.add_all(
+            [
+                ResultFetchJob(
+                    match_id=stale_match_id,
+                    source_match_id="misli:football:2816300",
+                    misli_event_id="2816300",
+                    status="unresolvable",
+                    next_attempt_at="2026-05-18T22:30:00+04:00",
+                    last_error="result unavailable after repeated Misli lookups",
+                ),
+                ResultFetchJob(
+                    match_id=open_bet_match_id,
+                    source_match_id="misli:football:2816200",
+                    misli_event_id="2816200",
+                    status="pending",
+                    next_attempt_at="2026-05-20T22:30:00+04:00",
+                ),
+            ]
+        )
+
+    payload = result_jobs_payload(
+        engine,
+        now_iso="2026-05-20T23:00:00+04:00",
+    )
+
+    assert payload["jobs"][0]["match_id"] == open_bet_match_id
 
 
 def _result_item(
