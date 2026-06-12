@@ -257,6 +257,9 @@ def _ensure_result_jobs(session, now: datetime) -> None:
         )
         if not has_open_paper_bet:
             continue
+        if job.status not in {"completed", "unresolvable"}:
+            next_attempt = _parse_iso(job.next_attempt_at)
+            job.next_attempt_at = now.isoformat() if next_attempt <= now else _utc_iso(next_attempt)
         if job.status == "unresolvable" or (
             job.status == "completed" and not _match_has_settleable_result(match)
         ):
@@ -319,7 +322,7 @@ def _misli_metadata(match: Match) -> tuple[str | None, str | None]:
 def _initial_attempt_at(match: Match, now: datetime) -> str:
     kickoff = _parse_iso(match.kickoff_time)
     if kickoff > now:
-        return (kickoff + timedelta(hours=2)).isoformat()
+        return _utc_iso(kickoff + timedelta(hours=2))
     return now.isoformat()
 
 
@@ -332,13 +335,13 @@ def _next_non_final_attempt(now: datetime, match: Match, status: str) -> str:
 def _next_pending_attempt(now: datetime, match: Match) -> str:
     kickoff = _parse_iso(match.kickoff_time)
     if kickoff > now:
-        return (kickoff + timedelta(hours=2)).isoformat()
-    return (now + timedelta(minutes=30)).isoformat()
+        return _utc_iso(kickoff + timedelta(hours=2))
+    return _utc_iso(now + timedelta(minutes=30))
 
 
 def _next_backoff(now: datetime, attempt_count: int) -> str:
     hours = min(24, max(1, 2 ** min(attempt_count, 5)))
-    return (now + timedelta(hours=hours)).isoformat()
+    return _utc_iso(now + timedelta(hours=hours))
 
 
 def _job_payload(job: ResultFetchJob, match: Match, now_iso: str) -> dict[str, Any]:
@@ -366,3 +369,7 @@ def _parse_iso(value: str | None) -> datetime:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed
+
+
+def _utc_iso(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat()
