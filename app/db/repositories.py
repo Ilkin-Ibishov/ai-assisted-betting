@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -484,11 +484,17 @@ class ResultFetchJobRepository:
             self.session.scalars(
                 select(ResultFetchJob)
                 .join(Match, ResultFetchJob.match_id == Match.id)
+                .outerjoin(
+                    PaperBet,
+                    (PaperBet.match_id == ResultFetchJob.match_id)
+                    & (PaperBet.status == "open"),
+                )
                 .where(
                     ResultFetchJob.status.not_in(["completed", "unresolvable"]),
                     ResultFetchJob.next_attempt_at <= now_iso,
                 )
                 .order_by(
+                    case((PaperBet.id.is_not(None), 0), else_=1).asc(),
                     Match.kickoff_time.desc(),
                     ResultFetchJob.next_attempt_at.asc(),
                     ResultFetchJob.id.asc(),

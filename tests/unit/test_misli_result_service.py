@@ -3,7 +3,7 @@ import json
 from sqlalchemy import select
 
 from app.db.engine import create_engine_from_url, session_scope
-from app.db.models import Base, Match, ResultFetchJob
+from app.db.models import Base, Match, PaperBet, Prediction, ResultFetchJob
 from app.db.repositories import MatchRepository
 from app.providers.misli_results import (
     MisliResult,
@@ -318,6 +318,92 @@ def test_collect_due_results_prioritizes_recent_due_jobs(tmp_path) -> None:
     assert old_job.status == "pending"
     assert recent_job is not None
     assert recent_job.status == "completed"
+
+
+def test_collect_due_results_prioritizes_open_paper_bet_jobs(tmp_path) -> None:
+    engine = _engine(tmp_path, "open-bet-priority.sqlite")
+    bet_match_id = _seed_misli_match(
+        engine,
+        event_id="2816200",
+        kickoff_time="2026-05-18T20:30:00+04:00",
+    )
+    non_bet_match_id = _seed_misli_match(
+        engine,
+        event_id="2816300",
+        kickoff_time="2026-05-19T20:30:00+04:00",
+    )
+    with session_scope(engine) as session:
+        prediction = Prediction(
+            match_id=bet_match_id,
+            market="1X2",
+            selection="HOME",
+            model_name="baseline_heuristic",
+            model_version="v0",
+            model_probability=0.5,
+            bookmaker_probability=0.48,
+            edge=0.02,
+            confidence_score=0.133333,
+            decision="BET",
+        )
+        session.add(prediction)
+        session.flush()
+        session.add(
+            PaperBet(
+                prediction_id=prediction.id,
+                match_id=bet_match_id,
+                market="1X2",
+                selection="HOME",
+                odds_taken=2.0,
+                stake_units=1.0,
+                expected_value=0.01,
+                status="open",
+            )
+        )
+        session.add(
+            ResultFetchJob(
+                match_id=bet_match_id,
+                source_match_id="misli:football:2816200",
+                misli_event_id="2816200",
+                detail_url="https://www.misli.az/idman-novleri-canli-merc-teferruati/futbol/2816200",
+                status="pending",
+                next_attempt_at="2026-05-18T22:30:00+04:00",
+            )
+        )
+        session.add(
+            ResultFetchJob(
+                match_id=non_bet_match_id,
+                source_match_id="misli:football:2816300",
+                misli_event_id="2816300",
+                detail_url="https://www.misli.az/idman-novleri-canli-merc-teferruati/futbol/2816300",
+                status="pending",
+                next_attempt_at="2026-05-19T22:30:00+04:00",
+            )
+        )
+
+    payload = {
+        "success": True,
+        "data": {
+            "data": [_result_item("2816200", "Forest City", "Eastport Athletic", "ENDED", 2, 1)]
+        },
+    }
+
+    summary = MisliResultService(engine, fetcher=lambda: payload).collect_due_results(
+        now_iso="2026-05-20T01:00:00+04:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 1
+    with session_scope(engine) as session:
+        bet_match = session.get(Match, bet_match_id)
+        non_bet_job = session.scalar(
+            select(ResultFetchJob).where(ResultFetchJob.match_id == non_bet_match_id)
+        )
+    assert bet_match is not None
+    assert bet_match.status == "completed"
+    assert non_bet_job is not None
+    assert non_bet_job.status == "pending"
 
 
 def test_result_jobs_payload_counts_unresolvable_jobs(tmp_path) -> None:
