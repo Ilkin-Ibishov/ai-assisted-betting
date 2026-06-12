@@ -483,11 +483,16 @@ class ResultFetchJobRepository:
         return list(
             self.session.scalars(
                 select(ResultFetchJob)
+                .join(Match, ResultFetchJob.match_id == Match.id)
                 .where(
                     ResultFetchJob.status.not_in(["completed", "unresolvable"]),
                     ResultFetchJob.next_attempt_at <= now_iso,
                 )
-                .order_by(ResultFetchJob.next_attempt_at.asc(), ResultFetchJob.id.asc())
+                .order_by(
+                    Match.kickoff_time.desc(),
+                    ResultFetchJob.next_attempt_at.asc(),
+                    ResultFetchJob.id.asc(),
+                )
                 .limit(limit)
             )
         )

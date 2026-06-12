@@ -257,6 +257,69 @@ def test_collect_due_results_retires_stale_jobs_before_due_limit(tmp_path) -> No
     assert fresh_job.status == "completed"
 
 
+def test_collect_due_results_prioritizes_recent_due_jobs(tmp_path) -> None:
+    engine = _engine(tmp_path, "recent-due.sqlite")
+    old_match_id = _seed_misli_match(
+        engine,
+        event_id="2816200",
+        kickoff_time="2026-05-18T20:30:00+04:00",
+    )
+    recent_match_id = _seed_misli_match(
+        engine,
+        event_id="2816300",
+        kickoff_time="2026-05-19T20:30:00+04:00",
+    )
+    with session_scope(engine) as session:
+        session.add(
+            ResultFetchJob(
+                match_id=old_match_id,
+                source_match_id="misli:football:2816200",
+                misli_event_id="2816200",
+                detail_url="https://www.misli.az/idman-novleri-canli-merc-teferruati/futbol/2816200",
+                status="pending",
+                next_attempt_at="2026-05-18T22:30:00+04:00",
+                last_error="result not found in Misli response",
+            )
+        )
+        session.add(
+            ResultFetchJob(
+                match_id=recent_match_id,
+                source_match_id="misli:football:2816300",
+                misli_event_id="2816300",
+                detail_url="https://www.misli.az/idman-novleri-canli-merc-teferruati/futbol/2816300",
+                status="pending",
+                next_attempt_at="2026-05-19T22:30:00+04:00",
+            )
+        )
+
+    payload = {
+        "success": True,
+        "data": {
+            "data": [_result_item("2816300", "Forest City", "Eastport Athletic", "ENDED", 2, 1)]
+        },
+    }
+
+    summary = MisliResultService(engine, fetcher=lambda: payload).collect_due_results(
+        now_iso="2026-05-20T01:00:00+04:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 1
+    with session_scope(engine) as session:
+        old_job = session.scalar(
+            select(ResultFetchJob).where(ResultFetchJob.match_id == old_match_id)
+        )
+        recent_job = session.scalar(
+            select(ResultFetchJob).where(ResultFetchJob.match_id == recent_match_id)
+        )
+    assert old_job is not None
+    assert old_job.status == "pending"
+    assert recent_job is not None
+    assert recent_job.status == "completed"
+
+
 def test_result_jobs_payload_counts_unresolvable_jobs(tmp_path) -> None:
     engine = _engine(tmp_path, "result-job-payload.sqlite")
     match_id = _seed_misli_match(engine, event_id="2816300")
