@@ -8,6 +8,7 @@ from app.db.repositories import MatchRepository
 from app.providers.misli_results import (
     MisliResult,
     match_misli_result,
+    parse_misli_match_detail_payload,
     parse_misli_results_payload,
 )
 from app.services.misli_result_service import MisliResultService, result_jobs_payload
@@ -56,6 +57,51 @@ def test_parse_misli_results_payload_keeps_non_final_games_unsettleable() -> Non
         ("misli:football:2816301", "in_progress", None),
         ("misli:football:2816302", "postponed", None),
     ]
+
+
+def test_parse_misli_match_detail_payload_maps_direct_match_result() -> None:
+    payload = {
+        "success": True,
+        "data": {
+            "sgi": 2842611,
+            "d": 1781258400000,
+            "s": "ENDED",
+            "ht": {"n": "Nepean FC", "s": {"r": 0, "c": 0, "ht": 0}},
+            "at": {"n": "Dunbar Rovers FC", "s": {"r": 2, "c": 2, "ht": 1}},
+        },
+    }
+
+    result = parse_misli_match_detail_payload(payload)
+
+    assert result is not None
+    assert result.source_match_id == "misli:football:2842611"
+    assert result.status == "completed"
+    assert result.home_team == "Nepean FC"
+    assert result.away_team == "Dunbar Rovers FC"
+    assert result.home_score == 0
+    assert result.away_score == 2
+    assert result.result == "AWAY"
+
+
+def test_parse_misli_match_detail_payload_preserves_completed_missing_score() -> None:
+    payload = {
+        "success": True,
+        "data": {
+            "sgi": 2842605,
+            "d": 1781256600000,
+            "s": "ENDED",
+            "ht": {"n": "Gold Coast Knights"},
+            "at": {"n": "Brisbane City FC"},
+        },
+    }
+
+    result = parse_misli_match_detail_payload(payload)
+
+    assert result is not None
+    assert result.status == "completed"
+    assert result.home_score is None
+    assert result.away_score is None
+    assert result.result is None
 
 
 def test_match_misli_result_uses_sgid_then_rejects_ambiguous_fallback() -> None:
@@ -639,7 +685,11 @@ def test_collect_due_results_classifies_open_bet_provider_retention_miss(tmp_pat
 
     payload = {"success": True, "data": {"data": []}}
 
-    summary = MisliResultService(engine, fetcher=lambda: payload).collect_due_results(
+    summary = MisliResultService(
+        engine,
+        fetcher=lambda: payload,
+        match_detail_fetcher=lambda event_id: {"success": False},
+    ).collect_due_results(
         now_iso="2026-05-20T15:00:00+00:00",
         dry_run=False,
         limit=1,
@@ -667,8 +717,8 @@ def test_collect_due_results_classifies_open_bet_provider_retention_miss(tmp_pat
     assert result_payload["jobs"][0]["is_due"] is False
 
 
-def test_collect_due_results_does_not_reopen_provider_retention_miss(tmp_path) -> None:
-    engine = _engine(tmp_path, "provider-retention-miss-stays-terminal.sqlite")
+def test_collect_due_results_does_not_reopen_provider_result_missing_score(tmp_path) -> None:
+    engine = _engine(tmp_path, "provider-result-missing-score-stays-terminal.sqlite")
     match_id = _seed_misli_match(
         engine,
         event_id="2816200",
@@ -685,8 +735,8 @@ def test_collect_due_results_does_not_reopen_provider_retention_miss(tmp_path) -
                 next_attempt_at="2026-05-20T15:00:00+00:00",
                 attempt_count=3,
                 last_error=(
-                    "provider_retention_miss: Misli current feed no longer contains event "
-                    "after repeated lookups"
+                    "provider_result_missing_score: Misli match detail returned final event "
+                    "without score"
                 ),
             )
         )
@@ -698,7 +748,11 @@ def test_collect_due_results_does_not_reopen_provider_retention_miss(tmp_path) -
         },
     }
 
-    summary = MisliResultService(engine, fetcher=lambda: payload).collect_due_results(
+    summary = MisliResultService(
+        engine,
+        fetcher=lambda: payload,
+        match_detail_fetcher=lambda event_id: payload,
+    ).collect_due_results(
         now_iso="2026-05-20T16:00:00+00:00",
         dry_run=False,
         limit=1,
@@ -714,9 +768,132 @@ def test_collect_due_results_does_not_reopen_provider_retention_miss(tmp_path) -
     assert job is not None
     assert job.status == "unresolvable"
     assert job.last_error == (
-        "provider_retention_miss: Misli current feed no longer contains event "
-        "after repeated lookups"
+        "provider_result_missing_score: Misli match detail returned final event without score"
     )
+
+
+def test_collect_due_results_uses_match_detail_for_provider_retention_miss(tmp_path) -> None:
+    engine = _engine(tmp_path, "provider-retention-detail-settlement.sqlite")
+    match_id = _seed_misli_match(
+        engine,
+        event_id="2842611",
+        kickoff_time="2026-06-12T14:00:00+04:00",
+    )
+    with session_scope(engine) as session:
+        _seed_open_paper_bet(session, match_id)
+        session.add(
+            ResultFetchJob(
+                match_id=match_id,
+                source_match_id="misli:football:2842611",
+                misli_event_id="2842611",
+                status="unresolvable",
+                next_attempt_at="2026-06-13T08:32:11+00:00",
+                attempt_count=18,
+                last_error=(
+                    "provider_retention_miss: Misli current feed no longer contains event "
+                    "after repeated lookups"
+                ),
+            )
+        )
+
+    detail_payload = {
+        "success": True,
+        "data": {
+            "sgi": 2842611,
+            "d": 1781258400000,
+            "s": "ENDED",
+            "ht": {"n": "Nepean FC", "s": {"r": 0, "c": 0, "ht": 0}},
+            "at": {"n": "Dunbar Rovers FC", "s": {"r": 2, "c": 2, "ht": 1}},
+        },
+    }
+
+    summary = MisliResultService(
+        engine,
+        fetcher=lambda: {"success": True, "data": {"data": []}},
+        match_detail_fetcher=lambda event_id: detail_payload,
+    ).collect_due_results(
+        now_iso="2026-06-13T09:00:00+00:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 1
+    with session_scope(engine) as session:
+        match = session.get(Match, match_id)
+        job = session.scalar(select(ResultFetchJob).where(ResultFetchJob.match_id == match_id))
+    assert match is not None
+    assert match.status == "completed"
+    assert match.home_score == 0
+    assert match.away_score == 2
+    assert match.result == "AWAY"
+    assert job is not None
+    assert job.status == "completed"
+
+
+def test_collect_due_results_classifies_match_detail_missing_score(tmp_path) -> None:
+    engine = _engine(tmp_path, "provider-detail-missing-score.sqlite")
+    match_id = _seed_misli_match(
+        engine,
+        event_id="2842605",
+        kickoff_time="2026-06-12T13:30:00+04:00",
+    )
+    with session_scope(engine) as session:
+        _seed_open_paper_bet(session, match_id)
+        session.add(
+            ResultFetchJob(
+                match_id=match_id,
+                source_match_id="misli:football:2842605",
+                misli_event_id="2842605",
+                status="unresolvable",
+                next_attempt_at="2026-06-13T08:32:11+00:00",
+                attempt_count=18,
+                last_error=(
+                    "provider_retention_miss: Misli current feed no longer contains event "
+                    "after repeated lookups"
+                ),
+            )
+        )
+
+    detail_payload = {
+        "success": True,
+        "data": {
+            "sgi": 2842605,
+            "d": 1781256600000,
+            "s": "ENDED",
+            "ht": {"n": "Gold Coast Knights"},
+            "at": {"n": "Brisbane City FC"},
+        },
+    }
+
+    summary = MisliResultService(
+        engine,
+        fetcher=lambda: {"success": True, "data": {"data": []}},
+        match_detail_fetcher=lambda event_id: detail_payload,
+    ).collect_due_results(
+        now_iso="2026-06-13T09:00:00+00:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 0
+    assert summary.items_skipped == 1
+    with session_scope(engine) as session:
+        match = session.get(Match, match_id)
+        job = session.scalar(select(ResultFetchJob).where(ResultFetchJob.match_id == match_id))
+    assert match is not None
+    assert match.status == "scheduled"
+    assert job is not None
+    assert job.status == "unresolvable"
+    assert job.last_error == (
+        "provider_result_missing_score: Misli match detail returned final event without score"
+    )
+
+    result_payload = result_jobs_payload(engine, now_iso="2026-06-13T09:30:00+00:00")
+
+    assert result_payload["summary"]["missing_score"] == 1
+    assert result_payload["jobs"][0]["diagnostic_reason"] == "provider_result_missing_score"
 
 
 def test_result_jobs_payload_counts_unresolvable_jobs(tmp_path) -> None:

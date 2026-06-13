@@ -13,14 +13,25 @@ from app.db.repositories import (
     LiveRunRepository,
     ResultFetchJobRepository,
 )
-from app.providers.misli_results import match_misli_result, parse_misli_results_payload
+from app.providers.misli_results import (
+    MisliResult,
+    match_misli_result,
+    parse_misli_match_detail_payload,
+    parse_misli_results_payload,
+)
 from app.services.prediction_service import StepSummary
 
 MISLI_RESULTS_URL = "https://apivx.misli.az/api/web/v1/statistics/sport/SOCCER/matches/live"
+MISLI_MATCH_DETAIL_URL = (
+    "https://apivx.misli.az/api/web/v1/statistics/sportType/SOCCER/match/{event_id}"
+)
 RESULT_NOT_FOUND_MESSAGE = "result not found in Misli response"
 UNRESOLVABLE_RESULT_MESSAGE = "result unavailable after repeated Misli lookups"
 PROVIDER_RETENTION_MISS_MESSAGE = (
     "provider_retention_miss: Misli current feed no longer contains event after repeated lookups"
+)
+PROVIDER_RESULT_MISSING_SCORE_MESSAGE = (
+    "provider_result_missing_score: Misli match detail returned final event without score"
 )
 UNRESOLVABLE_RESULT_LOOKUP_ATTEMPTS = 3
 UNRESOLVABLE_RESULT_LOOKUP_AFTER = timedelta(days=2)
@@ -33,9 +44,11 @@ class MisliResultService:
         engine: Engine,
         *,
         fetcher: Callable[[], dict[str, Any]] | None = None,
+        match_detail_fetcher: Callable[[str], dict[str, Any]] | None = None,
     ) -> None:
         self.engine = engine
         self.fetcher = fetcher or fetch_misli_results_payload
+        self.match_detail_fetcher = match_detail_fetcher or fetch_misli_match_detail_payload
 
     def collect_due_results(
         self,
@@ -100,6 +113,9 @@ class MisliResultService:
                 result = match_misli_result(match, results)
                 job.attempt_count += 1
                 if result is None:
+                    result = self._fetch_match_detail_result(session, job, match)
+
+                if result is None:
                     retention_miss = _provider_retention_miss_message(session, job, match, now)
                     if retention_miss is not None:
                         job.status = "unresolvable"
@@ -129,9 +145,15 @@ class MisliResultService:
                     continue
 
                 if result.home_score is None or result.away_score is None or result.result is None:
-                    job.status = "pending"
-                    job.last_error = "final result missing score"
-                    job.next_attempt_at = _next_pending_attempt(now, match)
+                    missing_score = _provider_missing_score_message(session, job, match, now)
+                    if missing_score is not None:
+                        job.status = "unresolvable"
+                        job.last_error = missing_score
+                        job.next_attempt_at = now_iso_value
+                    else:
+                        job.status = "pending"
+                        job.last_error = "final result missing score"
+                        job.next_attempt_at = _next_pending_attempt(now, match)
                     items_skipped += 1
                     continue
 
@@ -188,6 +210,23 @@ class MisliResultService:
 
         return StepSummary(items_read, 0, items_updated, items_skipped, len(errors))
 
+    def _fetch_match_detail_result(
+        self,
+        session,
+        job: ResultFetchJob,
+        match: Match,
+    ) -> MisliResult | None:
+        if not _has_open_paper_bet(session, match.id):
+            return None
+        event_id = job.misli_event_id or _misli_metadata(match)[0]
+        if not event_id:
+            return None
+        payload = self.match_detail_fetcher(event_id)
+        result = parse_misli_match_detail_payload(payload)
+        if result is None or result.source_match_id != match.source_match_id:
+            return None
+        return result
+
 
 def fetch_misli_results_payload() -> dict[str, Any]:
     request = Request(
@@ -195,6 +234,18 @@ def fetch_misli_results_payload() -> dict[str, Any]:
         headers={
             "Accept": "application/json",
             "User-Agent": "PaperOddsLab/0.1 public-result-check",
+        },
+    )
+    with urlopen(request, timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def fetch_misli_match_detail_payload(event_id: str) -> dict[str, Any]:
+    request = Request(
+        MISLI_MATCH_DETAIL_URL.format(event_id=event_id),
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "PaperOddsLab/0.1 public-result-detail-check",
         },
     )
     with urlopen(request, timeout=30) as response:
@@ -238,6 +289,9 @@ def result_jobs_payload(
             "retention_miss": sum(
                 1 for job in jobs if job["diagnostic_reason"] == "provider_retention_miss"
             ),
+            "missing_score": sum(
+                1 for job in jobs if job["diagnostic_reason"] == "provider_result_missing_score"
+            ),
             "pending": sum(1 for job in jobs if job["status"] in {"pending", "scheduled"}),
         },
         "jobs": jobs,
@@ -270,7 +324,7 @@ def _ensure_result_jobs(session, now: datetime) -> None:
         )
         if not has_open_paper_bet:
             continue
-        if job.status == "unresolvable" and job.last_error == PROVIDER_RETENTION_MISS_MESSAGE:
+        if job.status == "unresolvable" and job.last_error == PROVIDER_RESULT_MISSING_SCORE_MESSAGE:
             continue
         if job.status not in {"completed", "unresolvable"}:
             next_attempt = _parse_iso(job.next_attempt_at)
@@ -329,6 +383,21 @@ def _provider_retention_miss_message(
     if now - _parse_iso(match.kickoff_time) < PROVIDER_RETENTION_MISS_AFTER:
         return None
     return PROVIDER_RETENTION_MISS_MESSAGE
+
+
+def _provider_missing_score_message(
+    session,
+    job: ResultFetchJob,
+    match: Match,
+    now: datetime,
+) -> str | None:
+    if not _has_open_paper_bet(session, match.id):
+        return None
+    if job.attempt_count < UNRESOLVABLE_RESULT_LOOKUP_ATTEMPTS:
+        return None
+    if now - _parse_iso(match.kickoff_time) < PROVIDER_RETENTION_MISS_AFTER:
+        return None
+    return PROVIDER_RESULT_MISSING_SCORE_MESSAGE
 
 
 def _has_open_paper_bet(session, match_id: int) -> bool:
@@ -401,6 +470,8 @@ def _job_payload(job: ResultFetchJob, match: Match, now_iso: str) -> dict[str, A
 def _diagnostic_reason(job: ResultFetchJob) -> str | None:
     if job.last_error == PROVIDER_RETENTION_MISS_MESSAGE:
         return "provider_retention_miss"
+    if job.last_error == PROVIDER_RESULT_MISSING_SCORE_MESSAGE:
+        return "provider_result_missing_score"
     if job.last_error == UNRESOLVABLE_RESULT_MESSAGE:
         return "unresolvable_result"
     if job.last_error == RESULT_NOT_FOUND_MESSAGE:

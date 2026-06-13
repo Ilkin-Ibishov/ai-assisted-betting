@@ -51,7 +51,7 @@ This task should not weaken settlement truth standards. If the system cannot pro
 
 ## Implementation Note
 
-The first implementation slice does not add an external fallback source. It adds a safer diagnostic foundation:
+The first implementation slice did not add an external fallback source. It added a safer diagnostic foundation:
 
 - Repeated not-found Misli result lookups for open paper bets are classified as `provider_retention_miss` after the provider window has plausibly passed.
 - Classified retention misses stay terminal instead of being reopened every worker cycle.
@@ -59,6 +59,20 @@ The first implementation slice does not add an external fallback source. It adds
 - The paper bet remains open; no result is inferred.
 
 The next slice should choose and wire an approved fallback source with provenance and ambiguity rejection.
+
+The next investigation found a provider-native fallback in the Misli web bundle:
+
+```text
+GET https://apivx.misli.az/api/web/v1/statistics/sportType/SOCCER/match/{event_id}
+```
+
+This endpoint resolves by the existing Misli/Betradar event id (`sgi`) and therefore avoids fuzzy team/date settlement. The second slice wires this endpoint after the current live-feed result lookup:
+
+- Use the current live statistics feed first.
+- If an open paper-bet job is not found there, fetch Misli direct match detail by `misli_event_id`.
+- Settle only when the direct detail payload returns final status and both scores.
+- If the direct detail payload is final but has no score fields, classify `provider_result_missing_score`.
+- Keep all behavior paper-only and provenance-bearing through `raw_result`.
 
 ## First-Slice Completion Evidence
 

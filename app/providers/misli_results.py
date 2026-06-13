@@ -58,6 +58,35 @@ def parse_misli_results_payload(payload: dict[str, Any]) -> list[MisliResult]:
     return results
 
 
+def parse_misli_match_detail_payload(payload: dict[str, Any]) -> MisliResult | None:
+    raw_item = payload.get("data")
+    if not isinstance(raw_item, dict):
+        return None
+    sg_id = _string_id(raw_item.get("sgi") or raw_item.get("sgId") or raw_item.get("id"))
+    if not sg_id:
+        return None
+    status = _normalize_detail_status(raw_item)
+    home_score = _detail_score(raw_item.get("ht"))
+    away_score = _detail_score(raw_item.get("at"))
+    final_result = (
+        _result_from_score(home_score, away_score)
+        if status == "completed" and home_score is not None and away_score is not None
+        else None
+    )
+    return MisliResult(
+        source_match_id=f"misli:football:{sg_id}",
+        misli_event_id=sg_id,
+        status=status,
+        home_team=_detail_team_name(raw_item.get("ht")),
+        away_team=_detail_team_name(raw_item.get("at")),
+        kickoff_time=_kickoff_iso(raw_item.get("d")),
+        home_score=home_score,
+        away_score=away_score,
+        result=final_result,
+        raw_payload=raw_item,
+    )
+
+
 def match_misli_result(match: Any, results: list[MisliResult]) -> MisliResult | None:
     exact = [result for result in results if result.source_match_id == match.source_match_id]
     if len(exact) == 1:
@@ -88,6 +117,19 @@ def _normalize_status(raw_item: dict[str, Any]) -> str:
     return "unknown"
 
 
+def _normalize_detail_status(raw_item: dict[str, Any]) -> str:
+    status = str(raw_item.get("s") or raw_item.get("status") or "").strip().upper()
+    if status in FINAL_STATUSES:
+        return "completed"
+    if status in SCHEDULED_STATUSES:
+        return "scheduled"
+    if status in POSTPONED_STATUSES:
+        return "postponed"
+    if status:
+        return "in_progress"
+    return "unknown"
+
+
 def _score(raw_team: Any) -> int | None:
     if not isinstance(raw_team, dict):
         return None
@@ -103,10 +145,31 @@ def _score(raw_team: Any) -> int | None:
     return None
 
 
+def _detail_score(raw_team: Any) -> int | None:
+    if not isinstance(raw_team, dict):
+        return None
+    scores = raw_team.get("s")
+    if not isinstance(scores, dict):
+        return None
+    for key in ("r", "c", "ft"):
+        value = scores.get(key)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.strip().isdigit():
+            return int(value)
+    return None
+
+
 def _team_name(raw_team: Any) -> str:
     if not isinstance(raw_team, dict):
         return ""
     return str(raw_team.get("teamName") or "").strip()
+
+
+def _detail_team_name(raw_team: Any) -> str:
+    if not isinstance(raw_team, dict):
+        return ""
+    return str(raw_team.get("n") or raw_team.get("teamName") or "").strip()
 
 
 def _kickoff_iso(value: Any) -> str | None:
