@@ -11,6 +11,7 @@ from app.providers.misli_results import (
     parse_misli_match_detail_payload,
     parse_misli_results_payload,
 )
+from app.providers.sportytrader_results import parse_sportytrader_result_page
 from app.services.misli_result_service import MisliResultService, result_jobs_payload
 
 
@@ -102,6 +103,53 @@ def test_parse_misli_match_detail_payload_preserves_completed_missing_score() ->
     assert result.home_score is None
     assert result.away_score is None
     assert result.result is None
+
+
+def test_parse_sportytrader_result_page_maps_postponed_fixture() -> None:
+    html = """
+    <html><body>
+      <h1>Stats and Result of the match Gold Coast Knights Brisbane City FC</h1>
+      <div>Australia - NPL Queensland, Women</div>
+      <div>Gold Coast Knights</div>
+      <div>12/06/2026 11:30 Postponed</div>
+      <div>Brisbane City FC</div>
+    </body></html>
+    """
+
+    result = parse_sportytrader_result_page(
+        html,
+        event_id="2842605",
+        home_team="Gold Coast Knights (Q)",
+        away_team="FK Brizban Siti (Q)",
+        kickoff_time="2026-06-12T13:30:00+04:00",
+    )
+
+    assert result is not None
+    assert result.source_match_id == "misli:football:2842605"
+    assert result.status == "postponed"
+    assert result.home_team == "Gold Coast Knights"
+    assert result.away_team == "Brisbane City FC"
+    assert result.raw_payload["source"] == "sportytrader"
+
+
+def test_parse_sportytrader_result_page_rejects_ambiguous_fixture() -> None:
+    html = """
+    <html><body>
+      <div>Gold Coast Knights</div>
+      <div>12/06/2026 11:30 Postponed</div>
+      <div>Eastern Suburbs FC</div>
+    </body></html>
+    """
+
+    result = parse_sportytrader_result_page(
+        html,
+        event_id="2842605",
+        home_team="Gold Coast Knights (Q)",
+        away_team="FK Brizban Siti (Q)",
+        kickoff_time="2026-06-12T13:30:00+04:00",
+    )
+
+    assert result is None
 
 
 def test_match_misli_result_uses_sgid_then_rejects_ambiguous_fallback() -> None:
@@ -811,6 +859,7 @@ def test_collect_due_results_uses_match_detail_for_provider_retention_miss(tmp_p
         engine,
         fetcher=lambda: {"success": True, "data": {"data": []}},
         match_detail_fetcher=lambda event_id: detail_payload,
+        external_result_fetcher=lambda match, job: None,
     ).collect_due_results(
         now_iso="2026-06-13T09:00:00+00:00",
         dry_run=False,
@@ -999,6 +1048,93 @@ def test_collect_due_results_classifies_match_detail_missing_score(tmp_path) -> 
 
     assert result_payload["summary"]["missing_score"] == 1
     assert result_payload["jobs"][0]["diagnostic_reason"] == "provider_result_missing_score"
+
+
+def test_collect_due_results_voids_external_postponed_missing_score(tmp_path) -> None:
+    engine = _engine(tmp_path, "provider-detail-external-postponed.sqlite")
+    match_id = _seed_misli_match(
+        engine,
+        event_id="2842605",
+        kickoff_time="2026-06-12T13:30:00+04:00",
+    )
+    with session_scope(engine) as session:
+        _seed_open_paper_bet(session, match_id)
+        session.add(
+            ResultFetchJob(
+                match_id=match_id,
+                source_match_id="misli:football:2842605",
+                misli_event_id="2842605",
+                status="unresolvable",
+                next_attempt_at="2026-06-13T09:31:43+00:00",
+                attempt_count=19,
+                last_error=(
+                    "provider_result_missing_score: Misli match detail returned final event "
+                    "without score"
+                ),
+            )
+        )
+
+    detail_payload = {
+        "success": True,
+        "data": {
+            "sgi": 2842605,
+            "d": 1781256600000,
+            "s": "ENDED",
+            "ht": {"n": "Gold Coast Knights"},
+            "at": {"n": "Brisbane City FC"},
+        },
+    }
+    external_result = MisliResult(
+        source_match_id="misli:football:2842605",
+        misli_event_id="2842605",
+        status="postponed",
+        home_team="Gold Coast Knights",
+        away_team="Brisbane City FC",
+        kickoff_time="2026-06-12T09:30:00+00:00",
+        home_score=None,
+        away_score=None,
+        result=None,
+        raw_payload={
+            "source": "sportytrader",
+            "source_url": (
+                "https://www.sportytrader.com/en/results-live/"
+                "gold-coast-knights-brisbane-city-fc-8315912/"
+            ),
+            "status": "postponed",
+        },
+    )
+
+    summary = MisliResultService(
+        engine,
+        fetcher=lambda: {"success": True, "data": {"data": []}},
+        match_detail_fetcher=lambda event_id: detail_payload,
+        external_result_fetcher=lambda match, job: external_result,
+    ).collect_due_results(
+        now_iso="2026-06-13T10:00:00+00:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 1
+    assert summary.items_skipped == 1
+    with session_scope(engine) as session:
+        match = session.get(Match, match_id)
+        paper_bet = session.scalar(select(PaperBet).where(PaperBet.match_id == match_id))
+        job = session.scalar(select(ResultFetchJob).where(ResultFetchJob.match_id == match_id))
+    assert match is not None
+    assert match.status == "postponed"
+    assert match.home_score is None
+    assert match.away_score is None
+    assert match.raw_payload_json is not None
+    assert "sportytrader" in match.raw_payload_json
+    assert paper_bet is not None
+    assert paper_bet.status == "void"
+    assert paper_bet.profit_loss_units == 0.0
+    assert paper_bet.settled_at == "2026-06-13T10:00:00+00:00"
+    assert job is not None
+    assert job.status == "postponed"
+    assert job.last_error is None
 
 
 def test_result_jobs_payload_counts_unresolvable_jobs(tmp_path) -> None:

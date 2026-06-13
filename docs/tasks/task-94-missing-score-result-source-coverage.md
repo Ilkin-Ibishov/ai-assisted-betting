@@ -37,3 +37,19 @@ Paper-bet success-rate analysis needs truthful settlement outcomes. If Misli som
 ## Notes
 
 Railway CLI OAuth was expired during Task 93 verification, so deployment proof used public API and smoke checks. Re-auth Railway before the next deployment audit if service-level deployment metadata is needed.
+
+## Implementation Note
+
+The first Task 94 slice uses a curated external evidence registry, not live scraping. Browser/search access could read SportyTrader and Sofascore pages for the production fixture, but local runtime checks with `curl` and Python `urllib` were reset by SportyTrader. Relying on live scraping would make production behavior flaky.
+
+For `misli:football:2842605`, the registry stores the SportyTrader source URL, capture time, and the relevant page excerpt:
+
+```text
+Gold Coast Knights
+12/06/2026 11:30 Postponed
+Brisbane City FC
+```
+
+The service now reopens `provider_result_missing_score` jobs when a curated external source exists. If the external source proves a non-played fixture, open paper bets for that match are voided with zero profit/loss and the source provenance is stored on the match payload. If no curated source exists or the source does not match teams/date, the existing `provider_result_missing_score` classification remains.
+
+This is intentionally narrow. It fixes the known production research record without pretending the system has general historical result coverage.

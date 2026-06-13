@@ -19,6 +19,10 @@ from app.providers.misli_results import (
     parse_misli_match_detail_payload,
     parse_misli_results_payload,
 )
+from app.providers.sportytrader_results import (
+    SPORTYTRADER_FALLBACK_EVIDENCE,
+    parse_sportytrader_result_page,
+)
 from app.services.prediction_service import StepSummary
 
 MISLI_RESULTS_URL = "https://apivx.misli.az/api/web/v1/statistics/sport/SOCCER/matches/live"
@@ -45,10 +49,13 @@ class MisliResultService:
         *,
         fetcher: Callable[[], dict[str, Any]] | None = None,
         match_detail_fetcher: Callable[[str], dict[str, Any]] | None = None,
+        external_result_fetcher: Callable[[Match, ResultFetchJob], MisliResult | None]
+        | None = None,
     ) -> None:
         self.engine = engine
         self.fetcher = fetcher or fetch_misli_results_payload
         self.match_detail_fetcher = match_detail_fetcher or fetch_misli_match_detail_payload
+        self.external_result_fetcher = external_result_fetcher or fetch_external_result
 
     def collect_due_results(
         self,
@@ -148,6 +155,46 @@ class MisliResultService:
                         else "pending"
                     )
                     job.next_attempt_at = _next_non_final_attempt(now, match, result.status)
+                    items_skipped += 1
+                    continue
+
+                if result.home_score is None or result.away_score is None or result.result is None:
+                    try:
+                        external_result = self.external_result_fetcher(match, job)
+                    except Exception:
+                        external_result = None
+                    if external_result is not None:
+                        result = external_result
+                        job.last_result_payload_json = json.dumps(
+                            result.raw_payload,
+                            sort_keys=True,
+                            ensure_ascii=False,
+                        )
+                        job.last_error = None
+                    else:
+                        missing_score = _provider_missing_score_message(session, job, match, now)
+                        if missing_score is not None:
+                            job.status = "unresolvable"
+                            job.last_error = missing_score
+                            job.next_attempt_at = now_iso_value
+                        else:
+                            job.status = "pending"
+                            job.last_error = "final result missing score"
+                            job.next_attempt_at = _next_pending_attempt(now, match)
+                        items_skipped += 1
+                        continue
+
+                if result.status == "postponed" and _is_external_result(result):
+                    void_count = _void_open_paper_bets_for_non_played(
+                        session,
+                        match,
+                        now_iso_value,
+                        logs,
+                        result,
+                    )
+                    job.status = "postponed"
+                    job.next_attempt_at = _next_non_final_attempt(now, match, result.status)
+                    items_updated += void_count
                     items_skipped += 1
                     continue
 
@@ -259,6 +306,29 @@ def fetch_misli_match_detail_payload(event_id: str) -> dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
+def fetch_external_result(match: Match, job: ResultFetchJob) -> MisliResult | None:
+    event_id = job.misli_event_id or _misli_metadata(match)[0]
+    if not event_id:
+        return None
+    evidence = SPORTYTRADER_FALLBACK_EVIDENCE.get(event_id)
+    if evidence is None:
+        return None
+    return parse_sportytrader_result_page(
+        str(evidence["html"]),
+        event_id=event_id,
+        home_team=match.home_team,
+        away_team=match.away_team,
+        kickoff_time=match.kickoff_time,
+        source_url=str(evidence["source_url"]),
+        captured_at=str(evidence["captured_at"]),
+    )
+
+
+def _has_external_result_source(match: Match, job: ResultFetchJob) -> bool:
+    event_id = job.misli_event_id or _misli_metadata(match)[0]
+    return bool(event_id and event_id in SPORTYTRADER_FALLBACK_EVIDENCE)
+
+
 def result_jobs_payload(
     engine: Engine,
     *,
@@ -331,7 +401,11 @@ def _ensure_result_jobs(session, now: datetime) -> None:
         )
         if not has_open_paper_bet:
             continue
-        if job.status == "unresolvable" and _is_provider_missing_score(job.last_error):
+        if (
+            job.status == "unresolvable"
+            and _is_provider_missing_score(job.last_error)
+            and not _has_external_result_source(match, job)
+        ):
             continue
         if job.status not in {"completed", "unresolvable"}:
             next_attempt = _parse_iso(job.next_attempt_at)
@@ -351,6 +425,57 @@ def _match_has_settleable_result(match: Match) -> bool:
         and match.away_score is not None
         and match.result in {"HOME", "DRAW", "AWAY"}
     )
+
+
+def _is_external_result(result: MisliResult) -> bool:
+    return result.raw_payload.get("source") not in {None, "misli_public"}
+
+
+def _void_open_paper_bets_for_non_played(
+    session,
+    match: Match,
+    now_iso: str,
+    logs: DecisionLogRepository,
+    result: MisliResult,
+) -> int:
+    match.status = result.status
+    match.home_score = None
+    match.away_score = None
+    match.result = None
+    match.raw_payload_json = json.dumps(
+        {
+            "source": "external_result_fallback",
+            "source_match_id": match.source_match_id,
+            "misli_event_id": result.misli_event_id,
+            "status": result.status,
+            "raw_result": result.raw_payload,
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    open_bets = list(
+        session.scalars(
+            select(PaperBet).where(
+                PaperBet.match_id == match.id,
+                PaperBet.status == "open",
+            )
+        )
+    )
+    for paper_bet in open_bets:
+        paper_bet.status = "void"
+        paper_bet.profit_loss_units = 0.0
+        paper_bet.settled_at = now_iso
+        logs.add(
+            match_id=match.id,
+            stage="VOID_EXTERNAL_NON_PLAYED_RESULT",
+            level="INFO",
+            message=(
+                "Voided paper bet from external non-played result: "
+                f"{result.raw_payload.get('source')}"
+            ),
+            input_json=json.dumps(result.raw_payload, sort_keys=True, ensure_ascii=False),
+        )
+    return len(open_bets)
 
 
 def _is_provider_missing_score(last_error: str | None) -> bool:
