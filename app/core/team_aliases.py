@@ -19,8 +19,8 @@ class TeamAliasResolver:
     def __init__(self, aliases: list[TeamAlias] | None = None) -> None:
         self._aliases_by_key: dict[tuple[str, str | None], set[str]] = {}
         for alias in aliases or []:
-            key = (_canonical_key(alias.alias), alias.league)
-            self._aliases_by_key.setdefault(key, set()).add(_canonical_key(alias.canonical))
+            key = (canonical_team_key(alias.alias), alias.league)
+            self._aliases_by_key.setdefault(key, set()).add(canonical_team_key(alias.canonical))
 
     @classmethod
     def from_json_file(cls, path: Path = DEFAULT_ALIAS_PATH) -> "TeamAliasResolver":
@@ -40,7 +40,7 @@ class TeamAliasResolver:
         return cls(aliases)
 
     def canonical_keys(self, team: str, *, league: str | None = None) -> set[str]:
-        direct_key = _canonical_key(team)
+        direct_key = canonical_team_key(team)
         keys = {direct_key}
         alias_keys = self._aliases_by_key.get((direct_key, league), set())
         alias_keys |= self._aliases_by_key.get((direct_key, None), set())
@@ -49,22 +49,22 @@ class TeamAliasResolver:
         return keys
 
 
-def _canonical_key(value: str) -> str:
+def canonical_team_key(value: str) -> str:
     transliterated = (
-        value.replace("ə", "e")
-        .replace("Ə", "E")
-        .replace("ı", "i")
-        .replace("İ", "I")
-        .replace("ö", "o")
-        .replace("Ö", "O")
-        .replace("ü", "u")
-        .replace("Ü", "U")
-        .replace("ğ", "g")
-        .replace("Ğ", "G")
-        .replace("ş", "s")
-        .replace("Ş", "S")
-        .replace("ç", "c")
-        .replace("Ç", "C")
+        value.replace("\u0259", "e")
+        .replace("\u018f", "E")
+        .replace("\u0131", "i")
+        .replace("\u0130", "I")
+        .replace("\u00f6", "o")
+        .replace("\u00d6", "O")
+        .replace("\u00fc", "u")
+        .replace("\u00dc", "U")
+        .replace("\u011f", "g")
+        .replace("\u011e", "G")
+        .replace("\u015f", "s")
+        .replace("\u015e", "S")
+        .replace("\u00e7", "c")
+        .replace("\u00c7", "C")
     )
     normalized = unicodedata.normalize("NFKD", transliterated)
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii").lower()

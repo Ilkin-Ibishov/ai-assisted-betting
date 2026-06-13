@@ -312,6 +312,35 @@ def test_live_status_endpoint_returns_empty_state(tmp_path: Path) -> None:
     }
 
 
+def test_live_enrichment_audit_endpoint_reports_unmatched_teams(tmp_path: Path) -> None:
+    database_url = _create_live_api_database(tmp_path)
+    engine = create_engine_from_url(database_url)
+    with session_scope(engine) as session:
+        MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:cold",
+            league="Sample Premier",
+            home_team="Unknown Home",
+            away_team="Unknown Away",
+            kickoff_time="2026-06-10T20:00:00+04:00",
+            status="scheduled",
+        )
+    engine.dispose()
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.get("/api/live/enrichment-audit")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["scheduled_matches"] == 1
+    assert payload["cold_start_candidates"] == 1
+    assert payload["team_coverage"]["unmatched_team_slots"] == 2
+    assert {team["team"] for team in payload["unmatched_teams"]} == {
+        "Unknown Home",
+        "Unknown Away",
+    }
+
+
 def test_worker_status_endpoint_returns_latest_worker_freshness(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     engine = create_engine_from_url(database_url)

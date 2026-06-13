@@ -254,7 +254,8 @@ def _has_external_football_data_context(
     away_history: list[Match],
 ) -> bool:
     return any(
-        match.source == "football_data" for match in [*home_history, *away_history]
+        match.source in {"football_data", "football-data"}
+        for match in [*home_history, *away_history]
     )
 
 

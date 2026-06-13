@@ -14,6 +14,7 @@ from app.services.combination_service import CombinationService
 from app.services.comparison_service import ReplayComparisonRequest, ReplayComparisonService
 from app.services.daily_paper_journal_service import DailyPaperJournalService
 from app.services.evaluation_service import EvaluationService, format_evaluation_report
+from app.services.feature_enrichment_audit_service import FeatureEnrichmentAuditService
 from app.services.football_data_service import FootballDataImportRequest, FootballDataImportService
 from app.services.live_collection_service import LiveCollectionRequest, LiveCollectionService
 from app.services.live_cycle_service import LivePaperCycleRequest, LivePaperCycleService
@@ -425,6 +426,35 @@ def recommendation_quality(
     typer.echo(f"fresh_snapshot_count={report['summary']['fresh_snapshot_count']}")
     typer.echo(f"ai_approval_state={report['ai_review']['approval_state']}")
     typer.echo("recommendation-quality: finished")
+
+
+@app.command("feature-enrichment-audit")
+def feature_enrichment_audit(
+    limit: int = typer.Option(100, help="Maximum scheduled matches to audit."),
+    minimum_history: int = typer.Option(3, help="Minimum prior matches required per team."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    try:
+        report = FeatureEnrichmentAuditService(engine).report(
+            limit=limit,
+            minimum_history=minimum_history,
+        )
+    finally:
+        engine.dispose()
+    typer.echo("feature-enrichment-audit: started")
+    typer.echo(f"scheduled_matches={report['scheduled_matches']}")
+    typer.echo(f"audited_matches={report['audited_matches']}")
+    typer.echo(f"full_enriched_candidates={report['full_enriched_candidates']}")
+    typer.echo(f"partial_enriched_candidates={report['partial_enriched_candidates']}")
+    typer.echo(f"cold_start_candidates={report['cold_start_candidates']}")
+    typer.echo(f"unmatched_team_slots={report['team_coverage']['unmatched_team_slots']}")
+    for team in report["unmatched_teams"][:10]:
+        typer.echo(
+            "unmatched_team="
+            f"{team['team']}|league={team['league']}|history_count={team['history_count']}"
+        )
+    typer.echo("feature-enrichment-audit: finished")
 
 
 @app.command("daily-paper-journal")

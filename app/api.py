@@ -20,6 +20,7 @@ from app.db.models import (
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.bet_ledger_service import BetLedgerService, DateRange, LedgerStatus
 from app.services.daily_paper_journal_service import DailyPaperJournalService
+from app.services.feature_enrichment_audit_service import FeatureEnrichmentAuditService
 from app.services.live_snapshot_service import LiveSnapshotService
 from app.services.live_status_service import LiveStatusService
 from app.services.misli_result_service import result_jobs_payload
@@ -183,6 +184,20 @@ def create_api(
             fresh_after_minutes=fresh_after_minutes,
             limit=limit,
         )
+
+    @api.get("/api/live/enrichment-audit")
+    def get_live_enrichment_audit(
+        limit: int = 100,
+        minimum_history: int = 3,
+    ) -> dict[str, Any]:
+        engine = create_engine_from_url(live_database_url)
+        try:
+            return FeatureEnrichmentAuditService(engine).report(
+                limit=limit,
+                minimum_history=minimum_history,
+            )
+        finally:
+            engine.dispose()
 
     @api.get("/api/live/daily-journal/latest")
     def get_live_daily_journal_latest() -> dict[str, Any]:

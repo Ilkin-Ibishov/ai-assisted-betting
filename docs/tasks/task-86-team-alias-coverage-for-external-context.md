@@ -29,11 +29,14 @@ First slice implemented:
 - Added `data/team_aliases.json` as the auditable local alias file. It starts empty until production unmatched teams are reviewed and mapped deliberately.
 - `FeatureBuilder` now uses the resolver when selecting team history and when scoring whether the target team was home or away inside a historical match.
 - Ambiguous aliases intentionally return only the direct canonical key, so they cannot silently enrich rows.
+- Added read-only alias/enrichment coverage reporting:
+  - API: `GET /api/live/enrichment-audit`
+  - CLI: `python -m app.cli feature-enrichment-audit`
+- Fixed Football-Data provenance detection to recognize both historical source labels currently present in code/tests: `football_data` and `football-data`.
 
 Still open:
 
 - Populate live Misli aliases with source/league/confidence metadata.
-- Report unmatched team and alias coverage in CLI/API output.
 - Run before/after source-context backtests.
 
 ## Verification
