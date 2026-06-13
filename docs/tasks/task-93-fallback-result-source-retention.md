@@ -127,3 +127,62 @@ paper_bet result_job=2315 source_match_id=misli:football:2842611 diagnostic_reas
 ```
 
 The two paper bets remain open because no approved result source proved their outcomes. That is intentional; this slice made the data-coverage gap explicit rather than inventing settlement outcomes.
+
+## Direct-Detail Completion Evidence
+
+Verified on 2026-06-13.
+
+Pushed to `main`:
+
+```text
+79867c2 Use Misli match detail result fallback
+82c147d Harden Misli result fallback reopening
+```
+
+Local verification:
+
+```text
+ruff: All checks passed.
+pytest: 290 passed.
+```
+
+Production worker proof after the hardening deployment:
+
+```text
+latest collect_results run id=3786
+started_at=2026-06-13T09:31:43.620355+00:00
+status=completed
+items_read=7
+items_updated=2
+items_skipped=5
+errors_count=0
+```
+
+Production smoke:
+
+```text
+ok=true
+worker_status=fresh
+worker_status.freshness_minutes=0
+open_paper_bets=1
+settled_paper_bets=594
+```
+
+Outcome proof:
+
+```text
+result_jobs.summary.retention_miss=0
+result_jobs.summary.missing_score=1
+paper_bet id=589 source_match_id=misli:football:2842611 status=lost profit_loss_units=-1.0 settled_at=2026-06-13T09:31:49.489353+00:00
+result_job id=2308 source_match_id=misli:football:2842605 diagnostic_reason=provider_result_missing_score
+```
+
+The direct Misli detail endpoint proved `misli:football:2842611` and allowed settlement. The remaining open production paper bet, `misli:football:2842605`, is no longer a provider-retention miss; the provider-native detail endpoint returns final status without usable score fields, so the system correctly exposes it as `provider_result_missing_score`.
+
+## Audit Corrections
+
+The original first-slice decision to keep `provider_retention_miss` terminal was too conservative once a provider-native direct-detail endpoint was discovered. That decision was reversed so open paper bets can be reopened and retried against the fallback.
+
+The first direct-detail implementation missed a production-shaped path: older completed/no-score matches with open paper bets could be skipped by pre-retirement before the fallback was attempted. The hardening commit makes open paper-bet jobs flow through the main due loop, where fallback lookup and missing-score classification happen with tests.
+
+The current result architecture is now closer to the business requirement: it settles when a trusted source proves the score, and it records a precise blocker when the source cannot provide enough data. It still does not yet create a large enough clean settlement sample for probability learning by itself; that remains a next task.

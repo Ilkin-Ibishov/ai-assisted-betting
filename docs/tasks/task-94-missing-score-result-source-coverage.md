@@ -1,0 +1,39 @@
+# Task 94 - Missing-Score Result Source Coverage
+
+Status: proposed
+
+## Problem
+
+Task 93 removed the live-feed retention blocker for current paper bets, but production now has one open paper bet whose Misli direct match detail endpoint returns a final event without score fields:
+
+```text
+paper_bet id=590
+source_match_id=misli:football:2842605
+diagnostic_reason=provider_result_missing_score
+```
+
+This is a different failure mode from retention. The system can find the final event identity, but the provider payload does not include enough score data to settle.
+
+## Business Requirement
+
+Paper-bet success-rate analysis needs truthful settlement outcomes. If Misli sometimes omits scores from final detail payloads, the system needs a second approved result source or a documented non-settleable terminal reason. It must not infer scores from odds, model confidence, or recommendation state.
+
+## Scope
+
+- Find a source that can resolve `misli:football:{event_id}` directly or match by teams, kickoff date, and competition with ambiguity rejection.
+- Prefer a stable provider mapping over fuzzy text matching.
+- Store fallback source provenance in the match result payload.
+- Keep `provider_result_missing_score` visible in `/api/live/result-jobs`.
+- Add tests for successful missing-score fallback, ambiguous fallback rejection, and terminal missing-score diagnostics.
+- Run one Railway worker proof after deployment.
+
+## Acceptance Criteria
+
+- Production paper bet `590` either settles from a documented source or remains open with a precise non-settleable reason.
+- No result is inferred without score proof.
+- Production smoke stays green.
+- The next audit can separate model performance from data-coverage failures.
+
+## Notes
+
+Railway CLI OAuth was expired during Task 93 verification, so deployment proof used public API and smoke checks. Re-auth Railway before the next deployment audit if service-level deployment metadata is needed.
