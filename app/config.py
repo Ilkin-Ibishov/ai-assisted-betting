@@ -28,6 +28,8 @@ class Settings:
     ai_analysis_model_name: str = "deterministic_ai_fallback"
     product_timezone: str = "Asia/Baku"
     snapshot_ingest_token: str = ""
+    api_football_key: str = ""
+    api_football_base_url: str = "https://v3.football.api-sports.io"
     cors_allowed_origins: tuple[str, ...] = (
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -78,6 +80,11 @@ def load_settings() -> Settings:
         ai_analysis_model_name=getenv("AI_ANALYSIS_MODEL_NAME", "deterministic_ai_fallback"),
         product_timezone=getenv("PRODUCT_TIMEZONE", "Asia/Baku"),
         snapshot_ingest_token=getenv("SNAPSHOT_INGEST_TOKEN", ""),
+        api_football_key=getenv("API_FOOTBALL_KEY", ""),
+        api_football_base_url=getenv(
+            "API_FOOTBALL_BASE_URL",
+            "https://v3.football.api-sports.io",
+        ),
         cors_allowed_origins=_get_csv(
             "CORS_ALLOWED_ORIGINS",
             "http://localhost:5173,http://127.0.0.1:5173",

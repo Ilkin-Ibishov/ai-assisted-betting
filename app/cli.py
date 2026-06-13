@@ -7,6 +7,7 @@ from sqlalchemy.engine import make_url
 from app.config import load_settings
 from app.db.engine import create_engine_from_url
 from app.db.migrations import init_db as run_init_db
+from app.providers.api_football_provider import ApiFootballProvider
 from app.services.ai_analysis_service import AIAnalysisService
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.collection_service import CollectionService
@@ -14,6 +15,10 @@ from app.services.combination_service import CombinationService
 from app.services.comparison_service import ReplayComparisonRequest, ReplayComparisonService
 from app.services.daily_paper_journal_service import DailyPaperJournalService
 from app.services.evaluation_service import EvaluationService, format_evaluation_report
+from app.services.external_context_probe_service import (
+    ExternalContextProbeRequest,
+    ExternalContextProbeService,
+)
 from app.services.feature_enrichment_audit_service import FeatureEnrichmentAuditService
 from app.services.football_data_service import FootballDataImportRequest, FootballDataImportService
 from app.services.live_collection_service import LiveCollectionRequest, LiveCollectionService
@@ -466,6 +471,51 @@ def feature_enrichment_audit(
             f"{team['team']}|league={team['league']}|history_count={team['history_count']}"
         )
     typer.echo("feature-enrichment-audit: finished")
+
+
+@app.command("probe-external-context")
+def probe_external_context(
+    provider: str = typer.Option("api-football", help="External context provider."),
+    limit: int = typer.Option(20, help="Maximum unmatched teams to probe."),
+    minimum_history: int = typer.Option(3, help="Minimum recent fixtures required."),
+    history_sample_size: int = typer.Option(5, help="Recent fixtures to request per candidate."),
+    max_query_variants: int = typer.Option(3, help="Maximum search variants per team."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    api_football = None
+    if provider == "api-football" and settings.api_football_key:
+        api_football = ApiFootballProvider(
+            api_key=settings.api_football_key,
+            base_url=settings.api_football_base_url,
+        )
+    try:
+        report = ExternalContextProbeService(
+            engine,
+            api_football_provider=api_football,
+        ).probe(
+            ExternalContextProbeRequest(
+                provider=provider,
+                limit=limit,
+                minimum_history=minimum_history,
+                history_sample_size=history_sample_size,
+                max_query_variants=max_query_variants,
+            )
+        )
+    finally:
+        engine.dispose()
+
+    typer.echo("probe-external-context: started")
+    typer.echo(f"provider={report['provider']}")
+    typer.echo(f"status={report['status']}")
+    if report["status"] == "missing_credentials":
+        typer.echo(f"required_env={report['required_env']}")
+    typer.echo(f"teams_read={report['teams_read']}")
+    typer.echo(f"matched_count={report['matched_count']}")
+    typer.echo(f"ambiguous_count={report['ambiguous_count']}")
+    typer.echo(f"unmatched_count={report['unmatched_count']}")
+    typer.echo(json.dumps(report, indent=2, sort_keys=True))
+    typer.echo("probe-external-context: finished")
 
 
 @app.command("daily-paper-journal")
