@@ -81,6 +81,41 @@ def test_feature_enrichment_audit_excludes_past_scheduled_rows_by_default(tmp_pa
     engine.dispose()
 
 
+def test_feature_enrichment_audit_limits_after_excluding_past_rows(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'feature-audit-limit.sqlite').as_posix()}"
+    engine = create_engine_from_url(database_url)
+    Base.metadata.create_all(engine)
+    with session_scope(engine) as session:
+        repository = MatchRepository(session)
+        repository.add(
+            source="misli_public",
+            source_match_id="misli:football:old",
+            league="Sample Premier",
+            home_team="Old Home",
+            away_team="Old Away",
+            kickoff_time="2026-06-01T20:00:00+04:00",
+            status="scheduled",
+        )
+        repository.add(
+            source="misli_public",
+            source_match_id="misli:football:future",
+            league="Sample Premier",
+            home_team="Future Home",
+            away_team="Future Away",
+            kickoff_time="2026-06-10T20:00:00+04:00",
+            status="scheduled",
+        )
+
+    report = FeatureEnrichmentAuditService(engine).report(
+        limit=1,
+        now_iso="2026-06-09T00:00:00+00:00",
+    )
+
+    assert report["scheduled_matches"] == 1
+    assert report["matches"][0]["source_match_id"] == "misli:football:future"
+    engine.dispose()
+
+
 def _seed_completed_history(engine) -> None:
     with session_scope(engine) as session:
         repository = MatchRepository(session)

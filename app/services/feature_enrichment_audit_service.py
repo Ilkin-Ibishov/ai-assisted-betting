@@ -27,7 +27,6 @@ class FeatureEnrichmentAuditService:
                     select(Match)
                     .where(Match.status == "scheduled")
                     .order_by(Match.kickoff_time.asc(), Match.id.asc())
-                    .limit(max(1, min(limit, 500)))
                 )
             )
             completed_matches = list(
@@ -40,6 +39,7 @@ class FeatureEnrichmentAuditService:
                 if (kickoff := _parse_datetime(match.kickoff_time)) is not None
                 and kickoff >= now
             ]
+        scheduled_matches = scheduled_matches[: max(1, min(limit, 500))]
 
         match_reports = [
             self._match_report(
