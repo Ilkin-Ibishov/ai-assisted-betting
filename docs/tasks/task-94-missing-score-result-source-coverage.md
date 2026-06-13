@@ -53,3 +53,58 @@ Brisbane City FC
 The service now reopens `provider_result_missing_score` jobs when a curated external source exists. If the external source proves a non-played fixture, open paper bets for that match are voided with zero profit/loss and the source provenance is stored on the match payload. If no curated source exists or the source does not match teams/date, the existing `provider_result_missing_score` classification remains.
 
 This is intentionally narrow. It fixes the known production research record without pretending the system has general historical result coverage.
+
+## Completion Evidence
+
+Verified on 2026-06-13.
+
+Pushed to `main`:
+
+```text
+e53c889 Void curated postponed result fallback
+```
+
+Local verification:
+
+```text
+ruff: All checks passed.
+pytest: 293 passed.
+```
+
+Production worker proof:
+
+```text
+latest collect_results run id=3796
+started_at=2026-06-13T10:32:27.825686+00:00
+status=completed
+items_read=46
+items_updated=2
+items_skipped=45
+errors_count=0
+```
+
+Production outcome:
+
+```text
+paper_bet id=590 source_match_id=misli:football:2842605 status=void profit_loss_units=0.0 settled_at=2026-06-13T10:32:27.824676+00:00
+result_jobs.summary.retention_miss=0
+result_jobs.summary.missing_score=0
+open_paper_bets=1
+settled_paper_bets=595
+```
+
+The remaining open paper bet is a new post-deployment record:
+
+```text
+paper_bet id=596 source_match_id=misli:football:2847018 status=open
+```
+
+Production smoke:
+
+```text
+ok=true
+worker_status=fresh
+worker_status.freshness_minutes=5
+open_paper_bets=1
+settled_paper_bets=595
+```
