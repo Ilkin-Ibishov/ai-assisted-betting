@@ -1,6 +1,6 @@
 # Task 95 - Policy-Aligned Paper-Bet Gate
 
-Status: completed pending production proof
+Status: completed
 
 ## Problem
 
@@ -58,3 +58,60 @@ GET /api/live/paper-bets
 ```
 
 Expected behavior: if the cycle remains watchlist-only with max confidence below `0.5`, no new paper bet should be created. Existing open bet `596` may still settle later; that is separate from creation gating.
+
+## Completion Evidence
+
+Verified on 2026-06-13.
+
+Pushed to `main`:
+
+```text
+7feed11 Align paper bet confidence gate with policy
+```
+
+Local verification:
+
+```text
+ruff: All checks passed.
+pytest: 294 passed.
+```
+
+Production worker proof after deployment:
+
+```text
+latest_worker_run.id=3797
+started_at=2026-06-13T11:01:04.071446+00:00
+status=completed
+items_created=0
+items_skipped=568
+errors_count=0
+```
+
+Recommendation quality during the proof cycle:
+
+```text
+overall_state=watchlist_only
+actionable_count=0
+confidence.low=500
+ai_review.approval_state=reject
+ai_review.model_quality.max_confidence_score=0.133333
+```
+
+Paper-bet proof:
+
+```text
+latest paper_bet id remains 596
+paper_bet id=596 status=open confidence_score=0.133333 risk_flags=low_confidence,past_kickoff_open
+no post-deployment paper bet id > 596 was created
+```
+
+Production smoke:
+
+```text
+ok=true
+worker_status=fresh
+open_paper_bets=1
+settled_paper_bets=595
+```
+
+The remaining open paper bet predates this policy change. The creation leak is closed; the remaining work is to let existing bet `596` settle or retire through the normal result path.
