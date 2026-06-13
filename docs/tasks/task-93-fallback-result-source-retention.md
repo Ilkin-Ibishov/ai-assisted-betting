@@ -59,3 +59,57 @@ The first implementation slice does not add an external fallback source. It adds
 - The paper bet remains open; no result is inferred.
 
 The next slice should choose and wire an approved fallback source with provenance and ambiguity rejection.
+
+## First-Slice Completion Evidence
+
+Verified on 2026-06-13.
+
+Pushed to `main`:
+
+```text
+af6b737 Classify Misli result retention misses
+```
+
+Local verification:
+
+```text
+ruff: All checks passed.
+pytest: 284 passed.
+```
+
+Production API deployed the new diagnostic fields. Railway CLI metadata verification was blocked by expired OAuth (`invalid_grant`), so deployment proof used public API behavior and production smoke.
+
+Production smoke:
+
+```text
+ok=true
+api_health=ok
+live_status.latest_run_status=completed
+worker_status=fresh
+worker_status.freshness_minutes=0
+open_paper_bets=2
+settled_paper_bets=593
+```
+
+Worker proof:
+
+```text
+latest collect_results run id=3776
+started_at=2026-06-13T08:32:11.460263+00:00
+status=completed
+items_read=34
+items_updated=1
+items_skipped=33
+errors_count=0
+```
+
+Result-job diagnostics after the worker run:
+
+```text
+summary.due=0
+summary.retention_miss=2
+paper_bet result_job=2308 source_match_id=misli:football:2842605 diagnostic_reason=provider_retention_miss
+paper_bet result_job=2315 source_match_id=misli:football:2842611 diagnostic_reason=provider_retention_miss
+```
+
+The two paper bets remain open because no approved result source proved their outcomes. That is intentional; this slice made the data-coverage gap explicit rather than inventing settlement outcomes.
