@@ -831,6 +831,111 @@ def test_collect_due_results_uses_match_detail_for_provider_retention_miss(tmp_p
     assert job.status == "completed"
 
 
+def test_collect_due_results_reopens_completed_open_bet_retention_miss(tmp_path) -> None:
+    engine = _engine(tmp_path, "completed-open-bet-retention-detail-settlement.sqlite")
+    match_id = _seed_misli_match(
+        engine,
+        event_id="2842611",
+        kickoff_time="2026-06-12T14:00:00+04:00",
+    )
+    with session_scope(engine) as session:
+        match = session.get(Match, match_id)
+        assert match is not None
+        match.status = "completed"
+        _seed_open_paper_bet(session, match_id)
+        session.add(
+            ResultFetchJob(
+                match_id=match_id,
+                source_match_id="misli:football:2842611",
+                misli_event_id="2842611",
+                status="unresolvable",
+                next_attempt_at="2026-06-13T08:32:11+00:00",
+                attempt_count=18,
+                last_error=(
+                    "provider_retention_miss: Misli current feed no longer contains event "
+                    "after repeated lookups"
+                ),
+            )
+        )
+
+    detail_payload = {
+        "success": True,
+        "data": {
+            "sgi": 2842611,
+            "s": "ENDED",
+            "ht": {"n": "Nepean FC", "s": {"r": 0}},
+            "at": {"n": "Dunbar Rovers FC", "s": {"r": 2}},
+        },
+    }
+
+    summary = MisliResultService(
+        engine,
+        fetcher=lambda: {"success": True, "data": {"data": []}},
+        match_detail_fetcher=lambda event_id: detail_payload,
+    ).collect_due_results(
+        now_iso="2026-06-13T09:00:00+00:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 1
+    with session_scope(engine) as session:
+        match = session.get(Match, match_id)
+        job = session.scalar(select(ResultFetchJob).where(ResultFetchJob.match_id == match_id))
+    assert match is not None
+    assert match.home_score == 0
+    assert match.away_score == 2
+    assert match.result == "AWAY"
+    assert job is not None
+    assert job.status == "completed"
+
+
+def test_collect_due_results_backs_off_when_match_detail_lookup_fails(tmp_path) -> None:
+    engine = _engine(tmp_path, "match-detail-lookup-failure.sqlite")
+    match_id = _seed_misli_match(
+        engine,
+        event_id="2842611",
+        kickoff_time="2026-06-12T14:00:00+04:00",
+    )
+    with session_scope(engine) as session:
+        _seed_open_paper_bet(session, match_id)
+        session.add(
+            ResultFetchJob(
+                match_id=match_id,
+                source_match_id="misli:football:2842611",
+                misli_event_id="2842611",
+                status="pending",
+                next_attempt_at="2026-06-13T08:32:11+00:00",
+                attempt_count=18,
+                last_error="result not found in Misli response",
+            )
+        )
+
+    def fail_detail_lookup(event_id: str) -> dict:
+        raise TimeoutError(f"detail timeout for {event_id}")
+
+    summary = MisliResultService(
+        engine,
+        fetcher=lambda: {"success": True, "data": {"data": []}},
+        match_detail_fetcher=fail_detail_lookup,
+    ).collect_due_results(
+        now_iso="2026-06-13T09:00:00+00:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 0
+    assert summary.items_skipped == 1
+    with session_scope(engine) as session:
+        job = session.scalar(select(ResultFetchJob).where(ResultFetchJob.match_id == match_id))
+    assert job is not None
+    assert job.status == "failed"
+    assert job.last_error == "Misli match detail lookup failed: detail timeout for 2842611"
+    assert job.next_attempt_at > "2026-06-13T09:00:00+00:00"
+
+
 def test_collect_due_results_classifies_match_detail_missing_score(tmp_path) -> None:
     engine = _engine(tmp_path, "provider-detail-missing-score.sqlite")
     match_id = _seed_misli_match(

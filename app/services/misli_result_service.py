@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.request import Request, urlopen
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, or_, select
 
 from app.db.engine import session_scope
 from app.db.models import Match, PaperBet, ResultFetchJob
@@ -113,7 +113,14 @@ class MisliResultService:
                 result = match_misli_result(match, results)
                 job.attempt_count += 1
                 if result is None:
-                    result = self._fetch_match_detail_result(session, job, match)
+                    try:
+                        result = self._fetch_match_detail_result(session, job, match)
+                    except Exception as exc:
+                        job.status = "failed"
+                        job.last_error = f"Misli match detail lookup failed: {exc}"
+                        job.next_attempt_at = _next_backoff(now, job.attempt_count)
+                        items_skipped += 1
+                        continue
 
                 if result is None:
                     retention_miss = _provider_retention_miss_message(session, job, match, now)
@@ -300,16 +307,16 @@ def result_jobs_payload(
 
 def _ensure_result_jobs(session, now: datetime) -> None:
     repository = ResultFetchJobRepository(session)
-    has_open_bet = (
-        select(PaperBet.id)
-        .where(PaperBet.match_id == Match.id, PaperBet.status == "open")
-        .limit(1)
-        .exists()
+    open_paper_bet_match_ids = (
+        select(PaperBet.match_id).where(PaperBet.status == "open").distinct()
     )
     matches = session.scalars(
         select(Match).where(
             Match.source == "misli_public",
-            (Match.status != "completed") | has_open_bet,
+            or_(
+                Match.status != "completed",
+                Match.id.in_(open_paper_bet_match_ids),
+            ),
         )
     ).all()
     for match in matches:
@@ -324,7 +331,7 @@ def _ensure_result_jobs(session, now: datetime) -> None:
         )
         if not has_open_paper_bet:
             continue
-        if job.status == "unresolvable" and job.last_error == PROVIDER_RESULT_MISSING_SCORE_MESSAGE:
+        if job.status == "unresolvable" and _is_provider_missing_score(job.last_error):
             continue
         if job.status not in {"completed", "unresolvable"}:
             next_attempt = _parse_iso(job.next_attempt_at)
@@ -346,6 +353,13 @@ def _match_has_settleable_result(match: Match) -> bool:
     )
 
 
+def _is_provider_missing_score(last_error: str | None) -> bool:
+    return bool(
+        last_error
+        and last_error.startswith("provider_result_missing_score:")
+    )
+
+
 def _retire_unresolvable_result_jobs(session, now: datetime) -> None:
     rows = session.execute(
         select(ResultFetchJob, Match)
@@ -357,6 +371,8 @@ def _retire_unresolvable_result_jobs(session, now: datetime) -> None:
         )
     ).all()
     for job, match in rows:
+        if _has_open_paper_bet(session, match.id):
+            continue
         retention_miss = _provider_retention_miss_message(session, job, match, now)
         if retention_miss is not None:
             job.status = "unresolvable"
