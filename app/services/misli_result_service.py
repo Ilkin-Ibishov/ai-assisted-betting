@@ -19,8 +19,12 @@ from app.services.prediction_service import StepSummary
 MISLI_RESULTS_URL = "https://apivx.misli.az/api/web/v1/statistics/sport/SOCCER/matches/live"
 RESULT_NOT_FOUND_MESSAGE = "result not found in Misli response"
 UNRESOLVABLE_RESULT_MESSAGE = "result unavailable after repeated Misli lookups"
+PROVIDER_RETENTION_MISS_MESSAGE = (
+    "provider_retention_miss: Misli current feed no longer contains event after repeated lookups"
+)
 UNRESOLVABLE_RESULT_LOOKUP_ATTEMPTS = 3
 UNRESOLVABLE_RESULT_LOOKUP_AFTER = timedelta(days=2)
+PROVIDER_RETENTION_MISS_AFTER = timedelta(hours=6)
 
 
 class MisliResultService:
@@ -96,9 +100,15 @@ class MisliResultService:
                 result = match_misli_result(match, results)
                 job.attempt_count += 1
                 if result is None:
-                    job.status = "pending"
-                    job.last_error = RESULT_NOT_FOUND_MESSAGE
-                    job.next_attempt_at = _next_pending_attempt(now, match)
+                    retention_miss = _provider_retention_miss_message(session, job, match, now)
+                    if retention_miss is not None:
+                        job.status = "unresolvable"
+                        job.last_error = retention_miss
+                        job.next_attempt_at = now_iso_value
+                    else:
+                        job.status = "pending"
+                        job.last_error = RESULT_NOT_FOUND_MESSAGE
+                        job.next_attempt_at = _next_pending_attempt(now, match)
                     items_skipped += 1
                     continue
 
@@ -225,6 +235,9 @@ def result_jobs_payload(
             "postponed": sum(1 for job in jobs if job["status"] == "postponed"),
             "failed": sum(1 for job in jobs if job["status"] == "failed"),
             "unresolvable": sum(1 for job in jobs if job["status"] == "unresolvable"),
+            "retention_miss": sum(
+                1 for job in jobs if job["diagnostic_reason"] == "provider_retention_miss"
+            ),
             "pending": sum(1 for job in jobs if job["status"] in {"pending", "scheduled"}),
         },
         "jobs": jobs,
@@ -257,6 +270,8 @@ def _ensure_result_jobs(session, now: datetime) -> None:
         )
         if not has_open_paper_bet:
             continue
+        if job.status == "unresolvable" and job.last_error == PROVIDER_RETENTION_MISS_MESSAGE:
+            continue
         if job.status not in {"completed", "unresolvable"}:
             next_attempt = _parse_iso(job.next_attempt_at)
             job.next_attempt_at = now.isoformat() if next_attempt <= now else _utc_iso(next_attempt)
@@ -288,12 +303,32 @@ def _retire_unresolvable_result_jobs(session, now: datetime) -> None:
         )
     ).all()
     for job, match in rows:
-        kickoff = _parse_iso(match.kickoff_time)
-        if now - kickoff < UNRESOLVABLE_RESULT_LOOKUP_AFTER:
+        retention_miss = _provider_retention_miss_message(session, job, match, now)
+        if retention_miss is not None:
+            job.status = "unresolvable"
+            job.last_error = retention_miss
+            job.next_attempt_at = now.isoformat()
+            continue
+        if now - _parse_iso(match.kickoff_time) < UNRESOLVABLE_RESULT_LOOKUP_AFTER:
             continue
         job.status = "unresolvable"
         job.last_error = UNRESOLVABLE_RESULT_MESSAGE
         job.next_attempt_at = now.isoformat()
+
+
+def _provider_retention_miss_message(
+    session,
+    job: ResultFetchJob,
+    match: Match,
+    now: datetime,
+) -> str | None:
+    if not _has_open_paper_bet(session, match.id):
+        return None
+    if job.attempt_count < UNRESOLVABLE_RESULT_LOOKUP_ATTEMPTS:
+        return None
+    if now - _parse_iso(match.kickoff_time) < PROVIDER_RETENTION_MISS_AFTER:
+        return None
+    return PROVIDER_RETENTION_MISS_MESSAGE
 
 
 def _has_open_paper_bet(session, match_id: int) -> bool:
@@ -355,11 +390,22 @@ def _job_payload(job: ResultFetchJob, match: Match, now_iso: str) -> dict[str, A
         "next_attempt_at": job.next_attempt_at,
         "attempt_count": job.attempt_count,
         "last_error": job.last_error,
+        "diagnostic_reason": _diagnostic_reason(job),
         "is_due": job.status not in {"completed", "unresolvable"}
         and job.next_attempt_at <= now_iso,
         "match_label": f"{match.home_team} vs {match.away_team}",
         "kickoff_time": match.kickoff_time,
     }
+
+
+def _diagnostic_reason(job: ResultFetchJob) -> str | None:
+    if job.last_error == PROVIDER_RETENTION_MISS_MESSAGE:
+        return "provider_retention_miss"
+    if job.last_error == UNRESOLVABLE_RESULT_MESSAGE:
+        return "unresolvable_result"
+    if job.last_error == RESULT_NOT_FOUND_MESSAGE:
+        return "result_not_found"
+    return None
 
 
 def _parse_iso(value: str | None) -> datetime:

@@ -12,6 +12,7 @@ Without fallback result retention, success-rate analysis and threshold-policy le
 
 ## Scope
 
+- First slice: classify provider-retention misses explicitly when repeated Misli lookups for an open paper bet no longer find the event in the current feed.
 - Identify an approved, auditable fallback result source for event IDs that Misli no longer returns.
 - Prefer a source that can resolve by stable provider event ID; otherwise require deterministic team/date matching with ambiguity rejection.
 - Store result provenance so each settled paper bet shows the source used.
@@ -47,3 +48,14 @@ GET /api/live/recommendation-quality
 ## Notes
 
 This task should not weaken settlement truth standards. If the system cannot prove a result with a documented source and non-ambiguous identity match, the paper bet should remain unsettled and visible as a data-coverage gap.
+
+## Implementation Note
+
+The first implementation slice does not add an external fallback source. It adds a safer diagnostic foundation:
+
+- Repeated not-found Misli result lookups for open paper bets are classified as `provider_retention_miss` after the provider window has plausibly passed.
+- Classified retention misses stay terminal instead of being reopened every worker cycle.
+- `/api/live/result-jobs` exposes `diagnostic_reason` and a `retention_miss` summary count.
+- The paper bet remains open; no result is inferred.
+
+The next slice should choose and wire an approved fallback source with provenance and ambiguity rejection.

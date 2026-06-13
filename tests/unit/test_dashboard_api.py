@@ -944,10 +944,12 @@ def test_live_result_jobs_endpoint_reports_pipeline_health(tmp_path: Path) -> No
         "postponed": 0,
         "failed": 0,
         "unresolvable": 0,
+        "retention_miss": 0,
         "pending": 1,
     }
     assert payload["jobs"][0]["source_match_id"] == "misli:football:2816300"
     assert payload["jobs"][0]["match_label"] == "Forest City vs Eastport Athletic"
+    assert payload["jobs"][0]["diagnostic_reason"] is None
 
 
 def test_live_combinations_endpoint_lists_ranked_paper_combinations(tmp_path: Path) -> None:

@@ -616,6 +616,109 @@ def test_collect_due_results_normalizes_open_bet_job_attempt_timezones(tmp_path)
     assert job.next_attempt_at == "2026-05-20T21:00:00+00:00"
 
 
+def test_collect_due_results_classifies_open_bet_provider_retention_miss(tmp_path) -> None:
+    engine = _engine(tmp_path, "provider-retention-miss.sqlite")
+    match_id = _seed_misli_match(
+        engine,
+        event_id="2816200",
+        kickoff_time="2026-05-20T10:00:00+04:00",
+    )
+    with session_scope(engine) as session:
+        _seed_open_paper_bet(session, match_id)
+        session.add(
+            ResultFetchJob(
+                match_id=match_id,
+                source_match_id="misli:football:2816200",
+                misli_event_id="2816200",
+                status="pending",
+                next_attempt_at="2026-05-20T15:00:00+00:00",
+                attempt_count=2,
+                last_error="result not found in Misli response",
+            )
+        )
+
+    payload = {"success": True, "data": {"data": []}}
+
+    summary = MisliResultService(engine, fetcher=lambda: payload).collect_due_results(
+        now_iso="2026-05-20T15:00:00+00:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 1
+    assert summary.items_updated == 0
+    assert summary.items_skipped == 1
+    with session_scope(engine) as session:
+        job = session.scalar(select(ResultFetchJob).where(ResultFetchJob.match_id == match_id))
+    assert job is not None
+    assert job.status == "unresolvable"
+    assert job.last_error == (
+        "provider_retention_miss: Misli current feed no longer contains event "
+        "after repeated lookups"
+    )
+
+    result_payload = result_jobs_payload(
+        engine,
+        now_iso="2026-05-20T15:30:00+00:00",
+    )
+
+    assert result_payload["summary"]["retention_miss"] == 1
+    assert result_payload["jobs"][0]["diagnostic_reason"] == "provider_retention_miss"
+    assert result_payload["jobs"][0]["is_due"] is False
+
+
+def test_collect_due_results_does_not_reopen_provider_retention_miss(tmp_path) -> None:
+    engine = _engine(tmp_path, "provider-retention-miss-stays-terminal.sqlite")
+    match_id = _seed_misli_match(
+        engine,
+        event_id="2816200",
+        kickoff_time="2026-05-20T10:00:00+04:00",
+    )
+    with session_scope(engine) as session:
+        _seed_open_paper_bet(session, match_id)
+        session.add(
+            ResultFetchJob(
+                match_id=match_id,
+                source_match_id="misli:football:2816200",
+                misli_event_id="2816200",
+                status="unresolvable",
+                next_attempt_at="2026-05-20T15:00:00+00:00",
+                attempt_count=3,
+                last_error=(
+                    "provider_retention_miss: Misli current feed no longer contains event "
+                    "after repeated lookups"
+                ),
+            )
+        )
+
+    payload = {
+        "success": True,
+        "data": {
+            "data": [_result_item("2816200", "Forest City", "Eastport Athletic", "ENDED", 2, 1)]
+        },
+    }
+
+    summary = MisliResultService(engine, fetcher=lambda: payload).collect_due_results(
+        now_iso="2026-05-20T16:00:00+00:00",
+        dry_run=False,
+        limit=1,
+    )
+
+    assert summary.items_read == 0
+    assert summary.items_updated == 0
+    with session_scope(engine) as session:
+        match = session.get(Match, match_id)
+        job = session.scalar(select(ResultFetchJob).where(ResultFetchJob.match_id == match_id))
+    assert match is not None
+    assert match.status == "scheduled"
+    assert job is not None
+    assert job.status == "unresolvable"
+    assert job.last_error == (
+        "provider_retention_miss: Misli current feed no longer contains event "
+        "after repeated lookups"
+    )
+
+
 def test_result_jobs_payload_counts_unresolvable_jobs(tmp_path) -> None:
     engine = _engine(tmp_path, "result-job-payload.sqlite")
     match_id = _seed_misli_match(engine, event_id="2816300")
@@ -761,6 +864,35 @@ def _seed_misli_match(
             raw_payload_json=json.dumps(raw_payload),
         )
         return match.id
+
+
+def _seed_open_paper_bet(session, match_id: int) -> None:
+    prediction = Prediction(
+        match_id=match_id,
+        market="1X2",
+        selection="HOME",
+        model_name="baseline_heuristic",
+        model_version="v0",
+        model_probability=0.5,
+        bookmaker_probability=0.48,
+        edge=0.02,
+        confidence_score=0.133333,
+        decision="BET",
+    )
+    session.add(prediction)
+    session.flush()
+    session.add(
+        PaperBet(
+            prediction_id=prediction.id,
+            match_id=match_id,
+            market="1X2",
+            selection="HOME",
+            odds_taken=2.0,
+            stake_units=1.0,
+            expected_value=0.01,
+            status="open",
+        )
+    )
 
 
 def _memory_match(*, source_match_id: str, home_team: str, away_team: str, kickoff_time: str):
