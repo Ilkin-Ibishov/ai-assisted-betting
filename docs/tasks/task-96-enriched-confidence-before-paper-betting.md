@@ -1,6 +1,6 @@
 # Task 96 - Enriched Confidence Before Paper Betting
 
-Status: proposed
+Status: in progress
 
 ## Problem
 
@@ -40,3 +40,36 @@ The system should resume paper-bet sample creation only when a recommendation ha
 ## Notes
 
 Do not lower the confidence floor to create more samples. The previous low-confidence sample mode produced fast data, but it mixed model weakness with data-quality repair work and created noisy paper-bet records. The next improvement should increase signal quality, not relax the gate.
+
+## Implementation Notes
+
+First implementation slice:
+
+- Added an auditable team alias resolver at `app/core/team_aliases.py`.
+- Added `data/team_aliases.json` as the editable local alias catalog.
+- Made feature history lookup and team-stat scoring alias-aware inside `FeatureBuilder`.
+- Added deterministic normalization for accents, Azerbaijani characters, punctuation, and dotted acronyms such as `F.K.` versus `FK`.
+- Preserved fail-closed behavior: ambiguous aliases do not enrich feature rows.
+
+This improves the architecture blocker found during the audit, but it does not yet prove production has enough current Misli teams covered to resume paper-bet creation. The paper-bet confidence floor remains `0.5`.
+
+## Verification
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m ruff check .
+```
+
+Latest local result:
+
+```text
+297 passed
+All checks passed!
+```
+
+## Remaining Work
+
+- Add current live Misli-to-Football-Data aliases to `data/team_aliases.json` after reviewing unmatched production teams.
+- Add alias coverage reporting in CLI/API output.
+- Backtest source-context buckets before and after alias expansion.
+- Deploy and verify whether recommendation quality moves beyond `watchlist_only`.

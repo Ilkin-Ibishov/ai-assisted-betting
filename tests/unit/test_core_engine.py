@@ -6,6 +6,7 @@ from app.core.prediction_engine import (
     EloPredictionEngine,
     PredictionInput,
 )
+from app.core.team_aliases import TeamAlias, TeamAliasResolver
 from app.core.value_detector import ValueDetector
 from app.db.models import Match, Prediction
 
@@ -199,6 +200,101 @@ def test_feature_builder_marks_external_football_data_csv_provenance() -> None:
 
     assert home.enrichment_tier == "full_enriched"
     assert "external_context:football_data_csv" in home.feature_provenance
+
+
+def test_feature_builder_matches_history_with_normalized_team_names() -> None:
+    match = _match("target", "Qarabag Agdam", "Sabah FK", "2026-06-10T20:00:00+04:00")
+    completed = [
+        _completed("home-1", "Qarabağ Ağdam", "Gamma", "2026-06-08T20:00:00+04:00", 2, 0),
+        _completed("home-2", "Delta", "Qarabağ Ağdam", "2026-06-04T20:00:00+04:00", 1, 2),
+        _completed("home-3", "Qarabağ Ağdam", "Echo", "2026-06-01T20:00:00+04:00", 1, 1),
+        _completed("away-1", "Sabah F.K.", "Gamma", "2026-06-07T20:00:00+04:00", 0, 1),
+        _completed("away-2", "Delta", "Sabah F.K.", "2026-06-03T20:00:00+04:00", 2, 0),
+        _completed("away-3", "Sabah F.K.", "Echo", "2026-05-31T20:00:00+04:00", 1, 1),
+    ]
+
+    features = FeatureBuilder(allow_cold_start_features=True).build_for_match(
+        match=match,
+        completed_matches=completed,
+        odds_snapshots=[
+            _odds(match.id, "HOME", 2.0, "2026-06-10T12:00:00+04:00"),
+            _odds(match.id, "DRAW", 3.2, "2026-06-10T12:00:00+04:00"),
+            _odds(match.id, "AWAY", 3.8, "2026-06-10T12:00:00+04:00"),
+        ],
+    )
+
+    home = next(feature for feature in features if feature.selection == "HOME")
+
+    assert home.enrichment_tier == "full_enriched"
+    assert home.home_rest_days == 2.0
+
+
+def test_feature_builder_matches_history_with_explicit_team_aliases() -> None:
+    match = _match("target", "Inter Milan", "Roma", "2026-06-10T20:00:00+04:00")
+    completed = [
+        _completed("home-1", "Internazionale", "Gamma", "2026-06-08T20:00:00+04:00", 2, 0),
+        _completed("home-2", "Delta", "Internazionale", "2026-06-04T20:00:00+04:00", 1, 2),
+        _completed("home-3", "Internazionale", "Echo", "2026-06-01T20:00:00+04:00", 1, 1),
+        _completed("away-1", "Roma", "Gamma", "2026-06-07T20:00:00+04:00", 0, 1),
+        _completed("away-2", "Delta", "Roma", "2026-06-03T20:00:00+04:00", 2, 0),
+        _completed("away-3", "Roma", "Echo", "2026-05-31T20:00:00+04:00", 1, 1),
+    ]
+    resolver = TeamAliasResolver(
+        [TeamAlias(source="misli_public", alias="Inter Milan", canonical="Internazionale")]
+    )
+
+    features = FeatureBuilder(
+        allow_cold_start_features=True,
+        team_alias_resolver=resolver,
+    ).build_for_match(
+        match=match,
+        completed_matches=completed,
+        odds_snapshots=[
+            _odds(match.id, "HOME", 2.0, "2026-06-10T12:00:00+04:00"),
+            _odds(match.id, "DRAW", 3.2, "2026-06-10T12:00:00+04:00"),
+            _odds(match.id, "AWAY", 3.8, "2026-06-10T12:00:00+04:00"),
+        ],
+    )
+
+    home = next(feature for feature in features if feature.selection == "HOME")
+
+    assert home.enrichment_tier == "full_enriched"
+    assert home.home_form_points_5 == 2.333333
+
+
+def test_feature_builder_does_not_enrich_ambiguous_team_aliases() -> None:
+    resolver = TeamAliasResolver(
+        [
+            TeamAlias(source="misli_public", alias="United", canonical="United FC"),
+            TeamAlias(source="misli_public", alias="United", canonical="United City"),
+        ]
+    )
+    match = _match("target", "United", "Beta", "2026-06-10T20:00:00+04:00")
+    completed = [
+        _completed("home-1", "United FC", "Gamma", "2026-06-08T20:00:00+04:00", 2, 0),
+        _completed("home-2", "Delta", "United FC", "2026-06-04T20:00:00+04:00", 1, 2),
+        _completed("home-3", "United FC", "Echo", "2026-06-01T20:00:00+04:00", 1, 1),
+        _completed("away-1", "Beta", "Gamma", "2026-06-07T20:00:00+04:00", 0, 1),
+        _completed("away-2", "Delta", "Beta", "2026-06-03T20:00:00+04:00", 2, 0),
+        _completed("away-3", "Beta", "Echo", "2026-05-31T20:00:00+04:00", 1, 1),
+    ]
+
+    features = FeatureBuilder(
+        allow_cold_start_features=True,
+        team_alias_resolver=resolver,
+    ).build_for_match(
+        match=match,
+        completed_matches=completed,
+        odds_snapshots=[
+            _odds(match.id, "HOME", 2.0, "2026-06-10T12:00:00+04:00"),
+            _odds(match.id, "DRAW", 3.2, "2026-06-10T12:00:00+04:00"),
+            _odds(match.id, "AWAY", 3.8, "2026-06-10T12:00:00+04:00"),
+        ],
+    )
+
+    home = next(feature for feature in features if feature.selection == "HOME")
+
+    assert home.enrichment_tier == "cold_start"
 
 
 def test_value_detector_bets_only_when_edge_and_odds_are_in_range() -> None:

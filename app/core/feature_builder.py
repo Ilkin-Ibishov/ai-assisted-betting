@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core.team_aliases import TeamAliasResolver
 from app.db.models import Match, OddsSnapshot
 
 
@@ -37,11 +38,13 @@ class FeatureBuilder:
         elo_k_factor: float = 20,
         elo_home_advantage: float = 65,
         allow_cold_start_features: bool = False,
+        team_alias_resolver: TeamAliasResolver | None = None,
     ) -> None:
         self.elo_initial_rating = elo_initial_rating
         self.elo_k_factor = elo_k_factor
         self.elo_home_advantage = elo_home_advantage
         self.allow_cold_start_features = allow_cold_start_features
+        self.team_alias_resolver = team_alias_resolver or TeamAliasResolver.from_json_file()
 
     def build_for_match(
         self,
@@ -50,8 +53,20 @@ class FeatureBuilder:
         completed_matches: list[Match],
         odds_snapshots: list[OddsSnapshot],
     ) -> list[BuiltFeature]:
-        home_history = _team_history(match.home_team, match.kickoff_time, completed_matches)
-        away_history = _team_history(match.away_team, match.kickoff_time, completed_matches)
+        home_history = _team_history(
+            match.home_team,
+            match.kickoff_time,
+            completed_matches,
+            league=match.league,
+            alias_resolver=self.team_alias_resolver,
+        )
+        away_history = _team_history(
+            match.away_team,
+            match.kickoff_time,
+            completed_matches,
+            league=match.league,
+            alias_resolver=self.team_alias_resolver,
+        )
         if (
             not self.allow_cold_start_features
             and (len(home_history) < 3 or len(away_history) < 3)
@@ -61,8 +76,18 @@ class FeatureBuilder:
         if implied_sum <= 0:
             return []
 
-        home_stats = _team_stats_or_neutral(match.home_team, home_history)
-        away_stats = _team_stats_or_neutral(match.away_team, away_history)
+        home_stats = _team_stats_or_neutral(
+            match.home_team,
+            home_history,
+            league=match.league,
+            alias_resolver=self.team_alias_resolver,
+        )
+        away_stats = _team_stats_or_neutral(
+            match.away_team,
+            away_history,
+            league=match.league,
+            alias_resolver=self.team_alias_resolver,
+        )
         enrichment_tier = _enrichment_tier(home_history, away_history)
         feature_provenance = _feature_provenance(
             enrichment_tier,
@@ -117,30 +142,50 @@ class _TeamStats:
     goal_difference_trend: float
 
 
-def _team_history(team: str, kickoff_time: str, completed_matches: list[Match]) -> list[Match]:
+def _team_history(
+    team: str,
+    kickoff_time: str,
+    completed_matches: list[Match],
+    *,
+    league: str | None,
+    alias_resolver: TeamAliasResolver,
+) -> list[Match]:
+    team_keys = alias_resolver.canonical_keys(team, league=league)
     matches = [
         match
         for match in completed_matches
         if match.status == "completed"
         and match.kickoff_time < kickoff_time
-        and (match.home_team == team or match.away_team == team)
+        and (
+            alias_resolver.canonical_keys(match.home_team, league=match.league) & team_keys
+            or alias_resolver.canonical_keys(match.away_team, league=match.league) & team_keys
+        )
     ]
     return sorted(matches, key=lambda match: match.kickoff_time, reverse=True)[:5]
 
 
-def _team_stats(team: str, matches: list[Match]) -> _TeamStats:
+def _team_stats(
+    team: str,
+    matches: list[Match],
+    *,
+    league: str | None,
+    alias_resolver: TeamAliasResolver,
+) -> _TeamStats:
     points = 0
     goals_for = 0
     goals_against = 0
+    team_keys = alias_resolver.canonical_keys(team, league=league)
     for match in matches:
         if match.home_score is None or match.away_score is None:
             continue
-        if match.home_team == team:
+        if alias_resolver.canonical_keys(match.home_team, league=match.league) & team_keys:
             team_score = match.home_score
             opponent_score = match.away_score
-        else:
+        elif alias_resolver.canonical_keys(match.away_team, league=match.league) & team_keys:
             team_score = match.away_score
             opponent_score = match.home_score
+        else:
+            continue
 
         goals_for += team_score
         goals_against += opponent_score
@@ -158,7 +203,13 @@ def _team_stats(team: str, matches: list[Match]) -> _TeamStats:
     )
 
 
-def _team_stats_or_neutral(team: str, matches: list[Match]) -> _TeamStats:
+def _team_stats_or_neutral(
+    team: str,
+    matches: list[Match],
+    *,
+    league: str | None,
+    alias_resolver: TeamAliasResolver,
+) -> _TeamStats:
     if len(matches) < 3:
         return _TeamStats(
             form_points=0.0,
@@ -166,7 +217,7 @@ def _team_stats_or_neutral(team: str, matches: list[Match]) -> _TeamStats:
             goals_against_avg=0.0,
             goal_difference_trend=0.0,
         )
-    return _team_stats(team, matches)
+    return _team_stats(team, matches, league=league, alias_resolver=alias_resolver)
 
 
 def _enrichment_tier(home_history: list[Match], away_history: list[Match]) -> str:

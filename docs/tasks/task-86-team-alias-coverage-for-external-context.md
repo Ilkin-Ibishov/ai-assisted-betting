@@ -1,6 +1,6 @@
 # Task 86 - Team Alias Coverage For External Context
 
-Status: planned
+Status: in progress
 
 ## Goal
 
@@ -21,6 +21,21 @@ Improve Misli-to-Football-Data matching so external football context is not limi
 - Backtest output shows external-context sample counts before and after alias use.
 - Documentation records how aliases are maintained.
 
+## Implementation Notes
+
+First slice implemented:
+
+- Added `TeamAliasResolver` with exact canonical matching plus optional explicit aliases.
+- Added `data/team_aliases.json` as the auditable local alias file. It starts empty until production unmatched teams are reviewed and mapped deliberately.
+- `FeatureBuilder` now uses the resolver when selecting team history and when scoring whether the target team was home or away inside a historical match.
+- Ambiguous aliases intentionally return only the direct canonical key, so they cannot silently enrich rows.
+
+Still open:
+
+- Populate live Misli aliases with source/league/confidence metadata.
+- Report unmatched team and alias coverage in CLI/API output.
+- Run before/after source-context backtests.
+
 ## Verification
 
 ```powershell
@@ -31,4 +46,3 @@ Improve Misli-to-Football-Data matching so external football context is not limi
 ## Next
 
 Use alias-expanded source-context backtests to decide whether external context is mature enough for threshold policy approval.
-
