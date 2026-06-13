@@ -115,3 +115,58 @@ settled_paper_bets=595
 ```
 
 The remaining open paper bet predates this policy change. The creation leak is closed; the remaining work is to let existing bet `596` settle or retire through the normal result path.
+
+## Final Post-Settlement Evidence
+
+Verified later on 2026-06-13 after the normal result pipeline settled the remaining pre-policy bet.
+
+Production state:
+
+```text
+latest collect_results run id=3871
+started_at=2026-06-13T18:01:15.666456+00:00
+status=completed
+items_read=50
+items_updated=6
+errors_count=0
+
+open_paper_bets=0
+settled_paper_bets=596
+result_jobs.retention_miss=0
+result_jobs.missing_score=0
+```
+
+Paper bet `596` settled normally:
+
+```text
+paper_bet id=596
+source_match_id=misli:football:2847018
+status=lost
+profit_loss_units=-1.0
+settled_at=2026-06-13T12:00:55.230890+00:00
+confidence_score=0.133333
+```
+
+Current learning state:
+
+```text
+overall_state=watchlist_only
+actionable_count=0
+confidence.low=500
+ai_review.approval_state=reject
+daily_journal.open_paper_bets=[]
+daily_journal.settled_count=8
+bet_ledger.paper_profit_loss=-1.12
+bet_ledger.win_rate=0.333333
+```
+
+Production smoke:
+
+```text
+ok=true
+worker_status=fresh
+open_paper_bets=0
+settled_paper_bets=596
+```
+
+The system is now fail-closed: it continues to generate watchlist/rejected research rows, but it does not create new paper bets from low-confidence cold-start output.
