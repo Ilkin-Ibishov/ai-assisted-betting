@@ -1,9 +1,9 @@
 from app.db.models import Match, PaperBet, Prediction
 
-# Paper bets are research records, not real staking instructions. Keep the
-# confidence gate above neutral cold noise while allowing positive-EV candidates
-# to create enough paper samples for settlement and threshold learning.
-MIN_PAPER_BET_CONFIDENCE = 0.1
+# Paper bets are research records, not real staking instructions. The gate now
+# follows recommendation governance so watchlist-only low-confidence cold-start
+# rows do not become paper-bet samples.
+MIN_PAPER_BET_CONFIDENCE = 0.5
 
 
 class PaperBetLogger:

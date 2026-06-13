@@ -12,9 +12,17 @@ class _Match:
         self.status = status
 
 
-def test_paper_bet_logger_allows_low_confidence_research_samples() -> None:
-    assert PaperBetLogger().should_create(
+def test_paper_bet_logger_rejects_low_confidence_watchlist_samples() -> None:
+    assert not PaperBetLogger().should_create(
         prediction=_Prediction(decision="BET", confidence_score=0.133333),
+        match=_Match(),
+        existing_bet=None,
+    )
+
+
+def test_paper_bet_logger_allows_governance_confidence_samples() -> None:
+    assert PaperBetLogger().should_create(
+        prediction=_Prediction(decision="BET", confidence_score=0.5),
         match=_Match(),
         existing_bet=None,
     )

@@ -1,0 +1,60 @@
+# Task 95 - Policy-Aligned Paper-Bet Gate
+
+Status: completed pending production proof
+
+## Problem
+
+After Task 94 cleared the old result-coverage blockers, production still created a new open paper bet:
+
+```text
+paper_bet id=596
+source_match_id=misli:football:2847018
+confidence_score=0.133333
+risk_flags=low_confidence,past_kickoff_open
+```
+
+At the same time, recommendation governance reported:
+
+```text
+overall_state=watchlist_only
+actionable_count=0
+confidence.low=500
+ai_review.approval_state=reject
+threshold_policy.decision=fail_closed
+```
+
+That means the paper-bet writer was using a looser gate than the recommendation/AI review layer. The system could keep creating low-confidence cold-start research bets even when the current policy view says nothing is actionable.
+
+## Audit Findings
+
+- Result coverage is no longer the primary blocker: `provider_retention_miss=0` and `provider_result_missing_score=0`.
+- The latest daily journal is `settled_learning`, but the review still rejects promotion because all reviewed recommendations are low-confidence.
+- The latest bet ledger has only a tiny clean resulted sample for the current window: 2 resulted bets, 1 open needs-result bet, and paper P/L of `-0.12`.
+- The broad latest-paper-bets endpoint is dominated by historic voided cleanup rows, so it should not be used alone for model ROI decisions.
+
+## Decision
+
+Raise `PaperBetLogger`'s creation confidence floor from `0.1` to `0.5`, matching the active/default recommendation governance floor. This prevents watchlist-only cold-start rows from becoming new paper-bet samples.
+
+This does not disable paper betting globally. Higher-confidence `BET` predictions still create paper bets, and already-open bets still settle normally.
+
+## Verification
+
+```text
+pytest tests/unit/test_paper_bet_logger.py tests/unit/test_live_cycle_service.py tests/unit/test_scheduled_paper_worker_service.py -q
+pytest tests/unit/test_recommendation_service.py tests/unit/test_recommendation_quality_service.py -q
+```
+
+Both focused suites pass locally.
+
+## Production Proof Plan
+
+After deployment, wait for one scheduled worker cycle and verify:
+
+```text
+GET /api/live/recommendation-quality
+GET /api/live/bet-ledger?status=all&include_voided=true
+GET /api/live/paper-bets
+```
+
+Expected behavior: if the cycle remains watchlist-only with max confidence below `0.5`, no new paper bet should be created. Existing open bet `596` may still settle later; that is separate from creation gating.
