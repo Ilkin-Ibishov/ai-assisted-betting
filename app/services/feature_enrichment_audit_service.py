@@ -20,12 +20,17 @@ class FeatureEnrichmentAuditService:
         now_iso: str | None = None,
         include_past: bool = False,
         source: str | None = "misli_public",
+        source_match_id_prefix: str | None = "misli:football:",
     ) -> dict:
         now = _parse_datetime(now_iso) if now_iso else datetime.now(UTC)
         with session_scope(self.engine) as session:
             scheduled_query = select(Match).where(Match.status == "scheduled")
             if source is not None:
                 scheduled_query = scheduled_query.where(Match.source == source)
+            if source_match_id_prefix is not None:
+                scheduled_query = scheduled_query.where(
+                    Match.source_match_id.startswith(source_match_id_prefix)
+                )
             scheduled_matches = list(
                 session.scalars(
                     scheduled_query.order_by(Match.kickoff_time.asc(), Match.id.asc())
@@ -64,6 +69,7 @@ class FeatureEnrichmentAuditService:
             "include_past": include_past,
             "now": now.isoformat(),
             "source": source,
+            "source_match_id_prefix": source_match_id_prefix,
             "full_enriched_candidates": sum(
                 1
                 for match_report in match_reports

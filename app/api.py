@@ -192,8 +192,11 @@ def create_api(
         now: str | None = None,
         include_past: bool = False,
         source: str | None = "misli_public",
+        source_match_id_prefix: str | None = "misli:football:",
     ) -> dict[str, Any]:
         _parse_optional_query_datetime(now, parameter="now")
+        source = source or None
+        source_match_id_prefix = source_match_id_prefix or None
         engine = create_engine_from_url(live_database_url)
         try:
             return FeatureEnrichmentAuditService(engine).report(
@@ -202,6 +205,7 @@ def create_api(
                 now_iso=now,
                 include_past=include_past,
                 source=source,
+                source_match_id_prefix=source_match_id_prefix,
             )
         finally:
             engine.dispose()
