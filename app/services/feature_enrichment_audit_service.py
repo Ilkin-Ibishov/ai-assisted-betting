@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 
 from app.core.team_aliases import TeamAliasResolver
@@ -10,7 +12,15 @@ class FeatureEnrichmentAuditService:
         self.engine = engine
         self.alias_resolver = TeamAliasResolver.from_json_file()
 
-    def report(self, *, limit: int = 100, minimum_history: int = 3) -> dict:
+    def report(
+        self,
+        *,
+        limit: int = 100,
+        minimum_history: int = 3,
+        now_iso: str | None = None,
+        include_past: bool = False,
+    ) -> dict:
+        now = _parse_datetime(now_iso) if now_iso else datetime.now(UTC)
         with session_scope(self.engine) as session:
             scheduled_matches = list(
                 session.scalars(
@@ -23,6 +33,13 @@ class FeatureEnrichmentAuditService:
             completed_matches = list(
                 session.scalars(select(Match).where(Match.status == "completed"))
             )
+        if not include_past:
+            scheduled_matches = [
+                match
+                for match in scheduled_matches
+                if (kickoff := _parse_datetime(match.kickoff_time)) is not None
+                and kickoff >= now
+            ]
 
         match_reports = [
             self._match_report(
@@ -42,6 +59,8 @@ class FeatureEnrichmentAuditService:
             "scheduled_matches": len(scheduled_matches),
             "audited_matches": len(match_reports),
             "minimum_history": minimum_history,
+            "include_past": include_past,
+            "now": now.isoformat(),
             "full_enriched_candidates": sum(
                 1
                 for match_report in match_reports
@@ -144,3 +163,15 @@ class FeatureEnrichmentAuditService:
             "has_minimum_history": len(history) >= minimum_history,
             "history_sources": sources,
         }
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)

@@ -32,6 +32,7 @@ First slice implemented:
 - Added read-only alias/enrichment coverage reporting:
   - API: `GET /api/live/enrichment-audit`
   - CLI: `python -m app.cli feature-enrichment-audit`
+  - Current/future scheduled rows are audited by default; `include_past=true` is available for stale scheduled-row cleanup audits.
 - Fixed Football-Data provenance detection to recognize both historical source labels currently present in code/tests: `football_data` and `football-data`.
 
 Still open:

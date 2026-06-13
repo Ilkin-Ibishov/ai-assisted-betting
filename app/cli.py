@@ -432,6 +432,7 @@ def recommendation_quality(
 def feature_enrichment_audit(
     limit: int = typer.Option(100, help="Maximum scheduled matches to audit."),
     minimum_history: int = typer.Option(3, help="Minimum prior matches required per team."),
+    include_past: bool = typer.Option(False, help="Include past scheduled rows."),
 ) -> None:
     settings = load_settings()
     engine = create_engine_from_url(settings.database_url)
@@ -439,6 +440,7 @@ def feature_enrichment_audit(
         report = FeatureEnrichmentAuditService(engine).report(
             limit=limit,
             minimum_history=minimum_history,
+            include_past=include_past,
         )
     finally:
         engine.dispose()

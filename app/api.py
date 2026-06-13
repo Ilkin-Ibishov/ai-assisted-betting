@@ -189,12 +189,17 @@ def create_api(
     def get_live_enrichment_audit(
         limit: int = 100,
         minimum_history: int = 3,
+        now: str | None = None,
+        include_past: bool = False,
     ) -> dict[str, Any]:
+        _parse_optional_query_datetime(now, parameter="now")
         engine = create_engine_from_url(live_database_url)
         try:
             return FeatureEnrichmentAuditService(engine).report(
                 limit=limit,
                 minimum_history=minimum_history,
+                now_iso=now,
+                include_past=include_past,
             )
         finally:
             engine.dispose()

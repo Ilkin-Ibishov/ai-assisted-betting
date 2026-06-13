@@ -30,9 +30,10 @@ def test_feature_enrichment_audit_reports_full_and_unmatched_coverage(tmp_path) 
             status="scheduled",
         )
 
-    report = FeatureEnrichmentAuditService(engine).report()
+    report = FeatureEnrichmentAuditService(engine).report(now_iso="2026-06-09T00:00:00+00:00")
 
     assert report["scheduled_matches"] == 2
+    assert report["include_past"] is False
     assert report["full_enriched_candidates"] == 1
     assert report["cold_start_candidates"] == 1
     assert report["team_coverage"] == {
@@ -49,6 +50,34 @@ def test_feature_enrichment_audit_reports_full_and_unmatched_coverage(tmp_path) 
     )
     assert covered_match["enrichment_tier"] == "full_enriched"
     assert covered_match["home"]["history_sources"] == ["football-data"]
+    engine.dispose()
+
+
+def test_feature_enrichment_audit_excludes_past_scheduled_rows_by_default(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'feature-audit-past.sqlite').as_posix()}"
+    engine = create_engine_from_url(database_url)
+    Base.metadata.create_all(engine)
+    with session_scope(engine) as session:
+        MatchRepository(session).add(
+            source="misli_public",
+            source_match_id="misli:football:old",
+            league="Sample Premier",
+            home_team="Old Home",
+            away_team="Old Away",
+            kickoff_time="2026-06-01T20:00:00+04:00",
+            status="scheduled",
+        )
+
+    current_report = FeatureEnrichmentAuditService(engine).report(
+        now_iso="2026-06-09T00:00:00+00:00"
+    )
+    historical_report = FeatureEnrichmentAuditService(engine).report(
+        now_iso="2026-06-09T00:00:00+00:00",
+        include_past=True,
+    )
+
+    assert current_report["scheduled_matches"] == 0
+    assert historical_report["scheduled_matches"] == 1
     engine.dispose()
 
 

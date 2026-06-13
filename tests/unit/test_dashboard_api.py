@@ -328,7 +328,10 @@ def test_live_enrichment_audit_endpoint_reports_unmatched_teams(tmp_path: Path) 
     engine.dispose()
     client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
 
-    response = client.get("/api/live/enrichment-audit")
+    response = client.get(
+        "/api/live/enrichment-audit",
+        params={"now": "2026-06-09T00:00:00+00:00"},
+    )
 
     assert response.status_code == 200
     payload = response.json()
