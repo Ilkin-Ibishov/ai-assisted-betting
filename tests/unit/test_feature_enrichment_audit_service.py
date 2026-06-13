@@ -30,9 +30,13 @@ def test_feature_enrichment_audit_reports_full_and_unmatched_coverage(tmp_path) 
             status="scheduled",
         )
 
-    report = FeatureEnrichmentAuditService(engine).report(now_iso="2026-06-09T00:00:00+00:00")
+    report = FeatureEnrichmentAuditService(engine).report(
+        now_iso="2026-06-09T00:00:00+00:00",
+        source=None,
+    )
 
     assert report["scheduled_matches"] == 2
+    assert report["source"] is None
     assert report["include_past"] is False
     assert report["full_enriched_candidates"] == 1
     assert report["cold_start_candidates"] == 1
@@ -111,6 +115,41 @@ def test_feature_enrichment_audit_limits_after_excluding_past_rows(tmp_path) -> 
         now_iso="2026-06-09T00:00:00+00:00",
     )
 
+    assert report["scheduled_matches"] == 1
+    assert report["matches"][0]["source_match_id"] == "misli:football:future"
+    engine.dispose()
+
+
+def test_feature_enrichment_audit_defaults_to_misli_source(tmp_path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'feature-audit-source.sqlite').as_posix()}"
+    engine = create_engine_from_url(database_url)
+    Base.metadata.create_all(engine)
+    with session_scope(engine) as session:
+        repository = MatchRepository(session)
+        repository.add(
+            source="sample",
+            source_match_id="sample-future",
+            league="Sample Premier",
+            home_team="Sample Home",
+            away_team="Sample Away",
+            kickoff_time="2026-06-10T20:00:00+04:00",
+            status="scheduled",
+        )
+        repository.add(
+            source="misli_public",
+            source_match_id="misli:football:future",
+            league="Sample Premier",
+            home_team="Misli Home",
+            away_team="Misli Away",
+            kickoff_time="2026-06-10T21:00:00+04:00",
+            status="scheduled",
+        )
+
+    report = FeatureEnrichmentAuditService(engine).report(
+        now_iso="2026-06-09T00:00:00+00:00",
+    )
+
+    assert report["source"] == "misli_public"
     assert report["scheduled_matches"] == 1
     assert report["matches"][0]["source_match_id"] == "misli:football:future"
     engine.dispose()

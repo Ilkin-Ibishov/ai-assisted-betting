@@ -52,6 +52,7 @@ First implementation slice:
 - Preserved fail-closed behavior: ambiguous aliases do not enrich feature rows.
 - Added `GET /api/live/enrichment-audit` and `feature-enrichment-audit` CLI reporting so production can show which current scheduled teams still lack enough prior history. The audit excludes past scheduled rows by default; use `include_past=true` only for cleanup analysis.
 - Corrected the audit ordering so stale scheduled rows are filtered out before `limit` is applied; old rows can no longer hide current fixtures in the default audit.
+- Corrected the live audit scope so it defaults to `source=misli_public`; sample fixture rows can no longer inflate live Misli enrichment readiness.
 - Fixed Football-Data provenance detection for both `football_data` and `football-data` source labels.
 
 This improves the architecture blocker found during the audit, but it does not yet prove production has enough current Misli teams covered to resume paper-bet creation. The paper-bet confidence floor remains `0.5`.
@@ -66,7 +67,7 @@ This improves the architecture blocker found during the audit, but it does not y
 Latest local result:
 
 ```text
-301 passed
+302 passed
 All checks passed!
 ```
 

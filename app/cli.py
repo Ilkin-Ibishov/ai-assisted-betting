@@ -433,6 +433,7 @@ def feature_enrichment_audit(
     limit: int = typer.Option(100, help="Maximum scheduled matches to audit."),
     minimum_history: int = typer.Option(3, help="Minimum prior matches required per team."),
     include_past: bool = typer.Option(False, help="Include past scheduled rows."),
+    source: str | None = typer.Option("misli_public", help="Match source to audit."),
 ) -> None:
     settings = load_settings()
     engine = create_engine_from_url(settings.database_url)
@@ -441,11 +442,13 @@ def feature_enrichment_audit(
             limit=limit,
             minimum_history=minimum_history,
             include_past=include_past,
+            source=source,
         )
     finally:
         engine.dispose()
     typer.echo("feature-enrichment-audit: started")
     typer.echo(f"scheduled_matches={report['scheduled_matches']}")
+    typer.echo(f"source={report['source']}")
     typer.echo(f"audited_matches={report['audited_matches']}")
     typer.echo(f"full_enriched_candidates={report['full_enriched_candidates']}")
     typer.echo(f"partial_enriched_candidates={report['partial_enriched_candidates']}")

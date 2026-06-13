@@ -19,14 +19,16 @@ class FeatureEnrichmentAuditService:
         minimum_history: int = 3,
         now_iso: str | None = None,
         include_past: bool = False,
+        source: str | None = "misli_public",
     ) -> dict:
         now = _parse_datetime(now_iso) if now_iso else datetime.now(UTC)
         with session_scope(self.engine) as session:
+            scheduled_query = select(Match).where(Match.status == "scheduled")
+            if source is not None:
+                scheduled_query = scheduled_query.where(Match.source == source)
             scheduled_matches = list(
                 session.scalars(
-                    select(Match)
-                    .where(Match.status == "scheduled")
-                    .order_by(Match.kickoff_time.asc(), Match.id.asc())
+                    scheduled_query.order_by(Match.kickoff_time.asc(), Match.id.asc())
                 )
             )
             completed_matches = list(
@@ -61,6 +63,7 @@ class FeatureEnrichmentAuditService:
             "minimum_history": minimum_history,
             "include_past": include_past,
             "now": now.isoformat(),
+            "source": source,
             "full_enriched_candidates": sum(
                 1
                 for match_report in match_reports
