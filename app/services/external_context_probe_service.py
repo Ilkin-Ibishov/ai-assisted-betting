@@ -38,6 +38,7 @@ class ExternalContextProbeService:
                 "teams_read": 0,
                 "matched_count": 0,
                 "ambiguous_count": 0,
+                "insufficient_history_count": 0,
                 "unmatched_count": 0,
                 "teams": [],
             }
@@ -49,6 +50,7 @@ class ExternalContextProbeService:
                 "teams_read": 0,
                 "matched_count": 0,
                 "ambiguous_count": 0,
+                "insufficient_history_count": 0,
                 "unmatched_count": 0,
                 "teams": [],
             }
@@ -70,6 +72,9 @@ class ExternalContextProbeService:
             "teams_read": len(teams),
             "matched_count": sum(1 for team in probed if team["match_status"] == "matched"),
             "ambiguous_count": sum(1 for team in probed if team["match_status"] == "ambiguous"),
+            "insufficient_history_count": sum(
+                1 for team in probed if team["match_status"] == "insufficient_history"
+            ),
             "unmatched_count": sum(1 for team in probed if team["match_status"] == "unmatched"),
             "teams": probed,
         }
@@ -87,11 +92,18 @@ class ExternalContextProbeService:
 
         deduped = _dedupe_candidates(candidates)
         self._attach_history_counts(deduped, request)
-        strong = [candidate for candidate in deduped if candidate["match_score"] >= 0.82]
-        if len(strong) == 1:
+        strong_with_history = [
+            candidate
+            for candidate in deduped
+            if candidate["match_score"] >= 0.82 and candidate["has_minimum_history"] is True
+        ]
+        strong_name_only = [candidate for candidate in deduped if candidate["match_score"] >= 0.82]
+        if len(strong_with_history) == 1:
             match_status = "matched"
-        elif len(strong) > 1:
+        elif len(strong_with_history) > 1:
             match_status = "ambiguous"
+        elif strong_name_only:
+            match_status = "insufficient_history"
         else:
             match_status = "unmatched"
         return {
@@ -253,16 +265,30 @@ def _score_key(team: str) -> str:
 
 def _noise_stripped_variants(team: str) -> list[str]:
     tokens = team.split()
-    variants = []
+    candidates = []
     prefix_tokens = {"fc", "cf", "ac", "sc", "fk", "sk", "jk"}
-    if len(tokens) > 2 and tokens[0].lower().strip(".") in prefix_tokens:
-        variants.append(" ".join(tokens[1:]))
-    if len(tokens) > 2 and _is_age_suffix(tokens[-1]):
-        variants.append(" ".join(tokens[:-1]))
-    if len(tokens) > 2 and len(tokens[-1].strip(".")) == 1:
-        variants.append(" ".join(tokens[:-1]))
-    return variants
+    has_prefix = len(tokens) > 2 and tokens[0].lower().strip(".") in prefix_tokens
+    without_prefix = tokens[1:] if has_prefix else []
+    without_suffix = tokens[:-1] if len(tokens) > 2 and _is_noise_suffix(tokens[-1]) else []
+    if without_prefix:
+        candidates.append(without_prefix)
+    if without_prefix and len(without_prefix) > 2 and _is_noise_suffix(without_prefix[-1]):
+        candidates.append(without_prefix[:-1])
+    if without_suffix:
+        candidates.append(without_suffix)
+    suffix_left_prefix = (
+        without_suffix
+        and len(without_suffix) > 2
+        and without_suffix[0].lower().strip(".") in prefix_tokens
+    )
+    if suffix_left_prefix:
+        candidates.append(without_suffix[1:])
+    return [" ".join(candidate) for candidate in candidates]
 
 
 def _is_age_suffix(token: str) -> bool:
     return re.fullmatch(r"u\d+", token.lower().strip(".")) is not None
+
+
+def _is_noise_suffix(token: str) -> bool:
+    return _is_age_suffix(token) or len(token.strip(".")) == 1

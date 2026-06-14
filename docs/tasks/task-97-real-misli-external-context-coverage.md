@@ -31,6 +31,7 @@ Reason:
 - Added live-observed prefix/suffix search variants so names like `CF La Nucia`, `JK Tammeka Tartu U21`, and `Trival Valderas A.` can search as provider-friendly names.
 - API-Football free plan exposes a 10 requests/minute and 100 requests/day limit, so the provider now paces requests by default.
 - The probe now fetches fixture history only for plausible team-name matches instead of spending requests on weak candidates.
+- Provider name matches without enough recent fixture history are reported as `insufficient_history`, not `matched`, because they are not usable enrichment coverage yet.
 - The admin endpoint now accepts probe options in either query parameters or JSON body to avoid accidental default-size probes.
 - No imported matches, model features, predictions, recommendations, paper bets, or thresholds are changed by this task.
 
@@ -48,7 +49,8 @@ Sampled from production public audit on 2026-06-14:
   - `Rockdale Illinden U20` needed the new `Illinden` -> `Ilinden` fallback.
 - After Railway re-auth, `API_FOOTBALL_KEY` was set on the `ai-assisted-betting` production service and the service redeployed successfully.
 - A correctly parameterized admin probe (`limit=1`) completed from production. A JSON-body probe before the endpoint fix accidentally used default `limit=20`, proving the endpoint needed safer body parsing.
-- A production `limit=5` exact-search probe returned 5 unmatched teams, but direct provider searches showed 3 of those 5 could match with better query variants: `Tammeka Tartu`, `Trival Valderas`, and `La Nucia`.
+- A production `limit=5` exact-search probe returned 5 unmatched teams, but direct provider searches showed 3 of those 5 could match by name with better query variants: `Tammeka Tartu`, `Trival Valderas`, and `La Nucia`.
+- Follow-up production probe showed `Trival Valderas` matched by name but had 0 recent fixtures; the probe now keeps that separate from real matched coverage.
 
 ## Verification
 
@@ -60,7 +62,7 @@ Sampled from production public audit on 2026-06-14:
 Latest local result:
 
 ```text
-314 passed
+315 passed
 All checks passed!
 ```
 

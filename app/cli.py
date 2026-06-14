@@ -513,6 +513,7 @@ def probe_external_context(
     typer.echo(f"teams_read={report['teams_read']}")
     typer.echo(f"matched_count={report['matched_count']}")
     typer.echo(f"ambiguous_count={report['ambiguous_count']}")
+    typer.echo(f"insufficient_history_count={report.get('insufficient_history_count', 0)}")
     typer.echo(f"unmatched_count={report['unmatched_count']}")
     typer.echo(json.dumps(report, indent=2, sort_keys=True))
     typer.echo("probe-external-context: finished")

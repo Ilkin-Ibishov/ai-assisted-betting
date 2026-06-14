@@ -219,7 +219,8 @@ def test_external_context_probe_scores_age_suffix_equivalents(tmp_path) -> None:
         search_results={
             "JK Tammeka Tartu U21": [],
             "Tammeka Tartu U21": [],
-            "JK Tammeka Tartu": [
+            "JK Tammeka Tartu": [],
+            "Tammeka Tartu": [
                 ApiFootballTeamCandidate(
                     provider_team_id=407,
                     name="Tammeka Tartu U19",
@@ -238,7 +239,43 @@ def test_external_context_probe_scores_age_suffix_equivalents(tmp_path) -> None:
     ).probe(ExternalContextProbeRequest(limit=1, minimum_history=3))
 
     assert report["teams"][0]["match_status"] == "matched"
+    assert "Tammeka Tartu" in report["teams"][0]["query_variants"]
     assert report["teams"][0]["top_candidates"][0]["name"] == "Tammeka Tartu U19"
+    engine.dispose()
+
+
+def test_external_context_probe_reports_name_match_without_history_separately(tmp_path) -> None:
+    engine = _engine(tmp_path)
+    _seed_unmatched_misli_match(
+        engine,
+        home_team="Trival Valderas A.",
+        away_team="Other Team",
+    )
+    provider = _FakeApiFootballProvider(
+        search_results={
+            "Trival Valderas A.": [],
+            "Trival Valderas": [
+                ApiFootballTeamCandidate(
+                    provider_team_id=408,
+                    name="Trival Valderas",
+                    country="Spain",
+                    founded=None,
+                    venue_name=None,
+                )
+            ],
+        },
+        fixture_counts={408: 0},
+    )
+
+    report = ExternalContextProbeService(
+        engine,
+        api_football_provider=provider,
+    ).probe(ExternalContextProbeRequest(limit=1, minimum_history=3))
+
+    assert report["matched_count"] == 0
+    assert report["insufficient_history_count"] == 1
+    assert report["teams"][0]["match_status"] == "insufficient_history"
+    assert report["teams"][0]["top_candidates"][0]["has_minimum_history"] is False
     engine.dispose()
 
 
