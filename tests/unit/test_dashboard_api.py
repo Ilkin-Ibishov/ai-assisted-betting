@@ -1096,6 +1096,24 @@ def test_admin_void_unsafe_paper_bets_requires_token_and_executes(
     assert void_count == 1
 
 
+def test_admin_external_context_probe_requires_token(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SNAPSHOT_INGEST_TOKEN", "test-token")
+    monkeypatch.delenv("API_FOOTBALL_KEY", raising=False)
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    unauthorized = client.post("/api/admin/external-context/probe")
+    authorized = client.post(
+        "/api/admin/external-context/probe",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert unauthorized.status_code == 401
+    assert authorized.status_code == 200
+    assert authorized.json()["status"] == "missing_credentials"
+    assert authorized.json()["required_env"] == "API_FOOTBALL_KEY"
+
+
 def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_live_status_database(database_url)

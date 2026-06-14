@@ -38,6 +38,16 @@ def test_ai_analysis_settings_load_from_environment(monkeypatch) -> None:
     assert settings.ai_analysis_model_name == "gpt-test-analyst"
 
 
+def test_api_football_settings_load_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv("API_FOOTBALL_KEY", "test-api-football-key")
+    monkeypatch.setenv("API_FOOTBALL_BASE_URL", "https://example.test")
+
+    settings = load_settings()
+
+    assert settings.api_football_key == "test-api-football-key"
+    assert settings.api_football_base_url == "https://example.test"
+
+
 def test_product_timezone_loads_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("PRODUCT_TIMEZONE", "UTC")
 

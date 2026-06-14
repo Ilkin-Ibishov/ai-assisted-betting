@@ -167,6 +167,6 @@ def _seed_unmatched_misli_match(
             league="railway-fixture",
             home_team=home_team,
             away_team=away_team,
-            kickoff_time="2026-06-14T02:00:00+04:00",
+            kickoff_time="2026-06-20T02:00:00+04:00",
             status="scheduled",
         )

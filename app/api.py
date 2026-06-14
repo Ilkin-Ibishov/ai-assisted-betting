@@ -17,9 +17,14 @@ from app.db.models import (
     PaperRecommendation,
     Prediction,
 )
+from app.providers.api_football_provider import ApiFootballProvider
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.bet_ledger_service import BetLedgerService, DateRange, LedgerStatus
 from app.services.daily_paper_journal_service import DailyPaperJournalService
+from app.services.external_context_probe_service import (
+    ExternalContextProbeRequest,
+    ExternalContextProbeService,
+)
 from app.services.feature_enrichment_audit_service import FeatureEnrichmentAuditService
 from app.services.live_snapshot_service import LiveSnapshotService
 from app.services.live_status_service import LiveStatusService
@@ -330,6 +335,42 @@ def create_api(
                 "risk_flag_counts": summary.risk_flag_counts,
                 "dry_run": summary.dry_run,
             }
+        finally:
+            engine.dispose()
+
+    @api.post("/api/admin/external-context/probe")
+    def post_external_context_probe(
+        provider: str = "api-football",
+        limit: int = 20,
+        minimum_history: int = 3,
+        history_sample_size: int = 5,
+        max_query_variants: int = 3,
+        authorization: str | None = AUTHORIZATION_HEADER,
+    ) -> dict[str, Any]:
+        _require_snapshot_ingest_token(
+            configured_token=settings.snapshot_ingest_token,
+            authorization=authorization,
+        )
+        engine = create_engine_from_url(live_database_url)
+        api_football = None
+        if provider == "api-football" and settings.api_football_key:
+            api_football = ApiFootballProvider(
+                api_key=settings.api_football_key,
+                base_url=settings.api_football_base_url,
+            )
+        try:
+            return ExternalContextProbeService(
+                engine,
+                api_football_provider=api_football,
+            ).probe(
+                ExternalContextProbeRequest(
+                    provider=provider,
+                    limit=limit,
+                    minimum_history=minimum_history,
+                    history_sample_size=history_sample_size,
+                    max_query_variants=max_query_variants,
+                )
+            )
         finally:
             engine.dispose()
 

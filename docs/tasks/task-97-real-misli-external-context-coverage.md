@@ -24,6 +24,7 @@ Reason:
 
 - Added an API-Football provider client using `API_FOOTBALL_KEY`.
 - Added `probe-external-context` CLI command.
+- Added authenticated admin endpoint `POST /api/admin/external-context/probe`.
 - The probe starts from the production-style Misli-only enrichment audit, searches provider team candidates, fetches recent fixture counts for candidates, and reports matched/ambiguous/unmatched teams.
 - Added Misli transliteration query variants for common observed names such as `Kolo Kolo` -> `Colo Colo`, `Yunayted` -> `United`, and `Monarxs` -> `Monarchs`.
 - No imported matches, model features, predictions, recommendations, paper bets, or thresholds are changed by this task.
@@ -58,6 +59,6 @@ required_env=API_FOOTBALL_KEY
 ## Next
 
 - Add `API_FOOTBALL_KEY` in the target environment or local `.env`.
-- Run `python -m app.cli probe-external-context --limit 20`.
+- Run `python -m app.cli probe-external-context --limit 20`, or call the admin endpoint with the configured bearer token.
 - If coverage is good, add a controlled import path for confirmed team IDs and historical fixtures.
 - If coverage is weak or ambiguous, evaluate Sportmonks as the next provider.
