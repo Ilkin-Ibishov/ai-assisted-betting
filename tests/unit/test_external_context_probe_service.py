@@ -129,6 +129,92 @@ def test_external_context_probe_uses_misli_query_variants(tmp_path) -> None:
     engine.dispose()
 
 
+def test_external_context_probe_matches_live_suffix_and_transliteration_variants(tmp_path) -> None:
+    engine = _engine(tmp_path)
+    _seed_unmatched_misli_match(
+        engine,
+        home_team="Rockdale Illinden U20",
+        away_team="Other Team",
+    )
+    provider = _FakeApiFootballProvider(
+        search_results={
+            "Rockdale Illinden U20": [],
+            "Rockdale Ilinden U20": [
+                ApiFootballTeamCandidate(
+                    provider_team_id=404,
+                    name="Rockdale Ilinden",
+                    country="Australia",
+                    founded=None,
+                    venue_name=None,
+                )
+            ],
+        },
+        fixture_counts={404: 5},
+    )
+
+    report = ExternalContextProbeService(
+        engine,
+        api_football_provider=provider,
+    ).probe(ExternalContextProbeRequest(limit=1, minimum_history=3))
+
+    assert "Rockdale Ilinden U20" in report["teams"][0]["query_variants"]
+    assert report["teams"][0]["match_status"] == "matched"
+    assert report["teams"][0]["top_candidates"][0]["name"] == "Rockdale Ilinden"
+    assert report["teams"][0]["top_candidates"][0]["has_minimum_history"] is True
+    engine.dispose()
+
+
+def test_external_context_probe_limits_fixture_history_calls_to_plausible_candidates(
+    tmp_path,
+) -> None:
+    engine = _engine(tmp_path)
+    _seed_unmatched_misli_match(engine, home_team="Qingdao Red Lions", away_team="Other Team")
+    provider = _FakeApiFootballProvider(
+        search_results={
+            "Qingdao Red Lions": [
+                ApiFootballTeamCandidate(
+                    provider_team_id=501,
+                    name="Qingdao Red Lions",
+                    country="China",
+                    founded=None,
+                    venue_name=None,
+                ),
+                ApiFootballTeamCandidate(
+                    provider_team_id=502,
+                    name="Unrelated City",
+                    country="China",
+                    founded=None,
+                    venue_name=None,
+                ),
+                ApiFootballTeamCandidate(
+                    provider_team_id=503,
+                    name="Qingdao Youth",
+                    country="China",
+                    founded=None,
+                    venue_name=None,
+                ),
+            ],
+        },
+        fixture_counts={501: 5, 502: 5, 503: 5},
+    )
+
+    report = ExternalContextProbeService(
+        engine,
+        api_football_provider=provider,
+    ).probe(
+        ExternalContextProbeRequest(
+            limit=1,
+            minimum_history=3,
+            max_history_candidates_per_team=1,
+        )
+    )
+
+    assert report["teams"][0]["match_status"] == "matched"
+    assert provider.fixture_team_ids == [501]
+    assert report["teams"][0]["top_candidates"][0]["recent_fixture_count"] == 5
+    engine.dispose()
+
+
 class _FakeApiFootballProvider:
     def __init__(
         self,
@@ -139,12 +225,14 @@ class _FakeApiFootballProvider:
         self.search_results = search_results
         self.fixture_counts = fixture_counts
         self.search_queries: list[str] = []
+        self.fixture_team_ids: list[int] = []
 
     def search_teams(self, query: str) -> list[ApiFootballTeamCandidate]:
         self.search_queries.append(query)
         return self.search_results.get(query, [])
 
     def recent_fixture_count(self, *, team_id: int, last: int = 5) -> int:
+        self.fixture_team_ids.append(team_id)
         return min(self.fixture_counts.get(team_id, 0), last)
 
 

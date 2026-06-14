@@ -1,4 +1,5 @@
 import json
+import time
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
@@ -21,12 +22,15 @@ class ApiFootballProvider:
         api_key: str,
         base_url: str = "https://v3.football.api-sports.io",
         timeout_seconds: int = 20,
+        min_interval_seconds: float = 6.1,
     ) -> None:
         if not api_key:
             raise ValueError("API_FOOTBALL_KEY is required")
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.min_interval_seconds = max(0.0, min_interval_seconds)
+        self._last_request_at = 0.0
 
     def search_teams(self, query: str) -> list[ApiFootballTeamCandidate]:
         payload = self._get_json("/teams", {"search": query})
@@ -38,6 +42,7 @@ class ApiFootballProvider:
         return len(response) if isinstance(response, list) else 0
 
     def _get_json(self, path: str, params: dict[str, str]) -> dict[str, Any]:
+        self._pace_requests()
         url = f"{self.base_url}{path}?{urlencode(params)}"
         request = Request(
             url,
@@ -49,6 +54,15 @@ class ApiFootballProvider:
         )
         with urlopen(request, timeout=self.timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
+
+    def _pace_requests(self) -> None:
+        if self.min_interval_seconds <= 0:
+            return
+        now = time.monotonic()
+        wait_seconds = self.min_interval_seconds - (now - self._last_request_at)
+        if wait_seconds > 0:
+            time.sleep(wait_seconds)
+        self._last_request_at = time.monotonic()
 
 
 def _team_candidate(item: dict[str, Any]) -> ApiFootballTeamCandidate:

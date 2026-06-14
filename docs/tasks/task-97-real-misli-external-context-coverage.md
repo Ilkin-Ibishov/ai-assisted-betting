@@ -27,7 +27,24 @@ Reason:
 - Added authenticated admin endpoint `POST /api/admin/external-context/probe`.
 - The probe starts from the production-style Misli-only enrichment audit, searches provider team candidates, fetches recent fixture counts for candidates, and reports matched/ambiguous/unmatched teams.
 - Added Misli transliteration query variants for common observed names such as `Kolo Kolo` -> `Colo Colo`, `Yunayted` -> `United`, and `Monarxs` -> `Monarchs`.
+- Added live-observed variants for `Tayqers` -> `Tigers` and `Illinden` -> `Ilinden`.
+- API-Football free plan exposes a 10 requests/minute and 100 requests/day limit, so the provider now paces requests by default.
+- The probe now fetches fixture history only for plausible team-name matches instead of spending requests on weak candidates.
 - No imported matches, model features, predictions, recommendations, paper bets, or thresholds are changed by this task.
+
+## Live Probe Findings
+
+Sampled from production public audit on 2026-06-14:
+
+- Current audit had 19 scheduled Misli football fixtures and 38 unmatched team slots.
+- API-Football account status returned active Free plan with 100 daily requests.
+- Search-only sample used 8 provider calls and matched 4 of the first 5 unique teams:
+  - `Qingdao Red Lions` -> exact match.
+  - `Shanghai Port B` -> `Shanghai Port II`.
+  - `Prospect United U20` -> `Prospect United`.
+  - `Dulwich Hill U20` -> `Dulwich Hill`.
+  - `Rockdale Illinden U20` needed the new `Illinden` -> `Ilinden` fallback.
+- Railway project access is still unauthorized from the local CLI/MCP context, so the production `API_FOOTBALL_KEY` variable was not set by this task.
 
 ## Verification
 
@@ -39,7 +56,7 @@ Reason:
 Latest local result:
 
 ```text
-307 passed
+311 passed
 All checks passed!
 ```
 
@@ -60,5 +77,6 @@ required_env=API_FOOTBALL_KEY
 
 - Add `API_FOOTBALL_KEY` in the target environment or local `.env`.
 - Run `python -m app.cli probe-external-context --limit 20`, or call the admin endpoint with the configured bearer token.
+- Use small probe limits on the free plan; a full team probe can consume the daily quota quickly.
 - If coverage is good, add a controlled import path for confirmed team IDs and historical fixtures.
 - If coverage is weak or ambiguous, evaluate Sportmonks as the next provider.

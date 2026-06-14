@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 
 from sqlalchemy import Engine
 
@@ -14,6 +15,8 @@ class ExternalContextProbeRequest:
     minimum_history: int = 3
     history_sample_size: int = 5
     max_query_variants: int = 3
+    max_history_candidates_per_team: int = 2
+    minimum_history_candidate_score: float = 0.72
 
 
 class ExternalContextProbeService:
@@ -76,12 +79,13 @@ class ExternalContextProbeService:
         for query in query_variants:
             provider_candidates = self.api_football_provider.search_teams(query)
             candidates.extend(
-                self._candidate_payload(candidate, query, team, request)
+                self._candidate_payload(candidate, query, team)
                 for candidate in provider_candidates
                 if candidate.provider_team_id
             )
 
         deduped = _dedupe_candidates(candidates)
+        self._attach_history_counts(deduped, request)
         strong = [candidate for candidate in deduped if candidate["match_score"] >= 0.82]
         if len(strong) == 1:
             match_status = "matched"
@@ -103,12 +107,7 @@ class ExternalContextProbeService:
         candidate: ApiFootballTeamCandidate,
         query: str,
         team: dict,
-        request: ExternalContextProbeRequest,
     ) -> dict:
-        fixture_count = self.api_football_provider.recent_fixture_count(
-            team_id=candidate.provider_team_id,
-            last=request.history_sample_size,
-        )
         return {
             "provider_team_id": candidate.provider_team_id,
             "name": candidate.name,
@@ -117,9 +116,27 @@ class ExternalContextProbeService:
             "venue_name": candidate.venue_name,
             "query": query,
             "match_score": _name_score(str(team["team"]), candidate.name),
-            "recent_fixture_count": fixture_count,
-            "has_minimum_history": fixture_count >= request.minimum_history,
+            "recent_fixture_count": None,
+            "has_minimum_history": None,
         }
+
+    def _attach_history_counts(
+        self,
+        candidates: list[dict],
+        request: ExternalContextProbeRequest,
+    ) -> None:
+        eligible = [
+            candidate
+            for candidate in candidates
+            if float(candidate["match_score"]) >= request.minimum_history_candidate_score
+        ][: max(0, request.max_history_candidates_per_team)]
+        for candidate in eligible:
+            fixture_count = self.api_football_provider.recent_fixture_count(
+                team_id=int(candidate["provider_team_id"]),
+                last=request.history_sample_size,
+            )
+            candidate["recent_fixture_count"] = fixture_count
+            candidate["has_minimum_history"] = fixture_count >= request.minimum_history
 
 
 def _unique_unmatched_teams(items: list[dict], *, limit: int) -> list[dict]:
@@ -150,6 +167,8 @@ def _query_variants(team: str) -> list[str]:
         "braqantino": "bragantino",
         "krisiuma": "criciuma",
         "monarxs": "monarchs",
+        "tayqers": "tigers",
+        "illinden": "ilinden",
     }
     variants = [direct]
     replaced = lower
@@ -165,16 +184,20 @@ def _query_variants(team: str) -> list[str]:
 
 
 def _name_score(left: str, right: str) -> float:
-    left_key = canonical_team_key(left)
-    right_key = canonical_team_key(right)
+    left_key = _score_key(left)
+    right_key = _score_key(right)
     if left_key == right_key:
         return 1.0
     left_tokens = set(left_key.split())
     right_tokens = set(right_key.split())
     if not left_tokens or not right_tokens:
         return 0.0
+    if left_key in right_key or right_key in left_key:
+        return 0.9
     overlap = len(left_tokens & right_tokens)
-    return round((2 * overlap) / (len(left_tokens) + len(right_tokens)), 6)
+    token_score = (2 * overlap) / (len(left_tokens) + len(right_tokens))
+    sequence_score = SequenceMatcher(None, left_key, right_key).ratio()
+    return round(max(token_score, sequence_score), 6)
 
 
 def _dedupe_candidates(candidates: list[dict]) -> list[dict]:
@@ -188,7 +211,7 @@ def _dedupe_candidates(candidates: list[dict]) -> list[dict]:
         by_id.values(),
         key=lambda item: (
             float(item["match_score"]),
-            int(item["recent_fixture_count"]),
+            int(item["recent_fixture_count"] or 0),
         ),
         reverse=True,
     )
@@ -204,3 +227,17 @@ def _dedupe_strings(values: list[str]) -> list[str]:
         seen.add(key)
         deduped.append(value)
     return deduped
+
+
+def _score_key(team: str) -> str:
+    replacements = {
+        "illinden": "ilinden",
+        "tayqers": "tigers",
+        "monarxs": "monarchs",
+    }
+    key = canonical_team_key(team)
+    for source, target in replacements.items():
+        key = key.replace(source, target)
+    drop_tokens = {"fc", "cf", "ac", "sc", "fk", "sk", "u20", "ii", "b"}
+    tokens = [token for token in key.split() if token not in drop_tokens]
+    return " ".join(tokens)
