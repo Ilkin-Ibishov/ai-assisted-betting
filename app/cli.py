@@ -10,6 +10,10 @@ from app.db.migrations import init_db as run_init_db
 from app.providers.api_football_provider import ApiFootballProvider
 from app.services.ai_analysis_service import AIAnalysisService
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
+from app.services.api_football_context_import_service import (
+    ApiFootballContextImportRequest,
+    ApiFootballContextImportService,
+)
 from app.services.collection_service import CollectionService
 from app.services.combination_service import CombinationService
 from app.services.comparison_service import ReplayComparisonRequest, ReplayComparisonService
@@ -517,6 +521,52 @@ def probe_external_context(
     typer.echo(f"unmatched_count={report['unmatched_count']}")
     typer.echo(json.dumps(report, indent=2, sort_keys=True))
     typer.echo("probe-external-context: finished")
+
+
+@app.command("import-api-football-context")
+def import_api_football_context(
+    limit: int = typer.Option(5, help="Maximum unmatched teams to probe for import."),
+    minimum_history: int = typer.Option(3, help="Minimum recent fixtures required."),
+    history_sample_size: int = typer.Option(5, help="Recent fixtures to import per team."),
+    max_query_variants: int = typer.Option(3, help="Maximum search variants per team."),
+    dry_run: bool = typer.Option(True, help="Preview imports without writing matches."),
+) -> None:
+    settings = load_settings()
+    engine = create_engine_from_url(settings.database_url)
+    api_football = None
+    if settings.api_football_key:
+        api_football = ApiFootballProvider(
+            api_key=settings.api_football_key,
+            base_url=settings.api_football_base_url,
+        )
+    try:
+        report = ApiFootballContextImportService(
+            engine,
+            api_football_provider=api_football,
+        ).import_verified_history(
+            ApiFootballContextImportRequest(
+                limit=limit,
+                minimum_history=minimum_history,
+                history_sample_size=history_sample_size,
+                max_query_variants=max_query_variants,
+                dry_run=dry_run,
+            )
+        )
+    finally:
+        engine.dispose()
+
+    typer.echo("import-api-football-context: started")
+    typer.echo(f"status={report['status']}")
+    typer.echo(f"dry_run={report['dry_run']}")
+    if report["status"] == "missing_credentials":
+        typer.echo(f"required_env={report['required_env']}")
+    typer.echo(f"teams_read={report['teams_read']}")
+    typer.echo(f"teams_importable={report['teams_importable']}")
+    typer.echo(f"items_read={report['items_read']}")
+    typer.echo(f"items_created={report['items_created']}")
+    typer.echo(f"items_skipped={report['items_skipped']}")
+    typer.echo(json.dumps(report, indent=2, sort_keys=True))
+    typer.echo("import-api-football-context: finished")
 
 
 @app.command("daily-paper-journal")

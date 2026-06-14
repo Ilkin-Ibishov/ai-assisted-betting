@@ -19,6 +19,10 @@ from app.db.models import (
 )
 from app.providers.api_football_provider import ApiFootballProvider
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
+from app.services.api_football_context_import_service import (
+    ApiFootballContextImportRequest,
+    ApiFootballContextImportService,
+)
 from app.services.bet_ledger_service import BetLedgerService, DateRange, LedgerStatus
 from app.services.daily_paper_journal_service import DailyPaperJournalService
 from app.services.external_context_probe_service import (
@@ -386,6 +390,55 @@ def create_api(
         finally:
             engine.dispose()
 
+    @api.post("/api/admin/external-context/import")
+    def post_external_context_import(
+        limit: int | None = None,
+        minimum_history: int | None = None,
+        history_sample_size: int | None = None,
+        max_query_variants: int | None = None,
+        dry_run: bool | None = None,
+        import_body: dict[str, Any] | None = PROBE_BODY,
+        authorization: str | None = AUTHORIZATION_HEADER,
+    ) -> dict[str, Any]:
+        _require_snapshot_ingest_token(
+            configured_token=settings.snapshot_ingest_token,
+            authorization=authorization,
+        )
+        import_body = import_body or {}
+        limit_value = int(limit or import_body.get("limit") or 5)
+        minimum_history_value = int(minimum_history or import_body.get("minimum_history") or 3)
+        history_sample_size_value = int(
+            history_sample_size or import_body.get("history_sample_size") or 5
+        )
+        max_query_variants_value = int(
+            max_query_variants or import_body.get("max_query_variants") or 3
+        )
+        dry_run_value = _body_bool(import_body.get("dry_run"), default=True)
+        if dry_run is not None:
+            dry_run_value = dry_run
+        engine = create_engine_from_url(live_database_url)
+        api_football = None
+        if settings.api_football_key:
+            api_football = ApiFootballProvider(
+                api_key=settings.api_football_key,
+                base_url=settings.api_football_base_url,
+            )
+        try:
+            return ApiFootballContextImportService(
+                engine,
+                api_football_provider=api_football,
+            ).import_verified_history(
+                ApiFootballContextImportRequest(
+                    limit=limit_value,
+                    minimum_history=minimum_history_value,
+                    history_sample_size=history_sample_size_value,
+                    max_query_variants=max_query_variants_value,
+                    dry_run=dry_run_value,
+                )
+            )
+        finally:
+            engine.dispose()
+
     @api.get("/api/ai/analysis/latest")
     def get_latest_ai_analysis() -> dict[str, Any]:
         analysis = _latest_ai_analysis_payload(live_database_url)
@@ -421,6 +474,14 @@ def create_api(
 
 
 api = create_api()
+
+
+def _body_bool(value: object, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _comparison_summary(path: Path) -> dict[str, Any]:

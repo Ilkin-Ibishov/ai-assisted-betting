@@ -1134,6 +1134,32 @@ def test_admin_external_context_probe_accepts_json_body_options(
     assert response.json()["provider"] == "unsupported-test-provider"
 
 
+def test_admin_external_context_import_requires_token_and_reports_missing_credentials(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SNAPSHOT_INGEST_TOKEN", "test-token")
+    monkeypatch.delenv("API_FOOTBALL_KEY", raising=False)
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    unauthorized = client.post(
+        "/api/admin/external-context/import",
+        json={"limit": 1, "dry_run": True},
+    )
+    authorized = client.post(
+        "/api/admin/external-context/import",
+        headers={"Authorization": "Bearer test-token"},
+        json={"limit": 1, "dry_run": False},
+    )
+
+    assert unauthorized.status_code == 401
+    assert authorized.status_code == 200
+    assert authorized.json()["status"] == "missing_credentials"
+    assert authorized.json()["dry_run"] is False
+    assert authorized.json()["required_env"] == "API_FOOTBALL_KEY"
+
+
 def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_live_status_database(database_url)

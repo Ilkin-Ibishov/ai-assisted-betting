@@ -15,6 +15,22 @@ class ApiFootballTeamCandidate:
     venue_name: str | None
 
 
+@dataclass(frozen=True)
+class ApiFootballFixture:
+    provider_fixture_id: int
+    kickoff_time: str
+    league_name: str
+    league_season: int | None
+    home_team_id: int
+    away_team_id: int
+    home_team: str
+    away_team: str
+    home_score: int
+    away_score: int
+    status_short: str
+    raw_payload: dict[str, Any]
+
+
 class ApiFootballProvider:
     def __init__(
         self,
@@ -40,6 +56,19 @@ class ApiFootballProvider:
         payload = self._get_json("/fixtures", {"team": str(team_id), "last": str(last)})
         response = payload.get("response", [])
         return len(response) if isinstance(response, list) else 0
+
+    def recent_completed_fixtures(
+        self,
+        *,
+        team_id: int,
+        last: int = 5,
+    ) -> list[ApiFootballFixture]:
+        payload = self._get_json("/fixtures", {"team": str(team_id), "last": str(last)})
+        response = payload.get("response", [])
+        if not isinstance(response, list):
+            return []
+        fixtures = [_fixture(item) for item in response]
+        return [fixture for fixture in fixtures if fixture is not None]
 
     def _get_json(self, path: str, params: dict[str, str]) -> dict[str, Any]:
         self._pace_requests()
@@ -74,4 +103,45 @@ def _team_candidate(item: dict[str, Any]) -> ApiFootballTeamCandidate:
         country=str(team.get("country")) if team.get("country") else None,
         founded=int(team["founded"]) if team.get("founded") else None,
         venue_name=str(venue.get("name")) if venue.get("name") else None,
+    )
+
+
+def _fixture(item: dict[str, Any]) -> ApiFootballFixture | None:
+    fixture = item.get("fixture") if isinstance(item.get("fixture"), dict) else {}
+    league = item.get("league") if isinstance(item.get("league"), dict) else {}
+    teams = item.get("teams") if isinstance(item.get("teams"), dict) else {}
+    goals = item.get("goals") if isinstance(item.get("goals"), dict) else {}
+    home = teams.get("home") if isinstance(teams.get("home"), dict) else {}
+    away = teams.get("away") if isinstance(teams.get("away"), dict) else {}
+    status = fixture.get("status") if isinstance(fixture.get("status"), dict) else {}
+    home_goals = goals.get("home")
+    away_goals = goals.get("away")
+    if not isinstance(home_goals, int) or not isinstance(away_goals, int):
+        return None
+    status_short = str(status.get("short") or "")
+    if status_short not in {"FT", "AET", "PEN"}:
+        return None
+    provider_fixture_id = int(fixture.get("id") or 0)
+    home_team_id = int(home.get("id") or 0)
+    away_team_id = int(away.get("id") or 0)
+    kickoff_time = str(fixture.get("date") or "")
+    home_team = str(home.get("name") or "")
+    away_team = str(away.get("name") or "")
+    if not provider_fixture_id or not kickoff_time or not home_team_id or not away_team_id:
+        return None
+    if not home_team or not away_team:
+        return None
+    return ApiFootballFixture(
+        provider_fixture_id=provider_fixture_id,
+        kickoff_time=kickoff_time,
+        league_name=str(league.get("name") or ""),
+        league_season=int(league["season"]) if league.get("season") else None,
+        home_team_id=home_team_id,
+        away_team_id=away_team_id,
+        home_team=home_team,
+        away_team=away_team,
+        home_score=home_goals,
+        away_score=away_goals,
+        status_short=status_short,
+        raw_payload=item,
     )

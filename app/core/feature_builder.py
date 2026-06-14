@@ -92,7 +92,7 @@ class FeatureBuilder:
         feature_provenance = _feature_provenance(
             enrichment_tier,
             has_odds_movement=_has_odds_movement(odds_snapshots),
-            has_external_football_data_context=_has_external_football_data_context(
+            external_context_labels=_external_context_labels(
                 home_history,
                 away_history,
             ),
@@ -233,15 +233,14 @@ def _feature_provenance(
     enrichment_tier: str,
     *,
     has_odds_movement: bool,
-    has_external_football_data_context: bool,
+    external_context_labels: tuple[str, ...],
 ) -> tuple[str, ...]:
     labels = ["market_overround_normalized"]
     if enrichment_tier == "cold_start":
         labels.append("cold_start_history")
     else:
         labels.extend(["recent_form", "home_away_split", "rest_days", "goal_difference_trend"])
-    if has_external_football_data_context:
-        labels.append("external_context:football_data_csv")
+    labels.extend(external_context_labels)
     if has_odds_movement:
         labels.append("odds_movement_velocity")
     if enrichment_tier == "full_enriched":
@@ -249,14 +248,17 @@ def _feature_provenance(
     return tuple(labels)
 
 
-def _has_external_football_data_context(
+def _external_context_labels(
     home_history: list[Match],
     away_history: list[Match],
-) -> bool:
-    return any(
-        match.source in {"football_data", "football-data"}
-        for match in [*home_history, *away_history]
-    )
+) -> tuple[str, ...]:
+    labels = []
+    sources = {match.source for match in [*home_history, *away_history]}
+    if sources & {"football_data", "football-data"}:
+        labels.append("external_context:football_data_csv")
+    if "api_football_context" in sources:
+        labels.append("external_context:api_football")
+    return tuple(labels)
 
 
 def _rest_days(kickoff_time: str, history: list[Match]) -> float | None:

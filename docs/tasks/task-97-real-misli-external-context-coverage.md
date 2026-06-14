@@ -33,7 +33,15 @@ Reason:
 - The probe now fetches fixture history only for plausible team-name matches instead of spending requests on weak candidates.
 - Provider name matches without enough recent fixture history are reported as `insufficient_history`, not `matched`, because they are not usable enrichment coverage yet.
 - The admin endpoint now accepts probe options in either query parameters or JSON body to avoid accidental default-size probes.
-- No imported matches, model features, predictions, recommendations, paper bets, or thresholds are changed by this task.
+- Added a controlled API-Football context importer:
+  - CLI: `python -m app.cli import-api-football-context`
+  - Admin API: `POST /api/admin/external-context/import`
+  - Defaults to `dry_run=true`.
+  - Imports only teams classified as `matched`, meaning a strong provider team match with enough recent completed fixture history.
+  - Writes completed history under source `api_football_context`, with provider IDs/raw payload preserved.
+  - Does not create predictions, recommendations, paper bets, or threshold changes.
+- Feature provenance now labels API-Football-sourced history as `external_context:api_football`.
+- No predictions, recommendations, paper bets, or thresholds are changed by this task. The importer is explicit and dry-run by default.
 
 ## Live Probe Findings
 
@@ -62,7 +70,7 @@ Sampled from production public audit on 2026-06-14:
 Latest local result:
 
 ```text
-315 passed
+321 passed
 All checks passed!
 ```
 
@@ -84,5 +92,6 @@ required_env=API_FOOTBALL_KEY
 - Add `API_FOOTBALL_KEY` in the target environment or local `.env`.
 - Run `python -m app.cli probe-external-context --limit 20`, or call the admin endpoint with the configured bearer token.
 - Use small probe limits on the free plan; a full team probe can consume the daily quota quickly.
-- If coverage is good, add a controlled import path for confirmed team IDs and historical fixtures.
+- Start with dry-run imports and compare `/api/live/enrichment-audit` before/after any `dry_run=false` import.
+- If dry-run imports improve coverage, run the importer with `dry_run=false` for a small limit and regenerate features in the next worker cycle.
 - If coverage is weak or ambiguous, evaluate Sportmonks as the next provider.
