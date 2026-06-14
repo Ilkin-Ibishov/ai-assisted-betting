@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
@@ -177,6 +178,9 @@ def _query_variants(team: str) -> list[str]:
     title_replaced = " ".join(word.capitalize() for word in replaced.split())
     if title_replaced and canonical_team_key(title_replaced) != canonical_team_key(direct):
         variants.append(title_replaced)
+    variants.extend(_noise_stripped_variants(direct))
+    if title_replaced:
+        variants.extend(_noise_stripped_variants(title_replaced))
     tokens = direct.split()
     if len(tokens) > 2:
         variants.append(" ".join(tokens[:2]))
@@ -238,6 +242,27 @@ def _score_key(team: str) -> str:
     key = canonical_team_key(team)
     for source, target in replacements.items():
         key = key.replace(source, target)
-    drop_tokens = {"fc", "cf", "ac", "sc", "fk", "sk", "u20", "ii", "b"}
-    tokens = [token for token in key.split() if token not in drop_tokens]
+    drop_tokens = {"fc", "cf", "ac", "sc", "fk", "sk", "ii", "b"}
+    tokens = [
+        token
+        for token in key.split()
+        if token not in drop_tokens and not re.fullmatch(r"u\d+", token)
+    ]
     return " ".join(tokens)
+
+
+def _noise_stripped_variants(team: str) -> list[str]:
+    tokens = team.split()
+    variants = []
+    prefix_tokens = {"fc", "cf", "ac", "sc", "fk", "sk", "jk"}
+    if len(tokens) > 2 and tokens[0].lower().strip(".") in prefix_tokens:
+        variants.append(" ".join(tokens[1:]))
+    if len(tokens) > 2 and _is_age_suffix(tokens[-1]):
+        variants.append(" ".join(tokens[:-1]))
+    if len(tokens) > 2 and len(tokens[-1].strip(".")) == 1:
+        variants.append(" ".join(tokens[:-1]))
+    return variants
+
+
+def _is_age_suffix(token: str) -> bool:
+    return re.fullmatch(r"u\d+", token.lower().strip(".")) is not None

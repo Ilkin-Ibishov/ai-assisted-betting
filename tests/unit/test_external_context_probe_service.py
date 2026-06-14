@@ -164,6 +164,84 @@ def test_external_context_probe_matches_live_suffix_and_transliteration_variants
     engine.dispose()
 
 
+def test_external_context_probe_uses_live_prefix_and_suffix_search_variants(tmp_path) -> None:
+    engine = _engine(tmp_path)
+    _seed_unmatched_misli_match(
+        engine,
+        home_team="CF La Nucia",
+        away_team="Trival Valderas A.",
+    )
+    provider = _FakeApiFootballProvider(
+        search_results={
+            "CF La Nucia": [],
+            "La Nucia": [
+                ApiFootballTeamCandidate(
+                    provider_team_id=405,
+                    name="La Nucia",
+                    country="Spain",
+                    founded=None,
+                    venue_name=None,
+                )
+            ],
+            "Trival Valderas A.": [],
+            "Trival Valderas": [
+                ApiFootballTeamCandidate(
+                    provider_team_id=406,
+                    name="Trival Valderas",
+                    country="Spain",
+                    founded=None,
+                    venue_name=None,
+                )
+            ],
+        },
+        fixture_counts={405: 5, 406: 5},
+    )
+
+    report = ExternalContextProbeService(
+        engine,
+        api_football_provider=provider,
+    ).probe(ExternalContextProbeRequest(limit=2, minimum_history=3))
+
+    assert report["matched_count"] == 2
+    assert "La Nucia" in report["teams"][0]["query_variants"]
+    assert "Trival Valderas" in report["teams"][1]["query_variants"]
+    engine.dispose()
+
+
+def test_external_context_probe_scores_age_suffix_equivalents(tmp_path) -> None:
+    engine = _engine(tmp_path)
+    _seed_unmatched_misli_match(
+        engine,
+        home_team="JK Tammeka Tartu U21",
+        away_team="Other Team",
+    )
+    provider = _FakeApiFootballProvider(
+        search_results={
+            "JK Tammeka Tartu U21": [],
+            "Tammeka Tartu U21": [],
+            "JK Tammeka Tartu": [
+                ApiFootballTeamCandidate(
+                    provider_team_id=407,
+                    name="Tammeka Tartu U19",
+                    country="Estonia",
+                    founded=None,
+                    venue_name=None,
+                )
+            ],
+        },
+        fixture_counts={407: 5},
+    )
+
+    report = ExternalContextProbeService(
+        engine,
+        api_football_provider=provider,
+    ).probe(ExternalContextProbeRequest(limit=1, minimum_history=3))
+
+    assert report["teams"][0]["match_status"] == "matched"
+    assert report["teams"][0]["top_candidates"][0]["name"] == "Tammeka Tartu U19"
+    engine.dispose()
+
+
 def test_external_context_probe_limits_fixture_history_calls_to_plausible_candidates(
     tmp_path,
 ) -> None:

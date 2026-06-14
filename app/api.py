@@ -38,6 +38,7 @@ from app.services.threshold_policy_service import ThresholdPolicyService
 from app.services.worker_monitoring_service import WorkerMonitoringService
 
 SNAPSHOT_BODY = Body(...)
+PROBE_BODY = Body(default=None)
 AUTHORIZATION_HEADER = Header(default=None)
 BET_LEDGER_STATUSES = set(get_args(LedgerStatus))
 BET_LEDGER_DATE_RANGES = set(get_args(DateRange))
@@ -340,20 +341,31 @@ def create_api(
 
     @api.post("/api/admin/external-context/probe")
     def post_external_context_probe(
-        provider: str = "api-football",
-        limit: int = 20,
-        minimum_history: int = 3,
-        history_sample_size: int = 5,
-        max_query_variants: int = 3,
+        provider: str | None = None,
+        limit: int | None = None,
+        minimum_history: int | None = None,
+        history_sample_size: int | None = None,
+        max_query_variants: int | None = None,
+        probe_body: dict[str, Any] | None = PROBE_BODY,
         authorization: str | None = AUTHORIZATION_HEADER,
     ) -> dict[str, Any]:
         _require_snapshot_ingest_token(
             configured_token=settings.snapshot_ingest_token,
             authorization=authorization,
         )
+        probe_body = probe_body or {}
+        provider_value = str(provider or probe_body.get("provider") or "api-football")
+        limit_value = int(limit or probe_body.get("limit") or 20)
+        minimum_history_value = int(minimum_history or probe_body.get("minimum_history") or 3)
+        history_sample_size_value = int(
+            history_sample_size or probe_body.get("history_sample_size") or 5
+        )
+        max_query_variants_value = int(
+            max_query_variants or probe_body.get("max_query_variants") or 3
+        )
         engine = create_engine_from_url(live_database_url)
         api_football = None
-        if provider == "api-football" and settings.api_football_key:
+        if provider_value == "api-football" and settings.api_football_key:
             api_football = ApiFootballProvider(
                 api_key=settings.api_football_key,
                 base_url=settings.api_football_base_url,
@@ -364,11 +376,11 @@ def create_api(
                 api_football_provider=api_football,
             ).probe(
                 ExternalContextProbeRequest(
-                    provider=provider,
-                    limit=limit,
-                    minimum_history=minimum_history,
-                    history_sample_size=history_sample_size,
-                    max_query_variants=max_query_variants,
+                    provider=provider_value,
+                    limit=limit_value,
+                    minimum_history=minimum_history_value,
+                    history_sample_size=history_sample_size_value,
+                    max_query_variants=max_query_variants_value,
                 )
             )
         finally:

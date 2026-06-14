@@ -1114,6 +1114,26 @@ def test_admin_external_context_probe_requires_token(tmp_path: Path, monkeypatch
     assert authorized.json()["required_env"] == "API_FOOTBALL_KEY"
 
 
+def test_admin_external_context_probe_accepts_json_body_options(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SNAPSHOT_INGEST_TOKEN", "test-token")
+    monkeypatch.delenv("API_FOOTBALL_KEY", raising=False)
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.post(
+        "/api/admin/external-context/probe",
+        headers={"Authorization": "Bearer test-token"},
+        json={"provider": "unsupported-test-provider", "limit": 1},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "unsupported_provider"
+    assert response.json()["provider"] == "unsupported-test-provider"
+
+
 def test_ai_analysis_latest_endpoint_returns_latest_advisory(tmp_path: Path) -> None:
     database_url = _create_live_api_database(tmp_path)
     _seed_live_status_database(database_url)
