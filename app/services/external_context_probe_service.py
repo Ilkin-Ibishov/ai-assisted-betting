@@ -6,6 +6,7 @@ from sqlalchemy import Engine
 
 from app.core.team_aliases import canonical_team_key
 from app.providers.api_football_provider import ApiFootballProvider, ApiFootballTeamCandidate
+from app.providers.sportmonks_provider import SportmonksProvider
 from app.services.feature_enrichment_audit_service import FeatureEnrichmentAuditService
 
 
@@ -26,12 +27,15 @@ class ExternalContextProbeService:
         engine: Engine,
         *,
         api_football_provider: ApiFootballProvider | None = None,
+        sportmonks_provider: SportmonksProvider | None = None,
     ) -> None:
         self.engine = engine
         self.api_football_provider = api_football_provider
+        self.sportmonks_provider = sportmonks_provider
 
     def probe(self, request: ExternalContextProbeRequest) -> dict:
-        if request.provider != "api-football":
+        context_provider = self._context_provider(request.provider)
+        if request.provider not in {"api-football", "sportmonks"}:
             return {
                 "provider": request.provider,
                 "status": "unsupported_provider",
@@ -42,11 +46,11 @@ class ExternalContextProbeService:
                 "unmatched_count": 0,
                 "teams": [],
             }
-        if self.api_football_provider is None:
+        if context_provider is None:
             return {
                 "provider": request.provider,
                 "status": "missing_credentials",
-                "required_env": "API_FOOTBALL_KEY",
+                "required_env": _required_env(request.provider),
                 "teams_read": 0,
                 "matched_count": 0,
                 "ambiguous_count": 0,
@@ -60,7 +64,10 @@ class ExternalContextProbeService:
             minimum_history=request.minimum_history,
         )
         teams = _unique_unmatched_teams(audit["unmatched_teams"], limit=request.limit)
-        probed = [self._probe_team(team, request) for team in teams]
+        probed = [
+            self._probe_team(team, request, context_provider=context_provider)
+            for team in teams
+        ]
         return {
             "provider": request.provider,
             "status": "completed",
@@ -79,11 +86,17 @@ class ExternalContextProbeService:
             "teams": probed,
         }
 
-    def _probe_team(self, team: dict, request: ExternalContextProbeRequest) -> dict:
+    def _probe_team(
+        self,
+        team: dict,
+        request: ExternalContextProbeRequest,
+        *,
+        context_provider,
+    ) -> dict:
         query_variants = _query_variants(str(team["team"]))[: request.max_query_variants]
         candidates: list[dict] = []
         for query in query_variants:
-            provider_candidates = self.api_football_provider.search_teams(query)
+            provider_candidates = context_provider.search_teams(query)
             candidates.extend(
                 self._candidate_payload(candidate, query, team)
                 for candidate in provider_candidates
@@ -91,7 +104,7 @@ class ExternalContextProbeService:
             )
 
         deduped = _dedupe_candidates(candidates)
-        self._attach_history_counts(deduped, request)
+        self._attach_history_counts(deduped, request, context_provider=context_provider)
         strong_with_history = [
             candidate
             for candidate in deduped
@@ -137,6 +150,8 @@ class ExternalContextProbeService:
         self,
         candidates: list[dict],
         request: ExternalContextProbeRequest,
+        *,
+        context_provider,
     ) -> None:
         eligible = [
             candidate
@@ -144,12 +159,19 @@ class ExternalContextProbeService:
             if float(candidate["match_score"]) >= request.minimum_history_candidate_score
         ][: max(0, request.max_history_candidates_per_team)]
         for candidate in eligible:
-            fixture_count = self.api_football_provider.recent_fixture_count(
+            fixture_count = context_provider.recent_fixture_count(
                 team_id=int(candidate["provider_team_id"]),
                 last=request.history_sample_size,
             )
             candidate["recent_fixture_count"] = fixture_count
             candidate["has_minimum_history"] = fixture_count >= request.minimum_history
+
+    def _context_provider(self, provider: str):
+        if provider == "api-football":
+            return self.api_football_provider
+        if provider == "sportmonks":
+            return self.sportmonks_provider
+        return None
 
 
 def _unique_unmatched_teams(items: list[dict], *, limit: int) -> list[dict]:
@@ -164,6 +186,12 @@ def _unique_unmatched_teams(items: list[dict], *, limit: int) -> list[dict]:
         if len(teams) >= max(1, min(limit, 100)):
             break
     return teams
+
+
+def _required_env(provider: str) -> str:
+    if provider == "sportmonks":
+        return "SPORTMONKS_API_TOKEN"
+    return "API_FOOTBALL_KEY"
 
 
 def _query_variants(team: str) -> list[str]:

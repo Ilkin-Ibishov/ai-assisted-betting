@@ -30,6 +30,8 @@ class Settings:
     snapshot_ingest_token: str = ""
     api_football_key: str = ""
     api_football_base_url: str = "https://v3.football.api-sports.io"
+    sportmonks_api_token: str = ""
+    sportmonks_base_url: str = "https://api.sportmonks.com/v3/football"
     cors_allowed_origins: tuple[str, ...] = (
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -84,6 +86,11 @@ def load_settings() -> Settings:
         api_football_base_url=getenv(
             "API_FOOTBALL_BASE_URL",
             "https://v3.football.api-sports.io",
+        ),
+        sportmonks_api_token=getenv("SPORTMONKS_API_TOKEN", ""),
+        sportmonks_base_url=getenv(
+            "SPORTMONKS_BASE_URL",
+            "https://api.sportmonks.com/v3/football",
         ),
         cors_allowed_origins=_get_csv(
             "CORS_ALLOWED_ORIGINS",

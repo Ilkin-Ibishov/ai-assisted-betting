@@ -8,6 +8,7 @@ from app.config import load_settings
 from app.db.engine import create_engine_from_url
 from app.db.migrations import init_db as run_init_db
 from app.providers.api_football_provider import ApiFootballProvider
+from app.providers.sportmonks_provider import SportmonksProvider
 from app.services.ai_analysis_service import AIAnalysisService
 from app.services.analysis_service import ComparisonAnalysisError, ComparisonAnalysisService
 from app.services.api_football_context_import_service import (
@@ -488,15 +489,22 @@ def probe_external_context(
     settings = load_settings()
     engine = create_engine_from_url(settings.database_url)
     api_football = None
+    sportmonks = None
     if provider == "api-football" and settings.api_football_key:
         api_football = ApiFootballProvider(
             api_key=settings.api_football_key,
             base_url=settings.api_football_base_url,
         )
+    if provider == "sportmonks" and settings.sportmonks_api_token:
+        sportmonks = SportmonksProvider(
+            api_token=settings.sportmonks_api_token,
+            base_url=settings.sportmonks_base_url,
+        )
     try:
         report = ExternalContextProbeService(
             engine,
             api_football_provider=api_football,
+            sportmonks_provider=sportmonks,
         ).probe(
             ExternalContextProbeRequest(
                 provider=provider,

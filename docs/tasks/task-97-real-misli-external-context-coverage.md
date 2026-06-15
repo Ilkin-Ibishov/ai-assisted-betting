@@ -20,6 +20,14 @@ Reason:
 - Team search and fixture-history endpoints are available behind an API key.
 - Free/low-cost plans make coverage validation cheap before deeper integration.
 
+Second probe target: Sportmonks Football API.
+
+Reason:
+
+- API-Football did not cover the current Misli low-tier/reserve slate after waiting nearly a day.
+- Sportmonks exposes team search and team fixture endpoints that can support the same coverage probe shape.
+- Official Sportmonks free-plan coverage is limited, so a representative coverage proof needs a token/plan that includes the target leagues before importing anything.
+
 ## Implementation Notes
 
 - Added an API-Football provider client using `API_FOOTBALL_KEY`.
@@ -41,6 +49,10 @@ Reason:
   - Writes completed history under source `api_football_context`, with provider IDs/raw payload preserved.
   - Does not create predictions, recommendations, paper bets, or threshold changes.
 - Feature provenance now labels API-Football-sourced history as `external_context:api_football`.
+- Added probe-only Sportmonks provider support:
+  - CLI/admin probe can use `provider=sportmonks`.
+  - Requires `SPORTMONKS_API_TOKEN`.
+  - No Sportmonks importer exists yet; import remains blocked until coverage is proven.
 - No predictions, recommendations, paper bets, or thresholds are changed by this task. The importer is explicit and dry-run by default.
 
 ## Live Probe Findings
@@ -70,7 +82,7 @@ Sampled from production public audit on 2026-06-14:
 Latest local result:
 
 ```text
-321 passed
+327 passed
 All checks passed!
 ```
 
@@ -94,4 +106,4 @@ required_env=API_FOOTBALL_KEY
 - Use small probe limits on the free plan; a full team probe can consume the daily quota quickly.
 - Start with dry-run imports and compare `/api/live/enrichment-audit` before/after any `dry_run=false` import.
 - If dry-run imports improve coverage, run the importer with `dry_run=false` for a small limit and regenerate features in the next worker cycle.
-- If coverage is weak or ambiguous, evaluate Sportmonks as the next provider.
+- Configure `SPORTMONKS_API_TOKEN`, run `probe-external-context --provider sportmonks --limit 10`, and compare coverage against API-Football before building any Sportmonks importer.

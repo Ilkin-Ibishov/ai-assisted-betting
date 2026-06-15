@@ -1134,6 +1134,26 @@ def test_admin_external_context_probe_accepts_json_body_options(
     assert response.json()["provider"] == "unsupported-test-provider"
 
 
+def test_admin_external_context_probe_reports_missing_sportmonks_token(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SNAPSHOT_INGEST_TOKEN", "test-token")
+    monkeypatch.delenv("SPORTMONKS_API_TOKEN", raising=False)
+    database_url = _create_live_api_database(tmp_path)
+    client = TestClient(create_api(reports_dir=tmp_path / "reports", database_url=database_url))
+
+    response = client.post(
+        "/api/admin/external-context/probe",
+        headers={"Authorization": "Bearer test-token"},
+        json={"provider": "sportmonks", "limit": 1},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "missing_credentials"
+    assert response.json()["required_env"] == "SPORTMONKS_API_TOKEN"
+
+
 def test_admin_external_context_import_requires_token_and_reports_missing_credentials(
     tmp_path: Path,
     monkeypatch,

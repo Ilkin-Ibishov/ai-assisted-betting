@@ -2,6 +2,7 @@ from app.db.engine import create_engine_from_url, session_scope
 from app.db.models import Base
 from app.db.repositories import MatchRepository
 from app.providers.api_football_provider import ApiFootballTeamCandidate
+from app.providers.sportmonks_provider import SportmonksTeamCandidate
 from app.services.external_context_probe_service import (
     ExternalContextProbeRequest,
     ExternalContextProbeService,
@@ -16,6 +17,51 @@ def test_external_context_probe_reports_missing_api_football_credentials(tmp_pat
     assert report["status"] == "missing_credentials"
     assert report["required_env"] == "API_FOOTBALL_KEY"
     assert report["teams_read"] == 0
+    engine.dispose()
+
+
+def test_external_context_probe_reports_missing_sportmonks_credentials(tmp_path) -> None:
+    engine = _engine(tmp_path)
+
+    report = ExternalContextProbeService(engine).probe(
+        ExternalContextProbeRequest(provider="sportmonks")
+    )
+
+    assert report["status"] == "missing_credentials"
+    assert report["required_env"] == "SPORTMONKS_API_TOKEN"
+    assert report["teams_read"] == 0
+    engine.dispose()
+
+
+def test_external_context_probe_can_use_sportmonks_provider(tmp_path) -> None:
+    engine = _engine(tmp_path)
+    _seed_unmatched_misli_match(engine, home_team="Real Noroeste ES", away_team="Other Team")
+    provider = _FakeSportmonksProvider(
+        search_results={
+            "Real Noroeste ES": [],
+            "Real Noroeste": [
+                SportmonksTeamCandidate(
+                    provider_team_id=909,
+                    name="Real Noroeste",
+                    country="Brazil",
+                    founded=None,
+                    venue_name=None,
+                )
+            ],
+        },
+        fixture_counts={909: 3},
+    )
+
+    report = ExternalContextProbeService(
+        engine,
+        sportmonks_provider=provider,
+    ).probe(ExternalContextProbeRequest(provider="sportmonks", limit=1, minimum_history=3))
+
+    assert report["provider"] == "sportmonks"
+    assert report["matched_count"] == 1
+    assert report["teams"][0]["match_status"] == "matched"
+    assert provider.search_queries == ["Real Noroeste ES", "Real Noroeste"]
+    assert provider.fixture_team_ids == [909]
     engine.dispose()
 
 
@@ -343,6 +389,27 @@ class _FakeApiFootballProvider:
         self.fixture_team_ids: list[int] = []
 
     def search_teams(self, query: str) -> list[ApiFootballTeamCandidate]:
+        self.search_queries.append(query)
+        return self.search_results.get(query, [])
+
+    def recent_fixture_count(self, *, team_id: int, last: int = 5) -> int:
+        self.fixture_team_ids.append(team_id)
+        return min(self.fixture_counts.get(team_id, 0), last)
+
+
+class _FakeSportmonksProvider:
+    def __init__(
+        self,
+        *,
+        search_results: dict[str, list[SportmonksTeamCandidate]],
+        fixture_counts: dict[int, int],
+    ) -> None:
+        self.search_results = search_results
+        self.fixture_counts = fixture_counts
+        self.search_queries: list[str] = []
+        self.fixture_team_ids: list[int] = []
+
+    def search_teams(self, query: str) -> list[SportmonksTeamCandidate]:
         self.search_queries.append(query)
         return self.search_results.get(query, [])
 

@@ -48,6 +48,16 @@ def test_api_football_settings_load_from_environment(monkeypatch) -> None:
     assert settings.api_football_base_url == "https://example.test"
 
 
+def test_sportmonks_settings_load_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SPORTMONKS_API_TOKEN", "test-sportmonks-token")
+    monkeypatch.setenv("SPORTMONKS_BASE_URL", "https://sportmonks.example.test")
+
+    settings = load_settings()
+
+    assert settings.sportmonks_api_token == "test-sportmonks-token"
+    assert settings.sportmonks_base_url == "https://sportmonks.example.test"
+
+
 def test_product_timezone_loads_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("PRODUCT_TIMEZONE", "UTC")
 
